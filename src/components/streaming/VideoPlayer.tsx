@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
 
-interface VideoPlayerProps {
+export interface VideoPlayerProps {
   streamUrl?: string;
   isLive?: boolean;
   isPaused?: boolean;
@@ -16,6 +16,7 @@ interface VideoPlayerProps {
   onPause?: () => void;
   onResume?: () => void;
   onMute?: () => void;
+  fill?: boolean;
   className?: string;
 }
 
@@ -29,6 +30,7 @@ export function VideoPlayer({
   onPause,
   onResume,
   onMute,
+  fill = false,
   className,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,7 +106,11 @@ export function VideoPlayer({
   return (
     <div
       ref={containerRef}
-      className={cn("relative w-full aspect-video bg-black rounded-xl overflow-hidden group", className)}
+      className={cn(
+        "relative w-full bg-black overflow-hidden group",
+        fill ? "h-full" : "aspect-video rounded-xl",
+        className,
+      )}
     >
       {usesVideo && playbackUrl && (
         <>

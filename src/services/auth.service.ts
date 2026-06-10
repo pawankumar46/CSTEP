@@ -1,4 +1,5 @@
 import axios from "axios";
+import { apiClient } from "@/lib/api-client";
 import {
   extractApiErrorFromData,
   extractApiErrorMessage,
@@ -12,15 +13,9 @@ import {
 } from "@/lib/auth-mappers";
 import type { AuthResponse, LoginCredentials, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
-const authApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ,
-  headers: { "Content-Type": "application/json" },
-  timeout: 30000,
-});
-
 async function fetchCurrentUser(token: string, fallbackEmail?: string): Promise<User | null> {
   try {
-    const { data } = await authApi.get<Record<string, unknown>>("/auth/me/", {
+    const { data } = await apiClient.get<Record<string, unknown>>("/auth/me/", {
       headers: { Authorization: `Bearer ${token}` },
     });
     return mapApiUser(data, fallbackEmail);
@@ -34,7 +29,7 @@ async function fetchCurrentUser(token: string, fallbackEmail?: string): Promise<
 
 export const signUp = async (data: SignupCredentials): Promise<{ success: boolean }> => {
   try {
-    await authApi.post("/auth/sign_up/", toSignupPayload(data));
+    await apiClient.post("/auth/sign_up/", toSignupPayload(data));
     return { success: true };
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
@@ -45,7 +40,7 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
   const identifier = normalizeAuthIdentifier(credentials.identifier);
 
   try {
-    const { data } = await authApi.post<Record<string, unknown>>(
+    const { data } = await apiClient.post<Record<string, unknown>>(
       "/auth/login/",
       toLoginPayload(identifier, credentials.password)
     );
@@ -83,7 +78,7 @@ export const verifyOtp = async (payload: VerifyOtpPayload): Promise<{ success: b
   }
 
   try {
-    await authApi.post(
+    await apiClient.post(
       "/auth/verify-otp/",
       toVerifyOtpPayload(payload.method, payload.otp, contact)
     );
@@ -95,7 +90,7 @@ export const verifyOtp = async (payload: VerifyOtpPayload): Promise<{ success: b
 
 export const forgotPassword = async (email: string): Promise<{ success: boolean }> => {
   try {
-    await authApi.post("/auth/forgot_password/", { email: normalizeAuthIdentifier(email) });
+    await apiClient.post("/auth/forgot_password/", { email: normalizeAuthIdentifier(email) });
     return { success: true };
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
@@ -125,7 +120,7 @@ export const logout = async (refreshToken?: string | null, accessToken?: string 
       if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`;
       }
-      await authApi.post("/auth/logout/", { refresh: refreshToken }, { headers });
+      await apiClient.post("/auth/logout/", { refresh: refreshToken }, { headers });
     } catch {
       // Clear local session even when server logout fails
     }

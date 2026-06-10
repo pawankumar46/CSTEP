@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -47,6 +48,7 @@ export default function EventRegisterPage() {
 }
 
 function EventRegisterForm() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { events, isLoading: eventsLoading, fetchEvents } = useEventStore();
   const [step, setStep] = useState(0);
@@ -134,7 +136,7 @@ function EventRegisterForm() {
     } catch (err) {
       if (err instanceof AlreadyRegisteredError) {
         setAlreadyRegistered(true);
-        setSubmitted(true);
+        router.replace("/");
       }
     }
   };

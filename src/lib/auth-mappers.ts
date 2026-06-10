@@ -135,7 +135,14 @@ export function extractApiErrorMessage(error: unknown): string {
       if (message) return message;
     }
 
-    if (typeof data === "string" && data) return data;
+    if (typeof data === "string" && data) {
+      if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {
+        return error.response?.status === 404
+          ? "API endpoint not found. Please check NEXT_PUBLIC_API_URL."
+          : "Unable to reach the server. Please try again.";
+      }
+      return data;
+    }
     if (error.message && !error.message.startsWith("Request failed with status")) {
       return error.message;
     }

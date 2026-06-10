@@ -7,7 +7,7 @@ import {
   Pause, Play, VolumeX, Share2, Heart, ThumbsUp, HandMetal,
   Send, Users, ArrowLeft,
 } from "lucide-react";
-import { VideoPlayer } from "@/components/streaming/VideoPlayer";
+import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,12 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useMinRole } from "@/hooks/useRoleGuard";
 import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
 import { mockChatMessages } from "@/mock/feedback";
-import { APP_NAME, LIVE_STREAM_URL } from "@/lib/constants";
+import {
+  APP_NAME,
+  LIVE_STREAM_URL,
+  STREAM_LEFT_BANNER_URL,
+  STREAM_RIGHT_BANNER_URL,
+} from "@/lib/constants";
 import { isStaffRole } from "@/lib/auth-utils";
 import { UserInitials } from "@/components/shared/UserInitials";
 
@@ -88,13 +93,17 @@ export default function StreamingPage() {
       <div className="container mx-auto px-4 py-6">
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
-            <VideoPlayer
+            <StreamPlayerFrame
               streamUrl={LIVE_STREAM_URL}
               isLive
               isPaused={isPaused}
               isMuted={isMuted}
               thumbnailUrl={event.imageUrl}
               title={event.name}
+              leftBannerUrl={STREAM_LEFT_BANNER_URL}
+              rightBannerUrl={STREAM_RIGHT_BANNER_URL}
+              leftBannerAlt={`${event.name} left banner`}
+              rightBannerAlt={`${event.name} right banner`}
               onPause={() => setIsPaused(true)}
               onResume={() => setIsPaused(false)}
               onMute={() => setIsMuted(!isMuted)}

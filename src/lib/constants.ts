@@ -5,6 +5,9 @@ export const APP_SHORT_NAME = "CS";
 export const APP_DESCRIPTION =
   "CSTEP event management platform for registration, live streaming, and delegate coordination";
 
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://cstep-django.vercel.app";
+
 export const FEATURED_EVENT = {
   name: "CSTEP Annual Conference 2025",
   dates: "21st – 22nd August 2025",
@@ -19,6 +22,15 @@ export const LIVE_STREAM_URL =
 /** Direct Google Drive file ID for C1581.mp4 (used when folder resolution fails). */
 export const LIVE_STREAM_FILE_ID =
   process.env.NEXT_PUBLIC_LIVE_STREAM_FILE_ID ?? "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
+
+/** Vertical side banners shown beside the live stream (hidden in fullscreen). */
+export const STREAM_LEFT_BANNER_URL =
+  process.env.NEXT_PUBLIC_STREAM_LEFT_BANNER_URL ??
+  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=200&h=1200&fit=crop&q=80";
+
+export const STREAM_RIGHT_BANNER_URL =
+  process.env.NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL ??
+  "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=200&h=1200&fit=crop&q=80";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   base_user: "Base User",

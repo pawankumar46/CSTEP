@@ -13,15 +13,23 @@ import type {
   TravelType,
 } from "@/types";
 
+const DUPLICATE_REGISTRATION_PATTERNS = [
+  "user, event must make a unique set",
+  "you have already registered for this event",
+];
+
+function isDuplicateRegistrationMessage(message: unknown): boolean {
+  const normalized = String(message).toLowerCase();
+  return DUPLICATE_REGISTRATION_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
 function hasDuplicateRegistrationMessage(data: unknown): boolean {
   if (!data || typeof data !== "object") return false;
 
   const errors = (data as Record<string, unknown>).non_field_errors;
   if (!Array.isArray(errors)) return false;
 
-  return errors.some((message) =>
-    String(message).toLowerCase().includes("user, event must make a unique set")
-  );
+  return errors.some(isDuplicateRegistrationMessage);
 }
 
 export function isDuplicateRegistrationError(error: unknown): boolean {
@@ -30,7 +38,7 @@ export function isDuplicateRegistrationError(error: unknown): boolean {
   }
 
   if (error instanceof Error) {
-    return error.message.toLowerCase().includes("user, event must make a unique set");
+    return isDuplicateRegistrationMessage(error.message);
   }
 
   return false;
