@@ -1,0 +1,217 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import {
+  Pause, Play, VolumeX, Share2, Heart, ThumbsUp, HandMetal,
+  Send, Users, ArrowLeft,
+} from "lucide-react";
+import { VideoPlayer } from "@/components/streaming/VideoPlayer";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useMinRole } from "@/hooks/useRoleGuard";
+import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
+import { mockChatMessages } from "@/mock/feedback";
+import { APP_NAME, LIVE_STREAM_URL } from "@/lib/constants";
+import { isStaffRole } from "@/lib/auth-utils";
+import { UserInitials } from "@/components/shared/UserInitials";
+
+const REACTIONS = [
+  { icon: ThumbsUp, label: "Like", emoji: "👍" },
+  { icon: Heart, label: "Love", emoji: "❤️" },
+  { icon: HandMetal, label: "Clap", emoji: "👏" },
+];
+
+export default function StreamingPage() {
+  const user = useAuthStore((s) => s.user);
+  const isModerator = useMinRole("moderator");
+  const event = mockEvents.find((e) => e.status === "live") || mockEvents[2];
+
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [viewerCount, setViewerCount] = useState(2890);
+  const [chatMessages, setChatMessages] = useState(mockChatMessages);
+  const [newMessage, setNewMessage] = useState("");
+  const [reactions, setReactions] = useState<Record<string, number>>({ "👍": 42, "❤️": 28, "👏": 15 });
+
+  const sendMessage = () => {
+    if (!newMessage.trim()) return;
+    setChatMessages([
+      ...chatMessages,
+      {
+        id: `chat-${Date.now()}`,
+        userId: user?.id || "guest",
+        userName: user ? `${user.firstName} ${user.lastName}` : "Guest",
+        message: newMessage,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+    setNewMessage("");
+  };
+
+  const addReaction = (emoji: string) => {
+    setReactions((prev) => ({ ...prev, [emoji]: (prev[emoji] || 0) + 1 }));
+  };
+
+  const shareLink = () => {
+    navigator.clipboard?.writeText(window.location.href);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={user && isStaffRole(user.role) ? "/dashboard" : "/"}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              {user && isStaffRole(user.role) ? "Dashboard" : "Home"}
+            </Link>
+          </Button>
+          <Separator orientation="vertical" className="h-6" />
+          <span className="font-semibold">{APP_NAME} Live</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="success" className="gap-1">
+            <Users className="h-3 w-3" />
+            {viewerCount.toLocaleString()} watching
+          </Badge>
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <VideoPlayer
+              streamUrl={LIVE_STREAM_URL}
+              isLive
+              isPaused={isPaused}
+              isMuted={isMuted}
+              thumbnailUrl={event.imageUrl}
+              title={event.name}
+              onPause={() => setIsPaused(true)}
+              onResume={() => setIsPaused(false)}
+              onMute={() => setIsMuted(!isMuted)}
+            />
+
+            {isModerator && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Moderator Controls</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={isPaused ? "default" : "outline"} onClick={() => setIsPaused(!isPaused)}>
+                    {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
+                    {isPaused ? "Resume Stream" : "Pause Stream"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsMuted(!isMuted)}>
+                    <VolumeX className="h-4 w-4 mr-1" />
+                    {isMuted ? "Unmute" : "Mute Stream"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={shareLink}>
+                    <Share2 className="h-4 w-4 mr-1" /> Share Link
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  Live Chat
+                  <div className="flex gap-2">
+                    {REACTIONS.map((r) => (
+                      <Button key={r.label} size="sm" variant="ghost" className="h-7 px-2" onClick={() => addReaction(r.emoji)}>
+                        {r.emoji} {reactions[r.emoji] || 0}
+                      </Button>
+                    ))}
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="h-48 overflow-y-auto space-y-2 pr-2">
+                  {chatMessages.map((msg) => (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-sm"
+                    >
+                      <span className="font-medium text-primary">{msg.userName}: </span>
+                      <span>{msg.message}</span>
+                    </motion.div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                  />
+                  <Button size="icon" onClick={sendMessage}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Event Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <h3 className="font-semibold">{event.name}</h3>
+                <p className="text-muted-foreground">{event.description.slice(0, 150)}...</p>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Badge variant="success">Live</Badge>
+                  <span>{event.location}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Current Speaker</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <UserInitials name={mockSpeakers[0].name} size="lg" />
+                  <div>
+                    <p className="font-medium">{mockSpeakers[0].name}</p>
+                    <p className="text-xs text-muted-foreground">{mockSpeakers[0].title}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Event Agenda</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {mockSchedule.slice(0, 4).map((item) => (
+                  <div key={item.id} className="flex gap-3 text-sm">
+                    <span className="text-xs text-primary font-mono w-16 shrink-0">{item.time}</span>
+                    <div>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">{item.speaker}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,295 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Plus, Loader2 } from "lucide-react";
+import { EventCard } from "@/components/dashboard/EventCard";
+import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useEventStore } from "@/store/useEventStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { toLocalDateTimeInput } from "@/lib/event-mappers";
+import { Calendar } from "lucide-react";
+import type { Event } from "@/types";
+
+const defaultForm = {
+  title: "",
+  description: "",
+  scheduledStart: "",
+  scheduledEnd: "",
+  videoMutedByDefault: true,
+  pauseContinueEnabled: true,
+};
+
+type EventFormState = typeof defaultForm;
+
+function EventFormFields({
+  form,
+  setForm,
+  idPrefix,
+}: {
+  form: EventFormState;
+  setForm: (form: EventFormState) => void;
+  idPrefix: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Event Title</Label>
+        <Input
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          placeholder="CSTEP Demo Event"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Description</Label>
+        <Textarea
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Event description"
+        />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Scheduled Start</Label>
+          <Input
+            type="datetime-local"
+            value={form.scheduledStart}
+            onChange={(e) => setForm({ ...form, scheduledStart: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Scheduled End</Label>
+          <Input
+            type="datetime-local"
+            value={form.scheduledEnd}
+            onChange={(e) => setForm({ ...form, scheduledEnd: e.target.value })}
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`${idPrefix}-videoMuted`}
+            checked={form.videoMutedByDefault}
+            onCheckedChange={(checked) => setForm({ ...form, videoMutedByDefault: !!checked })}
+          />
+          <Label htmlFor={`${idPrefix}-videoMuted`} className="font-normal cursor-pointer">
+            Video muted by default
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`${idPrefix}-pauseContinue`}
+            checked={form.pauseContinueEnabled}
+            onCheckedChange={(checked) => setForm({ ...form, pauseContinueEnabled: !!checked })}
+          />
+          <Label htmlFor={`${idPrefix}-pauseContinue`} className="font-normal cursor-pointer">
+            Pause / continue enabled
+          </Label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function EventsPage() {
+  const { events, isLoading, error, fetchEvents, createEvent, updateEvent, deleteEvent } = useEventStore();
+  const user = useAuthStore((s) => s.user);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState(defaultForm);
+
+  const canManage = user?.role === "event_administrator" || user?.role === "super_administrator";
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  const isFormValid = form.title.trim() && form.scheduledStart && form.scheduledEnd;
+
+  const buildPayload = () => ({
+    title: form.title.trim(),
+    description: form.description.trim(),
+    scheduledStart: form.scheduledStart,
+    scheduledEnd: form.scheduledEnd,
+    videoMutedByDefault: form.videoMutedByDefault,
+    pauseContinueEnabled: form.pauseContinueEnabled,
+  });
+
+  const handleCreate = async () => {
+    if (!isFormValid) return;
+
+    setIsSubmitting(true);
+    try {
+      await createEvent(buildPayload());
+      setCreateOpen(false);
+      setForm(defaultForm);
+    } catch {
+      // error handled in store
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openEdit = (event: Event) => {
+    setEditingId(event.id);
+    setForm({
+      title: event.name,
+      description: event.description,
+      scheduledStart: toLocalDateTimeInput(event.date),
+      scheduledEnd: toLocalDateTimeInput(event.endDate ?? event.date),
+      videoMutedByDefault: true,
+      pauseContinueEnabled: true,
+    });
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingId || !isFormValid) return;
+
+    setIsSubmitting(true);
+    try {
+      await updateEvent(editingId, buildPayload());
+      setEditOpen(false);
+      setEditingId(null);
+      setForm(defaultForm);
+    } catch {
+      // error handled in store
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openDelete = (id: string) => {
+    const event = events.find((item) => item.id === id);
+    if (event) {
+      setDeletingEvent(event);
+      setDeleteOpen(true);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingEvent) return;
+
+    setIsSubmitting(true);
+    try {
+      await deleteEvent(deletingEvent.id);
+      setDeleteOpen(false);
+      setDeletingEvent(null);
+    } catch {
+      // error handled in store
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading && events.length === 0) return <DashboardSkeleton />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Events</h1>
+          <p className="text-muted-foreground">Browse and manage events</p>
+        </div>
+        {canManage && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Create Event
+          </Button>
+        )}
+      </div>
+
+      {error && (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
+
+      {events.length === 0 ? (
+        <EmptyState
+          icon={Calendar}
+          title="No events"
+          description="Create your first event to get started."
+          action={canManage ? { label: "Create Event", onClick: () => setCreateOpen(true) } : undefined}
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {events.map((event) => (
+            <EventCard
+              key={event.id}
+              event={event}
+              showActions={canManage}
+              onEdit={() => openEdit(event)}
+              onDelete={openDelete}
+            />
+          ))}
+        </div>
+      )}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Event</DialogTitle>
+          </DialogHeader>
+          <EventFormFields form={form} setForm={setForm} idPrefix="create" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={isSubmitting || !isFormValid}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+          </DialogHeader>
+          <EventFormFields form={form} setForm={setForm} idPrefix="edit" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={isSubmitting || !isFormValid}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Event</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{deletingEvent?.name}&quot;? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

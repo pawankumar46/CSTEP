@@ -1,0 +1,89 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const DEFAULT_FILE_ID = "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
+const resolvedUrlCache = new Map<string, string>();
+
+async function resolveDriveStreamUrl(fileId: string): Promise<string> {
+  const cached = resolvedUrlCache.get(fileId);
+  if (cached) {
+    return cached;
+  }
+
+  const initialUrl = `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download`;
+  const initial = await fetch(initialUrl, { redirect: "follow" });
+  const contentType = initial.headers.get("content-type") ?? "";
+
+  if (contentType.includes("video/")) {
+    resolvedUrlCache.set(fileId, initialUrl);
+    return initialUrl;
+  }
+
+  if (!contentType.includes("text/html")) {
+    resolvedUrlCache.set(fileId, initialUrl);
+    return initialUrl;
+  }
+
+  const html = await initial.text();
+  const uuid = html.match(/name="uuid"\s+value="([^"]+)"/)?.[1];
+  const id = html.match(/name="id"\s+value="([^"]+)"/)?.[1] ?? fileId;
+
+  const streamUrl = uuid
+    ? `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t&uuid=${encodeURIComponent(uuid)}`
+    : `https://drive.google.com/uc?export=download&confirm=t&id=${encodeURIComponent(fileId)}`;
+
+  resolvedUrlCache.set(fileId, streamUrl);
+  return streamUrl;
+}
+
+export async function GET(request: NextRequest) {
+  const fileId = request.nextUrl.searchParams.get("fileId") ?? DEFAULT_FILE_ID;
+  const range = request.headers.get("range");
+
+  try {
+    const streamUrl = await resolveDriveStreamUrl(fileId);
+    const upstreamHeaders: HeadersInit = {};
+    if (range) {
+      upstreamHeaders.Range = range;
+    }
+
+    const upstream = await fetch(streamUrl, {
+      headers: upstreamHeaders,
+      redirect: "follow",
+    });
+
+    if (!upstream.ok) {
+      return NextResponse.json({ error: "Failed to load video stream" }, { status: upstream.status });
+    }
+
+    const upstreamType = upstream.headers.get("content-type") ?? "";
+    if (upstreamType.includes("text/html")) {
+      resolvedUrlCache.delete(fileId);
+      return NextResponse.json({ error: "Stream URL expired" }, { status: 502 });
+    }
+
+    const responseHeaders = new Headers();
+    const passThrough = ["content-type", "content-length", "content-range", "accept-ranges"];
+    for (const key of passThrough) {
+      const value = upstream.headers.get(key);
+      if (value) {
+        responseHeaders.set(key, value);
+      }
+    }
+
+    if (!responseHeaders.has("content-type")) {
+      responseHeaders.set("content-type", "video/mp4");
+    }
+    if (!responseHeaders.has("accept-ranges")) {
+      responseHeaders.set("accept-ranges", "bytes");
+    }
+
+    responseHeaders.set("cache-control", "public, max-age=3600");
+
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: responseHeaders,
+    });
+  } catch {
+    return NextResponse.json({ error: "Failed to load video stream" }, { status: 500 });
+  }
+}
