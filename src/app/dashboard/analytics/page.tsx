@@ -97,7 +97,7 @@ function AnalyticsContent() {
             </ChartContainer>
           </ChartCard>
 
-          <ChartCard title="Participation by Week" compact>
+          <ChartCard title="Registration Week on Week " compact>
             <ChartContainer height={168}>
               <BarChart data={analytics.participationTrend} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/60" />
