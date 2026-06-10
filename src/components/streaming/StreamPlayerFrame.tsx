@@ -20,7 +20,11 @@ function StreamBanner({
 }) {
   return (
     <aside className="relative hidden md:block h-full min-h-0 overflow-hidden bg-muted" aria-hidden>
-      <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover object-center" />
+      <img
+        src={src}
+        alt={alt}
+        className="absolute inset-0 h-full w-full scale-110 object-cover object-center blur-md"
+      />
     </aside>
   );
 }

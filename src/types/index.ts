@@ -55,6 +55,7 @@ export type RegistrationStatus = "pending" | "accepted" | "rejected" | "on_hold"
 
 export type ParticipationDate = "21st" | "22nd" | "both_days" | (string & {});
 export type ParticipationTime = "half_day" | "full_day";
+export type AttendanceMode = "physical" | "virtual";
 export type FoodPreference =
   | "veg"
   | "jain"
@@ -115,6 +116,7 @@ export interface Registration {
   participationDate: ParticipationDate;
   participationDateLabel?: string;
   participationTime: ParticipationTime;
+  attendanceMode: AttendanceMode;
   foodPreference: FoodPreference;
   travelRequired: boolean;
   travelType?: TravelType;
@@ -286,6 +288,7 @@ export interface RegistrationFormData {
   email: string;
   participationDate: ParticipationDate;
   participationTime: ParticipationTime;
+  attendanceMode: AttendanceMode;
   foodPreference: FoodPreference;
   travelRequired: boolean;
   travelType?: TravelType;

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { registrationSchema, REGISTRATION_STEPS, type RegistrationFormValues } from "@/features/registration/registration.schema";
 import {
+  ATTENDANCE_MODES,
   FOOD_PREFERENCES,
   MEDICAL_SUPPORT_TYPES,
   PARTICIPATION_TIMES,
@@ -65,7 +66,7 @@ function EventRegisterForm() {
     defaultValues: {
       eventId: "",
       salutation: "", firstName: "", middleName: "", lastName: "", phone: "", email: "",
-      participationDate: "", participationTime: "full_day", foodPreference: "veg",
+      participationDate: "", participationTime: "full_day", attendanceMode: "physical", foodPreference: "veg",
       travelRequired: false, medicalSupportRequired: false, translationRequired: false,
     },
   });
@@ -84,6 +85,7 @@ function EventRegisterForm() {
         email: user.email,
         participationDate: "",
         participationTime: "full_day",
+        attendanceMode: "physical",
         foodPreference: "veg",
         travelRequired: false,
         medicalSupportRequired: false,
@@ -299,6 +301,22 @@ function EventRegisterForm() {
                       </RadioGroup>
                     )} />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Attendance Mode</Label>
+                    <Controller name="attendanceMode" control={control} render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger><SelectValue placeholder="Select attendance mode" /></SelectTrigger>
+                        <SelectContent>
+                          {ATTENDANCE_MODES.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )} />
+                    {errors.attendanceMode && (
+                      <p className="text-xs text-destructive">{errors.attendanceMode.message}</p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -421,7 +439,9 @@ function EventRegisterForm() {
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">Participation</h4>
-                      <p>{getParticipationDateLabel(values.participationDate, selectedEvent)} · {getRegistrationOptionLabel(values.participationTime)}</p>
+                      <p>
+                        {getParticipationDateLabel(values.participationDate, selectedEvent)} · {getRegistrationOptionLabel(values.participationTime)} · {getRegistrationOptionLabel(values.attendanceMode)}
+                      </p>
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">Preferences</h4>

@@ -21,6 +21,7 @@ export const registrationSchema = z.object({
   email: z.string().email("Valid email is required"),
   participationDate: z.string().min(1, "Please select a participation date"),
   participationTime: z.enum(["half_day", "full_day"]),
+  attendanceMode: z.enum(["physical", "virtual"]),
   foodPreference: foodEnum,
   travelRequired: z.boolean(),
   travelType: z.enum(["flight_taxi_hotel", "taxi_hotel", "hotel_only", "taxi_only", "flight_only", "train_only"]).optional(),
@@ -44,7 +45,7 @@ export type RegistrationFormValues = z.infer<typeof registrationSchema>;
 export const REGISTRATION_STEPS = [
   { title: "Select Event", fields: ["eventId"] as const },
   { title: "Personal Info", fields: ["salutation", "firstName", "middleName", "lastName", "phone", "email"] as const },
-  { title: "Participation", fields: ["participationDate", "participationTime"] as const },
+  { title: "Participation", fields: ["participationDate", "participationTime", "attendanceMode"] as const },
   { title: "Food", fields: ["foodPreference"] as const },
   { title: "Travel", fields: ["travelRequired", "travelType"] as const },
   { title: "Medical", fields: ["medicalSupportRequired", "medicalSupportType"] as const },

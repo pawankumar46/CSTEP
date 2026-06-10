@@ -9,6 +9,11 @@ export const PARTICIPATION_TIMES = [
   { value: "full_day", label: "Full Day" },
 ] as const;
 
+export const ATTENDANCE_MODES = [
+  { value: "physical", label: "Physical (On-site)" },
+  { value: "virtual", label: "Virtual (Online)" },
+] as const;
+
 export const FOOD_PREFERENCES = [
   { value: "veg", label: "Vegetarian" },
   { value: "jain", label: "Jain" },
@@ -56,11 +61,13 @@ export const TRANSLATION_LANGUAGES = [
 
 export type ParticipationDateValue = (typeof PARTICIPATION_DATES)[number]["value"];
 export type ParticipationTimeValue = (typeof PARTICIPATION_TIMES)[number]["value"];
+export type AttendanceModeValue = (typeof ATTENDANCE_MODES)[number]["value"];
 export type FoodPreferenceValue = (typeof FOOD_PREFERENCES)[number]["value"];
 export type MedicalSupportValue = (typeof MEDICAL_SUPPORT_TYPES)[number]["value"];
 export type TranslationLanguageValue = (typeof TRANSLATION_LANGUAGES)[number]["value"];
 
 export const PARTICIPATION_DATE_VALUES = PARTICIPATION_DATES.map((o) => o.value);
+export const ATTENDANCE_MODE_VALUES = ATTENDANCE_MODES.map((o) => o.value);
 export const FOOD_PREFERENCE_VALUES = FOOD_PREFERENCES.map((o) => o.value);
 export const MEDICAL_SUPPORT_VALUES = MEDICAL_SUPPORT_TYPES.map((o) => o.value);
 export const TRANSLATION_LANGUAGE_VALUES = TRANSLATION_LANGUAGES.map((o) => o.value);
@@ -68,6 +75,7 @@ export const TRANSLATION_LANGUAGE_VALUES = TRANSLATION_LANGUAGES.map((o) => o.va
 export const REGISTRATION_OPTION_LABELS: Record<string, string> = Object.fromEntries([
   ...PARTICIPATION_DATES,
   ...PARTICIPATION_TIMES,
+  ...ATTENDANCE_MODES,
   ...FOOD_PREFERENCES,
   ...MEDICAL_SUPPORT_TYPES,
   ...TRANSLATION_LANGUAGES,

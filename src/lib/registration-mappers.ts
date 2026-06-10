@@ -4,6 +4,7 @@ import type { Event } from "@/types";
 import type {
   FoodPreference,
   MedicalSupportType,
+  AttendanceMode,
   ParticipationDate,
   ParticipationTime,
   Registration,
@@ -131,6 +132,11 @@ export function formatParticipationDateDisplay(value: unknown): string {
   return parsed.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function mapApiAttendanceMode(value: unknown): AttendanceMode {
+  const normalized = String(value ?? "PHYSICAL").toUpperCase();
+  return normalized === "VIRTUAL" ? "virtual" : "physical";
+}
+
 function mapApiFoodPreference(value: unknown): FoodPreference {
   const normalized = fromApiEnum(String(value ?? "VEG"));
   const allowed: FoodPreference[] = [
@@ -205,6 +211,7 @@ export function toRegistrationApiPayload(
   return {
     event: Number(data.eventId),
     participation_dates: resolveParticipationDatesForApi(data.participationDate, event),
+    attendance_mode: toApiEnum(data.attendanceMode),
     participation_time: data.participationTime === "full_day" ? "FULL_DAY" : "HALF_DAY",
     food_preference: toApiEnum(data.foodPreference),
     travel_arrangement: data.travelRequired && data.travelType
@@ -260,6 +267,7 @@ export function mapApiRegistrationToRegistration(
     participationDate,
     participationDateLabel,
     participationTime,
+    attendanceMode: mapApiAttendanceMode(raw.attendance_mode),
     foodPreference: mapApiFoodPreference(raw.food_preference),
     travelRequired: travelArrangement != null && travelArrangement !== "",
     travelType: travelKey && travelKey !== "SELF_ARRANGED" ? API_TRAVEL_TO_APP[travelKey] : undefined,

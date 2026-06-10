@@ -1,11 +1,13 @@
 import type {
   Registration,
   RegistrationStatus,
+  AttendanceMode,
   ParticipationDate,
   ParticipationTime,
   TravelType,
 } from "@/types";
 import {
+  ATTENDANCE_MODE_VALUES,
   PARTICIPATION_DATE_VALUES,
   FOOD_PREFERENCE_VALUES,
   MEDICAL_SUPPORT_VALUES,
@@ -38,6 +40,7 @@ function generateRegistrations(): Registration[] {
       phone: user.phone,
       participationDate: PARTICIPATION_DATE_VALUES[i % PARTICIPATION_DATE_VALUES.length] as ParticipationDate,
       participationTime: (i % 3 === 0 ? "full_day" : "half_day") as ParticipationTime,
+      attendanceMode: ATTENDANCE_MODE_VALUES[i % ATTENDANCE_MODE_VALUES.length] as AttendanceMode,
       foodPreference: FOOD_PREFERENCE_VALUES[i % FOOD_PREFERENCE_VALUES.length],
       travelRequired,
       travelType: travelRequired ? TRAVEL_TYPES[i % TRAVEL_TYPES.length] : undefined,

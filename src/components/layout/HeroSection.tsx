@@ -10,7 +10,6 @@ import { APP_NAME, FEATURED_EVENT } from "@/lib/constants";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
 import { getUserSummary } from "@/services/analytics.service";
-import { mockEvents } from "@/mock/events";
 
 const CONFERENCE_IMAGE =
   "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80";
@@ -21,7 +20,6 @@ export function HeroSection() {
   const { isRegistered, isAuthenticated } = useEventRegistration();
   const registerHref = getHomeRegisterHref(isAuthenticated, isRegistered);
   const registerLabel = getHomeRegisterLabel(isAuthenticated, isRegistered);
-  const fallbackCount = mockEvents[0].registeredCount;
   const [participantsRegistered, setParticipantsRegistered] = useState<number | null>(null);
 
   useEffect(() => {
@@ -29,8 +27,6 @@ export function HeroSection() {
       .then((summary) => setParticipantsRegistered(summary.eventParticipants))
       .catch(() => setParticipantsRegistered(null));
   }, []);
-
-  const registeredCount = participantsRegistered ?? fallbackCount;
 
   return (
     <section id="home" className="relative overflow-hidden pt-6 pb-12 lg:pt-8 lg:pb-16">
@@ -86,10 +82,12 @@ export function HeroSection() {
                 <MapPin className="h-4 w-4 text-primary" />
                 {FEATURED_EVENT.location}
               </span>
-              <span className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-primary" />
-                {registeredCount.toLocaleString()} registered
-              </span>
+              {participantsRegistered !== null && (
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-primary" />
+                  {participantsRegistered.toLocaleString()} registered
+                </span>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-3 pt-2">
