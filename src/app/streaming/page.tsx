@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -44,6 +44,14 @@ export default function StreamingPage() {
   const [chatMessages, setChatMessages] = useState(mockChatMessages);
   const [newMessage, setNewMessage] = useState("");
   const [reactions, setReactions] = useState<Record<string, number>>({ "👍": 42, "❤️": 28, "👏": 15 });
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const sendMessage = () => {
     if (!newMessage.trim()) return;
@@ -64,8 +72,15 @@ export default function StreamingPage() {
     setReactions((prev) => ({ ...prev, [emoji]: (prev[emoji] || 0) + 1 }));
   };
 
-  const shareLink = () => {
-    navigator.clipboard?.writeText(window.location.href);
+  const shareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      setLinkCopied(false);
+    }
   };
 
   return (
@@ -114,7 +129,7 @@ export default function StreamingPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">Moderator Controls</CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
+                <CardContent className="flex flex-wrap items-center gap-2">
                   <Button size="sm" variant={isPaused ? "default" : "outline"} onClick={() => setIsPaused(!isPaused)}>
                     {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
                     {isPaused ? "Resume Stream" : "Pause Stream"}
@@ -126,6 +141,9 @@ export default function StreamingPage() {
                   <Button size="sm" variant="outline" onClick={shareLink}>
                     <Share2 className="h-4 w-4 mr-1" /> Share Link
                   </Button>
+                  {linkCopied && (
+                    <span className="text-sm text-emerald-600 font-medium">Link copied!</span>
+                  )}
                 </CardContent>
               </Card>
             )}
