@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
+
+const BUFFERING_TIMEOUT_MS = 20000;
+const IFRAME_LOAD_TIMEOUT_MS = 20000;
 
 export interface VideoPlayerProps {
   streamUrl?: string;
@@ -39,20 +42,27 @@ export function VideoPlayer({
   const [iframeReady, setIframeReady] = useState(false);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
   const [isBuffering, setIsBuffering] = useState(true);
+  const [needsUserPlay, setNeedsUserPlay] = useState(false);
+  const [playbackError, setPlaybackError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!streamUrl) {
       setSource(null);
       setIframeReady(false);
       setUseIframeFallback(false);
+      setPlaybackError(false);
+      setNeedsUserPlay(false);
       return;
     }
 
     setIframeReady(false);
     setUseIframeFallback(false);
     setIsBuffering(true);
+    setPlaybackError(false);
+    setNeedsUserPlay(false);
     setSource(parseStreamUrl(streamUrl));
-  }, [streamUrl]);
+  }, [streamUrl, reloadKey]);
 
   const usesIframe =
     source?.type === "google-drive-file" && Boolean(source.embedUrl) && useIframeFallback;
@@ -61,6 +71,23 @@ export function VideoPlayer({
     (source?.type === "google-drive-file" && Boolean(source.directUrl) && !useIframeFallback);
 
   const playbackUrl = usesVideo ? source?.directUrl : undefined;
+
+  const tryPlayVideo = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return false;
+
+    video.muted = isMuted;
+    try {
+      await video.play();
+      setNeedsUserPlay(false);
+      setPlaybackError(false);
+      setIsBuffering(false);
+      return true;
+    } catch {
+      setNeedsUserPlay(true);
+      return false;
+    }
+  }, [isMuted]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -73,10 +100,45 @@ export function VideoPlayer({
       return;
     }
 
-    void video.play().catch(() => undefined);
-  }, [isPaused, isMuted, playbackUrl]);
+    void tryPlayVideo();
+  }, [isPaused, isMuted, playbackUrl, tryPlayVideo]);
 
-  const showThumbnail = !streamUrl || (!usesIframe && !usesVideo);
+  useEffect(() => {
+    if (!usesVideo || isPaused || !isBuffering || needsUserPlay || playbackError) return;
+
+    const timeout = window.setTimeout(() => {
+      if (source?.type === "google-drive-file" && source.embedUrl && !useIframeFallback) {
+        setUseIframeFallback(true);
+        setIsBuffering(true);
+        return;
+      }
+      setPlaybackError(true);
+      setIsBuffering(false);
+    }, BUFFERING_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    usesVideo,
+    isPaused,
+    isBuffering,
+    needsUserPlay,
+    playbackError,
+    source,
+    useIframeFallback,
+  ]);
+
+  useEffect(() => {
+    if (!usesIframe || iframeReady) return;
+
+    const timeout = window.setTimeout(() => {
+      setPlaybackError(true);
+      setIsBuffering(false);
+    }, IFRAME_LOAD_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [usesIframe, iframeReady]);
+
+  const showThumbnail = !streamUrl || playbackError || (!usesIframe && !usesVideo);
 
   const toggleFullscreen = () => {
     const container = containerRef.current;
@@ -88,20 +150,41 @@ export function VideoPlayer({
     }
   };
 
+  const handleUserPlay = async () => {
+    onResume?.();
+    const played = await tryPlayVideo();
+    if (!played && source?.type === "google-drive-file" && source.embedUrl) {
+      setUseIframeFallback(true);
+    }
+  };
+
+  const handleRetry = () => {
+    setReloadKey((key) => key + 1);
+  };
+
   const handleVideoCanPlay = () => {
-    setIsBuffering(false);
     const video = videoRef.current;
-    if (!video || isPaused) return;
-    video.muted = isMuted;
-    void video.play().catch(() => setUseIframeFallback(true));
+    if (!video || isPaused) {
+      setIsBuffering(false);
+      return;
+    }
+
+    void tryPlayVideo();
   };
 
   const handleVideoError = () => {
-    if (source?.type === "google-drive-file" && source.embedUrl) {
+    if (source?.type === "google-drive-file" && source.embedUrl && !useIframeFallback) {
       setUseIframeFallback(true);
-      setIsBuffering(false);
+      setIsBuffering(true);
+      setPlaybackError(false);
+      return;
     }
+
+    setPlaybackError(true);
+    setIsBuffering(false);
   };
+
+  const showPlayOverlay = usesVideo && (needsUserPlay || isPaused) && !playbackError;
 
   return (
     <div
@@ -112,16 +195,16 @@ export function VideoPlayer({
         className,
       )}
     >
-      {usesVideo && playbackUrl && (
+      {usesVideo && playbackUrl && !playbackError && (
         <>
-          {isBuffering && !isPaused && (
+          {isBuffering && !isPaused && !needsUserPlay && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black">
               <Loader2 className="h-10 w-10 animate-spin text-white" />
             </div>
           )}
           <video
             ref={videoRef}
-            key={playbackUrl}
+            key={`${playbackUrl}-${reloadKey}`}
             src={playbackUrl}
             className="absolute inset-0 h-full w-full object-contain bg-black"
             autoPlay
@@ -130,19 +213,32 @@ export function VideoPlayer({
             muted={isMuted}
             preload="auto"
             onCanPlay={handleVideoCanPlay}
-            onPlaying={() => setIsBuffering(false)}
+            onPlaying={() => {
+              setIsBuffering(false);
+              setNeedsUserPlay(false);
+            }}
             onWaiting={() => !isPaused && setIsBuffering(true)}
             onError={handleVideoError}
           />
-          {isPaused && (
-            <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/25 pointer-events-none">
-              <Pause className="h-16 w-16 text-white/80" />
-            </div>
+          {showPlayOverlay && (
+            <button
+              type="button"
+              className="absolute inset-0 z-[25] flex flex-col items-center justify-center gap-3 bg-black/40"
+              onClick={handleUserPlay}
+              aria-label={isPaused ? "Resume stream" : "Play stream"}
+            >
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+                <Play className="h-8 w-8 text-white fill-white" />
+              </span>
+              {needsUserPlay && !isPaused && (
+                <span className="text-sm text-white/90">Click to play live stream</span>
+              )}
+            </button>
           )}
         </>
       )}
 
-      {usesIframe && source?.embedUrl && (
+      {usesIframe && source?.embedUrl && !playbackError && (
         <>
           {!iframeReady && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black">
@@ -155,8 +251,12 @@ export function VideoPlayer({
               title={title}
               className="absolute left-0 top-0 w-full border-0"
               style={{ height: "calc(100% + 6rem)" }}
-              allow="autoplay; encrypted-media"
-              onLoad={() => setIframeReady(true)}
+              allow="autoplay; encrypted-media; fullscreen"
+              referrerPolicy="no-referrer-when-downgrade"
+              onLoad={() => {
+                setIframeReady(true);
+                setIsBuffering(false);
+              }}
             />
           </div>
           {!isPaused && (
@@ -166,22 +266,50 @@ export function VideoPlayer({
             />
           )}
           {isPaused && (
-            <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/25 pointer-events-none">
+            <button
+              type="button"
+              className="absolute inset-0 z-[25] flex items-center justify-center bg-black/40"
+              onClick={onResume}
+              aria-label="Resume stream"
+            >
               <Pause className="h-16 w-16 text-white/80" />
-            </div>
+            </button>
           )}
         </>
       )}
 
       {showThumbnail && (
-        <img
-          src={thumbnailUrl}
-          alt={title}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        <>
+          <img
+            src={thumbnailUrl}
+            alt={title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {playbackError && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-black/70 p-6 text-center">
+              <p className="text-sm text-white max-w-md">
+                Unable to start the live stream in this browser. This can happen due to network
+                restrictions, autoplay settings, or blocked video sources.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" variant="secondary" onClick={handleRetry}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+                {source?.embedUrl && (
+                  <Button size="sm" variant="outline" className="text-white border-white/40" asChild>
+                    <a href={source.embedUrl} target="_blank" rel="noopener noreferrer">
+                      Open in new tab
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {isLive && !isPaused && (usesVideo || (usesIframe && iframeReady)) && (
+      {isLive && !isPaused && !playbackError && (usesVideo || (usesIframe && iframeReady)) && (
         <div className="absolute top-4 left-4 z-10 flex items-center gap-2 pointer-events-none">
           <span className="flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
             <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
@@ -193,16 +321,21 @@ export function VideoPlayer({
       <div
         className={cn(
           "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",
-          usesIframe ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity",
+          usesIframe || playbackError ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity",
         )}
       >
         <div className="flex items-center justify-between gap-4">
           <p className="text-white text-sm font-medium truncate">{title}</p>
           <div className="flex items-center gap-2 shrink-0">
-            {(usesVideo || usesIframe) && (
+            {(usesVideo || usesIframe) && !playbackError && (
               <>
-                {isPaused ? (
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onResume}>
+                {isPaused || needsUserPlay ? (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-white hover:bg-white/20"
+                    onClick={needsUserPlay ? handleUserPlay : onResume}
+                  >
                     <Play className="h-4 w-4" />
                   </Button>
                 ) : (

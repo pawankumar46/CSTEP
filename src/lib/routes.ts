@@ -7,9 +7,15 @@ export const ROUTES = {
   streaming: "/streaming",
 } as const;
 
-export function getHomeRegisterHref(isAuthenticated: boolean, isEventRegistered: boolean): string {
+export function getHomeRegisterHref(
+  isAuthenticated: boolean,
+  isEventRegistered: boolean,
+  eventId?: string,
+): string {
   if (!isAuthenticated) return ROUTES.signup;
-  if (!isEventRegistered) return ROUTES.eventRegister;
+  if (!isEventRegistered) {
+    return eventId ? `${ROUTES.eventRegister}?event=${eventId}` : ROUTES.eventRegister;
+  }
   return ROUTES.home;
 }
 

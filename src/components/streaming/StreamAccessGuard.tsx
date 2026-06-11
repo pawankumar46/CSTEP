@@ -18,6 +18,7 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hasHydrated || isLoading) return;
+    if (isAuthenticated && !isStaff && !checked) return;
 
     if (!isAuthenticated) {
       router.replace(`${ROUTES.login}?redirect=${ROUTES.streaming}`);
@@ -27,9 +28,11 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
     if (needsRegistration) {
       router.replace(ROUTES.eventRegister);
     }
-  }, [hasHydrated, isLoading, isAuthenticated, needsRegistration, router]);
+  }, [hasHydrated, isLoading, isAuthenticated, isStaff, checked, needsRegistration, router]);
 
-  if (!hasHydrated || isLoading) {
+  const pendingRegistrationCheck = isAuthenticated && !isStaff && !checked;
+
+  if (!hasHydrated || isLoading || pendingRegistrationCheck) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <DashboardSkeleton />

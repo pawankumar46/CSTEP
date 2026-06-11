@@ -1,4 +1,4 @@
-import type { CreateEventPayload, Event, EventStatus, UpdateEventPayload } from "@/types";
+import type { CreateEventPayload, Event, EventStatus, UpcomingEvent, UpdateEventPayload } from "@/types";
 
 const DEFAULT_EVENT_IMAGE =
   "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80";
@@ -51,6 +51,17 @@ function mapEventStatus(raw: Record<string, unknown>): EventStatus {
   const status = String(raw.status ?? "draft").toLowerCase();
   const valid: EventStatus[] = ["draft", "published", "live", "completed", "cancelled"];
   return valid.includes(status as EventStatus) ? (status as EventStatus) : "draft";
+}
+
+export function mapApiUpcomingEvent(raw: Record<string, unknown>): UpcomingEvent {
+  const hasRegistrationField = "is_registered" in raw || "isRegistered" in raw;
+
+  return {
+    ...mapApiEventToEvent(raw),
+    isRegistered: hasRegistrationField
+      ? Boolean(raw.is_registered ?? raw.isRegistered)
+      : false,
+  };
 }
 
 export function mapApiEventToEvent(raw: Record<string, unknown>): Event {

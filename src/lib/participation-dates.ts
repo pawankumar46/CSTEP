@@ -67,9 +67,12 @@ export function getParticipationDateOptions(
   }));
 
   if (dayOptions.length > 1) {
+    const allDaysLabel = dayOptions.map((option) => option.label).join(" & ");
+    const multiDayHeading = dayOptions.length === 2 ? "Both Days" : "All Days";
+
     dayOptions.push({
       value: "both_days",
-      label: `Both Days (${dayOptions.map((o) => o.label).join(" & ")})`,
+      label: `${multiDayHeading} (${allDaysLabel})`,
     });
   }
 

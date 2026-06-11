@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -43,13 +43,17 @@ const TRAVEL_LABELS: Record<string, string> = {
 export default function EventRegisterPage() {
   return (
     <EventRegisterGuard>
-      <EventRegisterForm />
+      <Suspense fallback={null}>
+        <EventRegisterForm />
+      </Suspense>
     </EventRegisterGuard>
   );
 }
 
 function EventRegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetEventId = searchParams.get("event");
   const user = useAuthStore((s) => s.user);
   const { events, isLoading: eventsLoading, fetchEvents } = useEventStore();
   const [step, setStep] = useState(0);
@@ -74,9 +78,19 @@ function EventRegisterForm() {
   const { register, control, watch, trigger, getValues, reset, setValue, formState: { errors } } = form;
 
   useEffect(() => {
+    if (!presetEventId || events.length === 0) return;
+    const match = events.find((event) => event.id === presetEventId);
+    if (match) {
+      setValue("eventId", presetEventId);
+    }
+  }, [presetEventId, events, setValue]);
+
+  useEffect(() => {
     if (user) {
       reset({
-        eventId: "",
+        eventId: presetEventId && events.some((event) => event.id === presetEventId)
+          ? presetEventId
+          : "",
         salutation: user.salutation ?? "",
         firstName: user.firstName,
         middleName: user.middleName ?? "",
@@ -92,7 +106,7 @@ function EventRegisterForm() {
         translationRequired: false,
       });
     }
-  }, [user, reset]);
+  }, [user, reset, presetEventId, events]);
 
   const values = watch();
   const selectedEvent = events.find((e) => e.id === values.eventId);

@@ -3,10 +3,20 @@ import { extractApiErrorMessage } from "@/lib/auth-mappers";
 import {
   extractEventList,
   mapApiEventToEvent,
+  mapApiUpcomingEvent,
   toCreateEventPayload,
   toUpdateEventPayload,
 } from "@/lib/event-mappers";
-import type { CreateEventPayload, Event, UpdateEventPayload } from "@/types";
+import type { CreateEventPayload, Event, UpcomingEvent, UpdateEventPayload } from "@/types";
+
+export const getUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
+  try {
+    const { data } = await apiClient.get<unknown>("/events/upcoming/");
+    return extractEventList(data).map(mapApiUpcomingEvent);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
 
 export const getEvents = async (): Promise<Event[]> => {
   try {

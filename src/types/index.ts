@@ -40,6 +40,10 @@ export interface Event {
   updatedAt: string;
 }
 
+export interface UpcomingEvent extends Event {
+  isRegistered: boolean;
+}
+
 export interface CreateEventPayload {
   title: string;
   description: string;
