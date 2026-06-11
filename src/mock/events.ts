@@ -168,7 +168,7 @@ export const mockSchedule = [
 export const mockFAQs = [
   { id: "faq-1", question: "How do I register for the event?", answer: "Click the Register button on this page and complete the multi-step registration form. You will receive a confirmation email upon successful submission." },
   { id: "faq-2", question: "Is the event virtual or in-person?", answer: "This is a hybrid event. You can attend in person at the venue or join virtually through our streaming platform." },
-  { id: "faq-3", question: "What are the participation date options?", answer: "You can choose to participate on the 21st, 22nd, or both days. Select your preferred date during registration." },
+  { id: "faq-3", question: "What are the participation date options?", answer: "You can choose to participate on the 19th, 20th, or 21st, or all days. Select your preferred date during registration." },
   { id: "faq-4", question: "Are meals provided?", answer: "Yes, meals are provided based on your food preference selection. Please indicate any dietary requirements during registration." },
   { id: "faq-5", question: "Can I request travel arrangements?", answer: "Yes, travel support is available. Select your travel requirements during registration and our team will coordinate arrangements." },
   { id: "faq-6", question: "Is translation support available?", answer: "Yes. We offer translation in Hindi, English, Kannada, Tamil, Telugu, Malayalam, Punjabi, Bengali, Marathi, Gujarati, Odia, Assamese, and Urdu. Select your language during registration." },

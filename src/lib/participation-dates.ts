@@ -79,6 +79,30 @@ export function getParticipationDateOptions(
   return dayOptions;
 }
 
+export function formatParticipationDatesFaqAnswer(
+  event?: Pick<Event, "date" | "endDate"> | null,
+): string {
+  const dayOptions = getParticipationDateOptions(event).filter(
+    (option) => option.value !== "both_days",
+  );
+
+  if (dayOptions.length === 0) {
+    return "Participation date options are shown during registration based on the event schedule.";
+  }
+
+  if (dayOptions.length === 1) {
+    return `The event takes place on ${dayOptions[0].label}. Select your preferred date during registration.`;
+  }
+
+  const dayOrdinals = dayOptions.map((option) => option.label.split(" ")[0]);
+  const lastOrdinal = dayOrdinals.pop()!;
+  const ordinalList =
+    dayOrdinals.length > 0 ? `${dayOrdinals.join(", ")}, or ${lastOrdinal}` : lastOrdinal;
+  const allDaysLabel = dayOptions.length === 2 ? "both days" : "all days";
+
+  return `You can choose to participate on the ${ordinalList}, or ${allDaysLabel}. Select your preferred date during registration.`;
+}
+
 export function getParticipationDateLabel(
   value: string,
   event?: Pick<Event, "date" | "endDate"> | null,

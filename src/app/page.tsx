@@ -18,6 +18,7 @@ import {
   formatEventDurationNoun,
   getEventDayCount,
 } from "@/lib/event-display";
+import { formatParticipationDatesFaqAnswer } from "@/lib/participation-dates";
 
 const MVP_FAQS = mockFAQs.slice(0, 4);
 
@@ -179,6 +180,35 @@ function AboutSection() {
   );
 }
 
+function FaqSection() {
+  const { upcomingEvent, hasEvent } = useHomeEvent();
+
+  const faqs = MVP_FAQS.map((faq) =>
+    faq.id === "faq-3" && hasEvent
+      ? { ...faq, answer: formatParticipationDatesFaqAnswer(upcomingEvent) }
+      : faq,
+  );
+
+  return (
+    <section id="faq" className="py-16 lg:py-20 bg-muted/30">
+      <div className="container mx-auto px-4">
+        <h2 className="text-3xl font-bold text-center mb-10">Frequently Asked Questions</h2>
+        <div className="max-w-2xl mx-auto space-y-3">
+          {faqs.map((faq) => (
+            <details key={faq.id} className="group rounded-lg border bg-background p-4">
+              <summary className="flex cursor-pointer items-center justify-between font-medium">
+                {faq.question}
+                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <p className="mt-3 text-sm text-muted-foreground">{faq.answer}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -187,22 +217,7 @@ export default function LandingPage() {
 
       <AboutSection />
 
-      <section id="faq" className="py-16 lg:py-20 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-10">Frequently Asked Questions</h2>
-          <div className="max-w-2xl mx-auto space-y-3">
-            {MVP_FAQS.map((faq) => (
-              <details key={faq.id} className="group rounded-lg border bg-background p-4">
-                <summary className="flex cursor-pointer items-center justify-between font-medium">
-                  {faq.question}
-                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-                </summary>
-                <p className="mt-3 text-sm text-muted-foreground">{faq.answer}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
+      <FaqSection />
 
       <BottomCTA />
       <LandingFooter />
