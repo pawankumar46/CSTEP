@@ -26,7 +26,7 @@ export function LandingFooter() {
             <h4 className="font-semibold mb-3 text-sm">Contact</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="mailto:support@cstep.com" className="hover:text-foreground">support@cstep.com</a></li>
-              <li>21<sup>st</sup> – 22<sup>nd</sup> August 2025</li>
+             
             </ul>
           </div>
         </div>
