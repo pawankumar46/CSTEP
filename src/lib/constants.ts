@@ -2,6 +2,9 @@ import type { UserRole } from "@/types";
 
 export const APP_NAME = "CSTEP";
 export const APP_SHORT_NAME = "CS";
+export const BRAND_LOGO_SRC = "/CstepLogo.png";
+export const BRAND_LOGO_DARK_SRC =
+  process.env.NEXT_PUBLIC_BRAND_LOGO_DARK_SRC ?? "/CSTEP_Primary-Logo%20copy.png";
 export const APP_DESCRIPTION =
   "CSTEP event management platform for registration, live streaming, and delegate coordination";
 
@@ -25,12 +28,10 @@ export const LIVE_STREAM_FILE_ID =
 
 /** Vertical side banners shown beside the live stream (hidden in fullscreen). */
 export const STREAM_LEFT_BANNER_URL =
-  process.env.NEXT_PUBLIC_STREAM_LEFT_BANNER_URL ??
-  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=200&h=1200&fit=crop&q=80";
+  process.env.NEXT_PUBLIC_STREAM_LEFT_BANNER_URL ?? "/CstepLeft1.jpeg";
 
 export const STREAM_RIGHT_BANNER_URL =
-  process.env.NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL ??
-  "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=200&h=1200&fit=crop&q=80";
+  process.env.NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL ?? "/CstepRight1.jpeg";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   base_user: "Base User",

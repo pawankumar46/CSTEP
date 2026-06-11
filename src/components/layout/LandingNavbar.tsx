@@ -10,7 +10,7 @@ import { UserInitials } from "@/components/shared/UserInitials";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
 import { isStaffRole } from "@/lib/auth-utils";
-import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
+import { BrandLogo } from "@/components/shared/BrandLogo";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -69,12 +69,7 @@ export function LandingNavbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
-            {APP_SHORT_NAME}
-          </div>
-          <span className="font-semibold text-xl">{APP_NAME}</span>
-        </Link>
+        <BrandLogo height={40} priority />
 
         <nav className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => (

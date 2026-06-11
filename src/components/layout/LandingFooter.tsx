@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { APP_NAME, APP_SHORT_NAME, APP_DESCRIPTION } from "@/lib/constants";
+import { BrandLogo } from "@/components/shared/BrandLogo";
+import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 
 export function LandingFooter() {
@@ -8,12 +9,7 @@ export function LandingFooter() {
       <div className="container mx-auto px-4 py-10">
         <div className="grid gap-8 md:grid-cols-3">
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-                {APP_SHORT_NAME}
-              </div>
-              <span className="font-semibold">{APP_NAME}</span>
-            </div>
+            <BrandLogo height={36} href="/" />
             <p className="text-sm text-muted-foreground max-w-xs">{APP_DESCRIPTION}</p>
           </div>
           <div>

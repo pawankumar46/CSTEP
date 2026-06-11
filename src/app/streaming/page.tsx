@@ -117,8 +117,8 @@ export default function StreamingPage() {
               title={event.name}
               leftBannerUrl={STREAM_LEFT_BANNER_URL}
               rightBannerUrl={STREAM_RIGHT_BANNER_URL}
-              leftBannerAlt={`${event.name} left banner`}
-              rightBannerAlt={`${event.name} right banner`}
+              leftBannerAlt="India Clean Air Summit 2026"
+              rightBannerAlt="India Clean Air Summit 2026"
               onPause={() => setIsPaused(true)}
               onResume={() => setIsPaused(false)}
               onMute={() => setIsMuted(!isMuted)}

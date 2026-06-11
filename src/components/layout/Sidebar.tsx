@@ -7,7 +7,8 @@ import {
   Settings, Plane, Languages, UserCog, ChevronLeft, ChevronRight, Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { APP_NAME, APP_SHORT_NAME, NAV_ITEMS } from "@/lib/constants";
+import { NAV_ITEMS } from "@/lib/constants";
+import { BrandLogo } from "@/components/shared/BrandLogo";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 
@@ -36,16 +37,26 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex h-16 items-center justify-between border-b px-4">
-        {!collapsed && (
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-              {APP_SHORT_NAME}
-            </div>
-            <span className="font-semibold text-lg">{APP_NAME}</span>
-          </Link>
+      <div
+        className={cn(
+          "flex border-b",
+          collapsed
+            ? "h-auto flex-col items-center gap-2 px-2 py-3"
+            : "h-16 items-center justify-between px-4",
         )}
-        <Button variant="ghost" size="icon" onClick={onToggle} className={collapsed ? "mx-auto" : ""}>
+      >
+        <BrandLogo
+          href="/dashboard"
+          height={collapsed ? 24 : 34}
+          imageClassName={collapsed ? "max-w-[3.25rem]" : undefined}
+          className={collapsed ? "w-full justify-center" : undefined}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggle}
+          className={collapsed ? "h-8 w-8" : ""}
+        >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
