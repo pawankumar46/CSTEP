@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Pause, Play, VolumeX, Share2, Heart, ThumbsUp, HandMetal,
-  Send, Users, ArrowLeft,
+  Send, Users, Home,
 } from "lucide-react";
 import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useMinRole } from "@/hooks/useRoleGuard";
 import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
@@ -24,7 +23,8 @@ import {
   STREAM_LEFT_BANNER_URL,
   STREAM_RIGHT_BANNER_URL,
 } from "@/lib/constants";
-import { isStaffRole } from "@/lib/auth-utils";
+import { getAppUrl } from "@/lib/env";
+import { ROUTES } from "@/lib/routes";
 import { UserInitials } from "@/components/shared/UserInitials";
 
 const REACTIONS = [
@@ -74,7 +74,7 @@ export default function StreamingPage() {
 
   const shareLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(getAppUrl(`${window.location.pathname}${window.location.search}`));
       setLinkCopied(true);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setLinkCopied(false), 2000);
@@ -87,13 +87,6 @@ export default function StreamingPage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={user && isStaffRole(user.role) ? "/dashboard" : "/"}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              {user && isStaffRole(user.role) ? "Dashboard" : "Home"}
-            </Link>
-          </Button>
-          <Separator orientation="vertical" className="h-6" />
           <span className="font-semibold">{APP_NAME} Live</span>
         </div>
         <div className="flex items-center gap-2">
@@ -123,6 +116,15 @@ export default function StreamingPage() {
               onResume={() => setIsPaused(false)}
               onMute={() => setIsMuted(!isMuted)}
             />
+
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={ROUTES.home} title="Exit to home">
+                  <Home className="h-4 w-4 mr-2" />
+                  Exit
+                </Link>
+              </Button>
+            </div>
 
             {isModerator && (
               <Card>

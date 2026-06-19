@@ -150,19 +150,19 @@ export const mockEvents: Event[] = [
 ];
 
 export const mockSpeakers = [
-  { id: "spk-1", name: "Dr. Angela Foster", title: "Chief Technology Officer", company: "TechVision Inc.", bio: "Leading AI researcher with 20+ years in enterprise technology.", imageUrl: "" },
-  { id: "spk-2", name: "Marcus Williams", title: "VP of Innovation", company: "Future Labs", bio: "Pioneer in sustainable technology and green computing solutions.", imageUrl: "" },
+  { id: "spk-1", name: "Dr. Anita Rao", title: "Chief Technology Officer", company: "TechVision Inc.", bio: "Leading AI researcher with 20+ years in enterprise technology.", imageUrl: "" },
+  { id: "spk-2", name: "Rahul Kapoor", title: "VP of Innovation", company: "Future Labs", bio: "Pioneer in sustainable technology and green computing solutions.", imageUrl: "" },
   { id: "spk-3", name: "Dr. Priya Sharma", title: "Director of Research", company: "HealthTech Global", bio: "Renowned healthcare innovator specializing in digital medicine.", imageUrl: "" },
-  { id: "spk-4", name: "James O'Connor", title: "CEO", company: "CloudScale Systems", bio: "Serial entrepreneur and cloud infrastructure expert.", imageUrl: "" },
+  { id: "spk-4", name: "Sanjay Mehta", title: "CEO", company: "CloudScale Systems", bio: "Serial entrepreneur and cloud infrastructure expert.", imageUrl: "" },
 ];
 
 export const mockSchedule = [
-  { id: "sch-1", time: "09:00 AM", title: "Opening Keynote", speaker: "Dr. Angela Foster", description: "Welcome address and vision for the future of technology." },
-  { id: "sch-2", time: "10:30 AM", title: "AI in Enterprise", speaker: "Marcus Williams", description: "Practical applications of AI in large organizations." },
+  { id: "sch-1", time: "09:00 AM", title: "Opening Keynote", speaker: "Dr. Anita Rao", description: "Welcome address and vision for the future of technology." },
+  { id: "sch-2", time: "10:30 AM", title: "AI in Enterprise", speaker: "Rahul Kapoor", description: "Practical applications of AI in large organizations." },
   { id: "sch-3", time: "12:00 PM", title: "Networking Lunch", speaker: "—", description: "Connect with peers and fellow delegates." },
   { id: "sch-4", time: "02:00 PM", title: "Digital Health Panel", speaker: "Dr. Priya Sharma", description: "Panel discussion on healthcare technology trends." },
-  { id: "sch-5", time: "04:00 PM", title: "Cloud Infrastructure", speaker: "James O'Connor", description: "Building scalable systems for the modern enterprise." },
-  { id: "sch-6", time: "05:30 PM", title: "Closing Remarks", speaker: "Dr. Angela Foster", description: "Summary and announcements for Day 2." },
+  { id: "sch-5", time: "04:00 PM", title: "Cloud Infrastructure", speaker: "Sanjay Mehta", description: "Building scalable systems for the modern enterprise." },
+  { id: "sch-6", time: "05:30 PM", title: "Closing Remarks", speaker: "Dr. Anita Rao", description: "Summary and announcements for Day 2." },
 ];
 
 export const mockFAQs = [

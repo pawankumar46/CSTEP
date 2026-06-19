@@ -5,6 +5,7 @@ import {
   isDuplicateRegistrationError,
   mapApiRegistrationToRegistration,
   toRegistrationApiPayload,
+  toRegistrationPreferencesPayload,
 } from "@/lib/registration-mappers";
 
 export class AlreadyRegisteredError extends Error {
@@ -16,6 +17,11 @@ export class AlreadyRegisteredError extends Error {
 import { delay } from "@/lib/utils";
 import { mockRegistrations } from "@/mock/registrations";
 import type { Event, PaginatedResponse, Registration, RegistrationFormData, RegistrationStatus } from "@/types";
+
+export type RegistrationPreferences = Pick<
+  RegistrationFormData,
+  "travelRequired" | "travelType" | "medicalSupportRequired" | "medicalSupportType"
+>;
 
 let registrations = [...mockRegistrations];
 
@@ -72,6 +78,36 @@ export const updateRegistrationStatus = async (
     updatedAt: new Date().toISOString(),
   };
   return registrations[index];
+};
+
+export const getUserRegistration = async (email: string): Promise<Registration | null> => {
+  try {
+    const { data } = await apiClient.get<unknown>("/registrations/");
+    const list = extractRegistrationList(data).map((raw) => mapApiRegistrationToRegistration(raw));
+    return list.find((r) => r.email.toLowerCase() === email.toLowerCase()) ?? null;
+  } catch {
+    return registrations.find((r) => r.email.toLowerCase() === email.toLowerCase()) ?? null;
+  }
+};
+
+export const updateRegistrationPreferences = async (
+  id: string,
+  preferences: RegistrationPreferences,
+): Promise<Registration> => {
+  try {
+    const { data } = await apiClient.patch<Record<string, unknown>>(
+      `/registrations/${id}/`,
+      toRegistrationPreferencesPayload(preferences),
+    );
+    const updated = mapApiRegistrationToRegistration(data);
+    const index = registrations.findIndex((r) => r.id === id);
+    if (index !== -1) {
+      registrations[index] = updated;
+    }
+    return updated;
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
 };
 
 export const submitRegistration = async (

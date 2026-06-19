@@ -5,7 +5,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import { Users, UserCheck, UserX, UserPlus, Pause } from "lucide-react";
+import { Users, UserCheck, UserX, UserPlus, Pause, Clock } from "lucide-react";
 import { StatCard } from "@/components/shared/StatCard";
 import { ChartCard } from "@/components/shared/ChartCard";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -64,12 +64,13 @@ function AnalyticsContent() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
           User Summary
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <StatCard title="Total Users" value={summary.totalUsers} icon={Users} />
           <StatCard title="Participants Registered" value={summary.eventParticipants} icon={UserPlus} />
           <StatCard title="Accepted" value={summary.accepted} icon={UserCheck} />
-          <StatCard title="Rejected" value={summary.rejected} icon={UserX} />
+          <StatCard title="Pending" value={summary.pending} icon={Clock} />
           <StatCard title="On Hold" value={summary.onHold} icon={Pause} />
+          <StatCard title="Rejected" value={summary.rejected} icon={UserX} />
         </div>
       </div>
 

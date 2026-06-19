@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
-import { getUserSummary } from "@/services/analytics.service";
+import { useHomeDataStore } from "@/store/useHomeDataStore";
 
 export function useHomeEvent() {
   const {
@@ -12,13 +11,8 @@ export function useHomeEvent() {
     upcomingEvents,
     upcomingEvent,
   } = useEventRegistration();
-  const [participantsRegistered, setParticipantsRegistered] = useState<number | null>(null);
 
-  useEffect(() => {
-    getUserSummary()
-      .then((summary) => setParticipantsRegistered(summary.eventParticipants))
-      .catch(() => setParticipantsRegistered(null));
-  }, []);
+  const participantsRegistered = useHomeDataStore((s) => s.participantsRegistered);
 
   const isLoading = !upcomingLoaded;
   const hasEvent = upcomingLoaded && upcomingEvents.length > 0;

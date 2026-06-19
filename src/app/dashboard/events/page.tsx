@@ -11,11 +11,33 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEventStore } from "@/store/useEventStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { toLocalDateTimeInput } from "@/lib/event-mappers";
 import { Calendar } from "lucide-react";
-import type { Event } from "@/types";
+import type { Event, EventListType } from "@/types";
+
+const EVENT_TYPE_LABELS: Record<EventListType, string> = {
+  upcoming: "Upcoming",
+  live: "Live",
+  past: "Past",
+};
+
+const EMPTY_STATE_COPY: Record<EventListType, { title: string; description: string }> = {
+  upcoming: {
+    title: "No upcoming events",
+    description: "Create your first event to get started.",
+  },
+  live: {
+    title: "No live events",
+    description: "There are no events streaming right now.",
+  },
+  past: {
+    title: "No past events",
+    description: "Completed events will appear here.",
+  },
+};
 
 const defaultForm = {
   title: "",
@@ -100,7 +122,17 @@ function EventFormFields({
 }
 
 export default function EventsPage() {
-  const { events, isLoading, error, fetchEvents, createEvent, updateEvent, deleteEvent } = useEventStore();
+  const {
+    events,
+    eventListType,
+    isLoading,
+    error,
+    fetchEvents,
+    setEventListType,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+  } = useEventStore();
   const user = useAuthStore((s) => s.user);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -113,8 +145,12 @@ export default function EventsPage() {
   const canManage = user?.role === "event_administrator" || user?.role === "super_administrator";
 
   useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+    fetchEvents(eventListType);
+  }, [eventListType, fetchEvents]);
+
+  const handleTypeChange = (type: EventListType) => {
+    setEventListType(type);
+  };
 
   const isFormValid = form.title.trim() && form.scheduledStart && form.scheduledEnd;
 
@@ -194,7 +230,33 @@ export default function EventsPage() {
     }
   };
 
-  if (isLoading && events.length === 0) return <DashboardSkeleton />;
+  if (isLoading && events.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Events</h1>
+            <p className="text-muted-foreground">Browse and manage events</p>
+          </div>
+          {canManage && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Create Event
+            </Button>
+          )}
+        </div>
+        <Tabs value={eventListType} onValueChange={(value) => handleTypeChange(value as EventListType)}>
+          <TabsList>
+            {(Object.keys(EVENT_TYPE_LABELS) as EventListType[]).map((type) => (
+              <TabsTrigger key={type} value={type}>
+                {EVENT_TYPE_LABELS[type]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <DashboardSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -214,12 +276,35 @@ export default function EventsPage() {
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
       )}
 
-      {events.length === 0 ? (
+      <Tabs value={eventListType} onValueChange={(value) => handleTypeChange(value as EventListType)}>
+        <TabsList>
+          {(Object.keys(EVENT_TYPE_LABELS) as EventListType[]).map((type) => (
+            <TabsTrigger key={type} value={type}>
+              {EVENT_TYPE_LABELS[type]}
+              {type === eventListType && !isLoading ? ` (${events.length})` : ""}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      <p className="text-sm text-muted-foreground">
+        {isLoading
+          ? `Loading ${EVENT_TYPE_LABELS[eventListType].toLowerCase()} events...`
+          : `${events.length} ${EVENT_TYPE_LABELS[eventListType].toLowerCase()} event${events.length === 1 ? "" : "s"}`}
+      </p>
+
+      {isLoading ? (
+        <DashboardSkeleton />
+      ) : events.length === 0 ? (
         <EmptyState
           icon={Calendar}
-          title="No events"
-          description="Create your first event to get started."
-          action={canManage ? { label: "Create Event", onClick: () => setCreateOpen(true) } : undefined}
+          title={EMPTY_STATE_COPY[eventListType].title}
+          description={EMPTY_STATE_COPY[eventListType].description}
+          action={
+            canManage && eventListType === "upcoming"
+              ? { label: "Create Event", onClick: () => setCreateOpen(true) }
+              : undefined
+          }
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -227,6 +312,7 @@ export default function EventsPage() {
             <EventCard
               key={event.id}
               event={event}
+              listType={eventListType}
               showActions={canManage}
               onEdit={() => openEdit(event)}
               onDelete={openDelete}

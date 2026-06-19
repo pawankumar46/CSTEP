@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Send Reset Link
+                {isLoading ? "Sending..." : "Send Reset Link"}
               </Button>
               <Link href="/login" className="text-sm text-primary hover:underline">Back to login</Link>
             </CardFooter>

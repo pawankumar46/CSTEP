@@ -22,17 +22,47 @@ export const getLobbyRegistrations = async (eventId: string): Promise<Registrati
   }
 };
 
+export const bulkUpdateLobbyStatus = async (
+  ids: string[],
+  status: RegistrationStatus
+): Promise<void> => {
+  try {
+    await apiClient.patch("/registrations/bulk-status/", {
+      ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
+      status: mapAppStatusToApiStatus(status),
+    });
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 export const updateLobbyStatus = async (
   id: string,
   status: RegistrationStatus,
   eventId?: string
 ): Promise<Registration> => {
   try {
-    const { data } = await apiClient.patch<Record<string, unknown>>(
-      `/registrations/${id}/status/`,
-      { status: mapAppStatusToApiStatus(status) }
-    );
-    return mapApiRegistrationToRegistration(data, eventId);
+    await bulkUpdateLobbyStatus([id], status);
+    if (eventId) {
+      const registrations = await getLobbyRegistrations(eventId);
+      const updated = registrations.find((registration) => registration.id === id);
+      if (updated) return updated;
+    }
+    return mapApiRegistrationToRegistration({ id }, eventId);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const bulkUpdateTravelStatus = async (
+  ids: string[],
+  status: "accepted" | "rejected"
+): Promise<void> => {
+  try {
+    await apiClient.patch("/registrations/bulk-travel-status/", {
+      ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
+      status: mapAppRequestStatusToApi(status),
+    });
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
@@ -44,11 +74,27 @@ export const updateTravelStatus = async (
   eventId?: string
 ): Promise<Registration> => {
   try {
-    const { data } = await apiClient.patch<Record<string, unknown>>(
-      `/registrations/${registrationId}/travel-status/`,
-      { travel_status: mapAppRequestStatusToApi(status) }
-    );
-    return mapApiRegistrationToRegistration(data, eventId);
+    await bulkUpdateTravelStatus([registrationId], status);
+    if (eventId) {
+      const registrations = await getLobbyRegistrations(eventId);
+      const updated = registrations.find((registration) => registration.id === registrationId);
+      if (updated) return updated;
+    }
+    return mapApiRegistrationToRegistration({ id: registrationId }, eventId);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const bulkUpdateTranslationStatus = async (
+  ids: string[],
+  status: "accepted" | "rejected"
+): Promise<void> => {
+  try {
+    await apiClient.patch("/registrations/bulk-translation-status/", {
+      ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
+      status: mapAppRequestStatusToApi(status),
+    });
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
@@ -60,11 +106,13 @@ export const updateTranslationStatus = async (
   eventId?: string
 ): Promise<Registration> => {
   try {
-    const { data } = await apiClient.patch<Record<string, unknown>>(
-      `/registrations/${registrationId}/translation-status/`,
-      { translation_status: mapAppRequestStatusToApi(status) }
-    );
-    return mapApiRegistrationToRegistration(data, eventId);
+    await bulkUpdateTranslationStatus([registrationId], status);
+    if (eventId) {
+      const registrations = await getLobbyRegistrations(eventId);
+      const updated = registrations.find((registration) => registration.id === registrationId);
+      if (updated) return updated;
+    }
+    return mapApiRegistrationToRegistration({ id: registrationId }, eventId);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

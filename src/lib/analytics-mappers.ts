@@ -5,7 +5,7 @@ export function mapApiUserSummary(raw: Record<string, unknown>): AnalyticsSummar
   const accepted = Number(raw.participants_accepted ?? 0);
   const rejected = Number(raw.participants_rejected ?? 0);
   const onHold = Number(raw.participants_held ?? 0);
-  const pending = Math.max(0, eventParticipants - accepted - rejected - onHold);
+  const pending = Number(raw.participants_pending ?? 0);
 
   return {
     totalUsers: Number(raw.total_registered_users ?? 0),

@@ -6,6 +6,10 @@ export function isStaffRole(role: UserRole): boolean {
   return STAFF_ROLES.includes(role);
 }
 
+export function isBaseUserRole(role: UserRole): boolean {
+  return role === "base_user";
+}
+
 export function getDefaultRouteForRole(role: UserRole): string {
   return role === "base_user" ? "/" : "/dashboard";
 }

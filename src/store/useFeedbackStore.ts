@@ -12,6 +12,7 @@ interface FeedbackState {
   feedback: Feedback[];
   stats: FeedbackStats | null;
   isLoading: boolean;
+  isSubmitting: boolean;
   error: string | null;
   fetchFeedback: () => Promise<void>;
   fetchStats: () => Promise<void>;
@@ -22,6 +23,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   feedback: [],
   stats: null,
   isLoading: false,
+  isSubmitting: false,
   error: null,
 
   fetchFeedback: async () => {
@@ -47,17 +49,17 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   },
 
   submitFeedback: async (data) => {
-    set({ isLoading: true, error: null });
+    set({ isSubmitting: true, error: null });
     try {
       const newFeedback = await feedbackService.submitFeedback(data);
       set({
         feedback: [newFeedback, ...get().feedback],
-        isLoading: false,
+        isSubmitting: false,
       });
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Failed to submit feedback",
-        isLoading: false,
+        isSubmitting: false,
       });
       throw err;
     }

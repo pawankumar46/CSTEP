@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as authService from "@/services/auth.service";
+import { refreshStoredAccessToken } from "@/lib/auth-token";
 import type { LoginCredentials, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
 interface AuthState {
@@ -8,6 +9,7 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   isLoading: boolean;
+  isLoggingOut: boolean;
   error: string | null;
   isAuthenticated: boolean;
   hasHydrated: boolean;
@@ -45,6 +47,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isLoading: false,
+      isLoggingOut: false,
       error: null,
       isAuthenticated: false,
       hasHydrated: false,
@@ -115,27 +118,33 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        const { token, refreshToken } = get();
-        const storedRefresh =
-          refreshToken ??
-          (typeof window !== "undefined" ? localStorage.getItem("auth_refresh") : null);
+        set({ isLoggingOut: true });
+        try {
+          const { token, refreshToken } = get();
+          const storedRefresh =
+            refreshToken ??
+            (typeof window !== "undefined" ? localStorage.getItem("auth_refresh") : null);
 
-        await authService.logout(storedRefresh, token);
+          await authService.logout(storedRefresh, token);
 
-        syncTokenToStorage(null);
-        syncRefreshToStorage(null);
-        const { useRegistrationStore } = await import("@/store/useRegistrationStore");
-        useRegistrationStore.getState().clearRegistrationSession();
-        set({
-          user: null,
-          token: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-          hasHydrated: true,
-        });
-        await useAuthStore.persist.clearStorage();
+          syncTokenToStorage(null);
+          syncRefreshToStorage(null);
+          const { useRegistrationStore } = await import("@/store/useRegistrationStore");
+          useRegistrationStore.getState().clearRegistrationSession();
+          set({
+            user: null,
+            token: null,
+            refreshToken: null,
+            isAuthenticated: false,
+            isLoading: false,
+            isLoggingOut: false,
+            error: null,
+            hasHydrated: true,
+          });
+          await useAuthStore.persist.clearStorage();
+        } finally {
+          set({ isLoggingOut: false });
+        }
       },
 
       hydrate: async () => {
@@ -156,7 +165,15 @@ export const useAuthStore = create<AuthState>()(
 
         set({ isLoading: true });
         try {
-          const resolvedUser = await authService.getCurrentUser();
+          let resolvedUser = await authService.getCurrentUser();
+
+          if (!resolvedUser) {
+            const newToken = await refreshStoredAccessToken();
+            if (newToken) {
+              resolvedUser = await authService.getCurrentUser();
+            }
+          }
+
           if (resolvedUser) {
             set({ user: resolvedUser, isAuthenticated: true, isLoading: false });
             return;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Home, LogOut, User } from "lucide-react";
+import { Home, Loader2, LogOut, User } from "lucide-react";
 import { SearchBar } from "@/components/shared/SearchBar";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { NotificationDropdown } from "@/components/shared/NotificationDropdown";
@@ -24,9 +24,10 @@ interface NavbarProps {
 
 export function Navbar({ onSearch }: NavbarProps) {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isLoggingOut } = useAuthStore();
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
     await logout();
     router.push("/login");
   };
@@ -70,9 +71,13 @@ export function Navbar({ onSearch }: NavbarProps) {
                   <User className="mr-2 h-4 w-4" />
                   Profile Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Log out
+                <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut}>
+                  {isLoggingOut ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="mr-2 h-4 w-4" />
+                  )}
+                  {isLoggingOut ? "Logging out..." : "Log out"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

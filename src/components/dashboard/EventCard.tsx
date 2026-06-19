@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
-import type { Event, EventStatus } from "@/types";
+import type { Event, EventListType, EventStatus } from "@/types";
 
 const statusVariant: Record<EventStatus, "default" | "secondary" | "success" | "warning" | "destructive"> = {
   draft: "secondary",
@@ -15,14 +15,27 @@ const statusVariant: Record<EventStatus, "default" | "secondary" | "success" | "
   cancelled: "destructive",
 };
 
+const listTypeVariant: Record<EventListType, "default" | "success" | "secondary"> = {
+  upcoming: "default",
+  live: "success",
+  past: "secondary",
+};
+
+const listTypeLabel: Record<EventListType, string> = {
+  upcoming: "Upcoming",
+  live: "Live",
+  past: "Past",
+};
+
 interface EventCardProps {
   event: Event;
+  listType?: EventListType;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   showActions?: boolean;
 }
 
-export function EventCard({ event, onEdit, onDelete, showActions = true }: EventCardProps) {
+export function EventCard({ event, listType, onEdit, onDelete, showActions = true }: EventCardProps) {
   return (
     <Card className="overflow-hidden group hover:shadow-lg transition-shadow">
       <div className="relative h-40 overflow-hidden">
@@ -34,6 +47,11 @@ export function EventCard({ event, onEdit, onDelete, showActions = true }: Event
         <Badge variant={statusVariant[event.status]} className="absolute top-3 right-3 capitalize">
           {event.status}
         </Badge>
+        {listType && (
+          <Badge variant={listTypeVariant[listType]} className="absolute top-3 left-3">
+            {listTypeLabel[listType]}
+          </Badge>
+        )}
       </div>
       <CardHeader className="pb-2">
         <CardTitle className="text-base line-clamp-1">{event.name}</CardTitle>

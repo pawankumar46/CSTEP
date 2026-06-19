@@ -5,30 +5,38 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
 import { isStaffRole } from "@/lib/auth-utils";
-import { ROUTES } from "@/lib/routes";
+import { getEventStreamPhase } from "@/lib/watch-live-access";
+import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 
 export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, isLoading, hasHydrated, user } = useAuthStore();
-  const { isRegistered, checked } = useEventRegistration();
+  const { isRegistered, checked, upcomingEvent } = useEventRegistration();
 
   const isStaff = user ? isStaffRole(user.role) : false;
   const needsRegistration = isAuthenticated && checked && !isStaff && !isRegistered;
+  const streamPhase = upcomingEvent ? getEventStreamPhase(upcomingEvent) : null;
+  const streamNotLive = !isStaff && checked && streamPhase !== "live";
 
   useEffect(() => {
     if (!hasHydrated || isLoading) return;
     if (isAuthenticated && !isStaff && !checked) return;
 
     if (!isAuthenticated) {
-      router.replace(`${ROUTES.login}?redirect=${ROUTES.streaming}`);
+      router.replace(buildAuthUrl(ROUTES.login, { redirect: ROUTES.streaming }));
       return;
     }
 
     if (needsRegistration) {
       router.replace(ROUTES.eventRegister);
+      return;
     }
-  }, [hasHydrated, isLoading, isAuthenticated, isStaff, checked, needsRegistration, router]);
+
+    if (streamNotLive) {
+      router.replace(ROUTES.home);
+    }
+  }, [hasHydrated, isLoading, isAuthenticated, isStaff, checked, needsRegistration, streamNotLive, router]);
 
   const pendingRegistrationCheck = isAuthenticated && !isStaff && !checked;
 
@@ -40,7 +48,7 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated || needsRegistration) {
+  if (!isAuthenticated || needsRegistration || streamNotLive) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <DashboardSkeleton />

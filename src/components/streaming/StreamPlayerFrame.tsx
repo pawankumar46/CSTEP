@@ -11,56 +11,8 @@ interface StreamPlayerFrameProps extends VideoPlayerProps {
   className?: string;
 }
 
-function StreamBanner({
-  src,
-  alt,
-  fit = "cover",
-  blurred = true,
-  className,
-}: {
-  src: string;
-  alt: string;
-  fit?: "cover" | "contain";
-  blurred?: boolean;
-  className?: string;
-}) {
-  if (fit === "contain") {
-    return (
-      <aside
-        className={cn(
-          "relative hidden h-full min-h-0 md:block",
-          className,
-        )}
-        aria-hidden
-      >
-        <img
-          src={src}
-          alt={alt}
-          className="absolute inset-0 h-full w-full object-contain object-center p-1.5"
-        />
-      </aside>
-    );
-  }
-
-  return (
-    <aside
-      className={cn(
-        "relative hidden h-full min-h-0 overflow-hidden bg-muted md:block",
-        className,
-      )}
-      aria-hidden
-    >
-      <img
-        src={src}
-        alt={alt}
-        className={cn(
-          "absolute inset-0 h-full w-full scale-110 object-cover object-center",
-          blurred && "blur-md",
-        )}
-      />
-    </aside>
-  );
-}
+const BANNER_COLUMN_CLASS =
+  "hidden md:block w-full h-auto object-contain bg-sky-50 dark:bg-slate-900";
 
 export function StreamPlayerFrame({
   leftBannerUrl,
@@ -85,26 +37,27 @@ export function StreamPlayerFrame({
       )}
     >
       {leftBannerUrl ? (
-        <StreamBanner
+        <img
           src={leftBannerUrl}
           alt={leftBannerAlt}
-          fit="contain"
-          blurred={false}
-          className="bg-sky-50 dark:bg-slate-900"
+          className={BANNER_COLUMN_CLASS}
+          aria-hidden
         />
       ) : (
         <div className="hidden md:block" />
       )}
-      <div className="relative aspect-video min-w-0 bg-black">
+
+      {/* Row height on desktop comes from banner images; video stretches to the same height */}
+      <div className="relative min-w-0 aspect-video bg-black md:aspect-auto md:h-full">
         <VideoPlayer {...playerProps} fill className="rounded-none" />
       </div>
+
       {rightBannerUrl ? (
-        <StreamBanner
+        <img
           src={rightBannerUrl}
           alt={rightBannerAlt}
-          fit="contain"
-          blurred={false}
-          className="bg-sky-50 dark:bg-slate-900"
+          className={BANNER_COLUMN_CLASS}
+          aria-hidden
         />
       ) : (
         <div className="hidden md:block" />

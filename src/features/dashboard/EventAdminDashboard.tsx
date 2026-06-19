@@ -16,7 +16,7 @@ export function EventAdminDashboard() {
 
   useEffect(() => {
     fetchAnalytics();
-    fetchEvents();
+    fetchEvents("upcoming");
   }, [fetchAnalytics, fetchEvents]);
 
   if (isLoading || !analytics) return <DashboardSkeleton />;

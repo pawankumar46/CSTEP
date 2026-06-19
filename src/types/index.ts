@@ -23,6 +23,8 @@ export interface User {
 
 export type EventStatus = "draft" | "published" | "live" | "completed" | "cancelled";
 
+export type EventListType = "upcoming" | "live" | "past";
+
 export interface Event {
   id: string;
   name: string;

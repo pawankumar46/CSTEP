@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
-  Play,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -20,13 +19,12 @@ import { formatEventDateRange, getUpcomingEventDays, getUpcomingEventMonthLabel 
 import { useHomeEvent } from "@/hooks/useHomeEvent";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
 import { HeroSectionSkeleton } from "@/components/shared/LoadingSkeleton";
+import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
 import { cn } from "@/lib/utils";
 import type { UpcomingEvent } from "@/types";
 
 const CONFERENCE_IMAGE =
   "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80";
-
-const STREAM_LOGIN_URL = "/login?redirect=/streaming";
 
 function UpcomingEventHeading({
   eventStart,
@@ -126,33 +124,11 @@ function HeroEventSlide({
               </Link>
             </Button>
           )}
-          {!isAuthenticated && (
-            <Button size="lg" variant="outline" asChild>
-              <Link href={STREAM_LOGIN_URL}>
-                <Play className="h-4 w-4 mr-2 fill-current" />
-                Watch Live
-              </Link>
-            </Button>
-          )}
-          {isAuthenticated && !eventIsRegistered && (
-            <Button
-              size="lg"
-              variant={registerLabel ? "outline" : "default"}
-              disabled
-              title="Register for this event first to watch live"
-            >
-              <Play className="h-4 w-4 mr-2 fill-current" />
-              Watch Live
-            </Button>
-          )}
-          {isAuthenticated && eventIsRegistered && (
-            <Button size="lg" variant={registerLabel ? "outline" : "default"} asChild>
-              <Link href={ROUTES.streaming}>
-                <Play className="h-4 w-4 mr-2 fill-current" />
-                Watch Live
-              </Link>
-            </Button>
-          )}
+          <WatchLiveButton
+            event={event}
+            size="lg"
+            variant={registerLabel ? "outline" : "default"}
+          />
         </div>
 
         {!isAuthenticated && (

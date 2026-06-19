@@ -22,6 +22,7 @@ import {
   MEDICAL_SUPPORT_TYPES,
   PARTICIPATION_TIMES,
   TRANSLATION_LANGUAGES,
+  TRAVEL_TYPES,
   getRegistrationOptionLabel,
 } from "@/lib/registration-options";
 import { getParticipationDateLabel, getParticipationDateOptions } from "@/lib/participation-dates";
@@ -30,15 +31,6 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { AlreadyRegisteredError } from "@/services/registration.service";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
-
-const TRAVEL_LABELS: Record<string, string> = {
-  flight_taxi_hotel: "Flight + Taxi + Hotel",
-  taxi_hotel: "Taxi + Hotel",
-  hotel_only: "Hotel Only",
-  taxi_only: "Taxi Only",
-  flight_only: "Flight Only",
-  train_only: "Train Only",
-};
 
 export default function EventRegisterPage() {
   return (
@@ -62,7 +54,7 @@ function EventRegisterForm() {
   const { submitRegistration, isLoading } = useRegistrationStore();
 
   useEffect(() => {
-    fetchEvents();
+    fetchEvents("upcoming");
   }, [fetchEvents]);
 
   const form = useForm<RegistrationFormValues>({
@@ -368,8 +360,8 @@ function EventRegisterForm() {
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger><SelectValue placeholder="Select travel type" /></SelectTrigger>
                           <SelectContent>
-                            {Object.entries(TRAVEL_LABELS).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>{label}</SelectItem>
+                            {TRAVEL_TYPES.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -460,7 +452,7 @@ function EventRegisterForm() {
                     <div>
                       <h4 className="font-semibold mb-2">Preferences</h4>
                       <p>Food: {getRegistrationOptionLabel(values.foodPreference)}</p>
-                      {values.travelRequired && <p>Travel: {values.travelType ? TRAVEL_LABELS[values.travelType] : "—"}</p>}
+                      {values.travelRequired && <p>Travel: {values.travelType ? getRegistrationOptionLabel(values.travelType) : "—"}</p>}
                       {values.medicalSupportRequired && <p>Medical: {values.medicalSupportType ? getRegistrationOptionLabel(values.medicalSupportType) : "—"}</p>}
                       {values.translationRequired && <p>Translation: {values.translationLanguage ? getRegistrationOptionLabel(values.translationLanguage) : "—"}</p>}
                     </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Star, MessageSquare } from "lucide-react";
+import { Star, MessageSquare, Loader2 } from "lucide-react";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ const feedbackSchema = z.object({
 type FeedbackForm = z.infer<typeof feedbackSchema>;
 
 export default function FeedbackPage() {
-  const { feedback, stats, isLoading, fetchFeedback, fetchStats, submitFeedback } = useFeedbackStore();
+  const { feedback, stats, isLoading, isSubmitting, fetchFeedback, fetchStats, submitFeedback } = useFeedbackStore();
   const user = useAuthStore((s) => s.user);
   const [hoveredStar, setHoveredStar] = useState(0);
 
@@ -129,7 +129,10 @@ export default function FeedbackPage() {
                 <Label>Suggestions</Label>
                 <Textarea {...register("suggestions")} placeholder="Any suggestions for improvement?" rows={3} />
               </div>
-              <Button type="submit">Submit Feedback</Button>
+              <Button type="submit" disabled={isSubmitting || rating === 0}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {isSubmitting ? "Submitting..." : "Submit Feedback"}
+              </Button>
             </form>
           </CardContent>
         </Card>

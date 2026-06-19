@@ -7,7 +7,7 @@ import {
   toCreateEventPayload,
   toUpdateEventPayload,
 } from "@/lib/event-mappers";
-import type { CreateEventPayload, Event, UpcomingEvent, UpdateEventPayload } from "@/types";
+import type { CreateEventPayload, Event, EventListType, UpcomingEvent, UpdateEventPayload } from "@/types";
 
 export const getUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
   try {
@@ -18,9 +18,9 @@ export const getUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
   }
 };
 
-export const getEvents = async (): Promise<Event[]> => {
+export const getEvents = async (type: EventListType = "upcoming"): Promise<Event[]> => {
   try {
-    const { data } = await apiClient.get<unknown>("/events/");
+    const { data } = await apiClient.get<unknown>("/events/", { params: { type } });
     return extractEventList(data).map(mapApiEventToEvent);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));

@@ -1,5 +1,9 @@
-import axios from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "@/lib/constants";
+import {
+  isAuthRefreshRequest,
+  refreshStoredAccessToken,
+} from "@/lib/auth-token";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -21,7 +25,24 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !isAuthRefreshRequest(originalRequest.url)
+    ) {
+      originalRequest._retry = true;
+
+      const newToken = await refreshStoredAccessToken();
+      if (newToken) {
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient(originalRequest);
+      }
+    }
+
     return Promise.reject(error);
-  }
+  },
 );

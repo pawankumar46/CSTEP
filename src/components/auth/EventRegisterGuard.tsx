@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
 interface EventRegisterGuardProps {
   children: React.ReactNode;
@@ -18,7 +18,7 @@ export function EventRegisterGuard({ children }: EventRegisterGuardProps) {
     if (!hasHydrated || isLoading) return;
 
     if (!isAuthenticated) {
-      router.replace(`${ROUTES.login}?redirect=${ROUTES.eventRegister}`);
+      router.replace(buildAuthUrl(ROUTES.login, { redirect: ROUTES.eventRegister }));
     }
   }, [hasHydrated, isLoading, isAuthenticated, router]);
 

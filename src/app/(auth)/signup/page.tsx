@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import { API_USER_ROLE_VALUES, USER_ROLE_OPTIONS, type ApiUserRole } from "@/lib/user-roles";
 
 const signupSchema = z.object({
@@ -38,8 +39,10 @@ const signupSchema = z.object({
 
 type SignupForm = z.infer<typeof signupSchema>;
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
   const { signUp, isLoading, error, clearError } = useAuthStore();
 
   const { register, handleSubmit, control, formState: { errors } } = useForm<SignupForm>({
@@ -74,6 +77,7 @@ export default function SignupPage() {
         email: data.email.trim().toLowerCase(),
         phone: data.phone,
       });
+      if (redirectTo) params.set("redirect", redirectTo);
       router.push(`${ROUTES.otp}?${params.toString()}`);
     } catch {
       // error handled in store
@@ -81,16 +85,11 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-background p-4">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-lg"
-      >
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-lg"
+    >
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
@@ -109,6 +108,16 @@ export default function SignupPage() {
           </CardHeader>
           <form onSubmit={handleSubmit(onSubmit)}>
             <CardContent className="space-y-4">
+              {redirectTo === ROUTES.streaming && (
+                <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+                  Create an account to watch the live stream.
+                </div>
+              )}
+              {redirectTo?.startsWith(ROUTES.eventRegister) && (
+                <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+                  Create an account to complete your event registration.
+                </div>
+              )}
               {error && (
                 <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
               )}
@@ -204,16 +213,28 @@ export default function SignupPage() {
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Create Account
+                {isLoading ? "Creating account..." : "Create Account"}
               </Button>
               <p className="text-sm text-muted-foreground text-center">
                 Already have an account?{" "}
-                <Link href={ROUTES.login} className="text-primary hover:underline">Sign in</Link>
+                <Link href={buildAuthUrl(ROUTES.login, { redirect: redirectTo })} className="text-primary hover:underline">Sign in</Link>
               </p>
             </CardFooter>
           </form>
         </Card>
       </motion.div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-background p-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      <Suspense fallback={<div className="text-muted-foreground">Loading...</div>}>
+        <SignupForm />
+      </Suspense>
     </div>
   );
 }

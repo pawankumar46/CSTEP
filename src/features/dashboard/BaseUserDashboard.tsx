@@ -16,7 +16,7 @@ export function BaseUserDashboard() {
   const { recordings, fetchRecordings } = useRecordingStore();
 
   useEffect(() => {
-    fetchEvents();
+    fetchEvents("upcoming");
     fetchRecordings();
   }, [fetchEvents, fetchRecordings]);
 

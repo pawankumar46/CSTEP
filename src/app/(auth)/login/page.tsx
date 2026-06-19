@@ -18,7 +18,7 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { getDefaultRouteForRole } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, buildAuthUrl, sanitizeRedirect } from "@/lib/routes";
 
 const loginSchema = z.object({
   identifier: z.string().min(1, "Email or phone is required"),
@@ -49,8 +49,9 @@ function LoginForm() {
         identifier: data.identifier.trim().toLowerCase(),
       });
       const user = useAuthStore.getState().user;
-      if (redirectTo) {
-        router.push(redirectTo);
+      const safeRedirect = sanitizeRedirect(redirectTo);
+      if (safeRedirect) {
+        router.push(safeRedirect);
       } else if (user) {
         router.push(getDefaultRouteForRole(user.role));
       } else {
@@ -93,7 +94,7 @@ function LoginForm() {
                 Please sign in to watch the live stream.
               </div>
             )}
-            {redirectTo === ROUTES.eventRegister && !verified && (
+            {redirectTo?.startsWith(ROUTES.eventRegister) && !verified && (
               <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
                 Sign in to complete your event registration.
               </div>
@@ -127,11 +128,11 @@ function LoginForm() {
           <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Sign In
+              {isLoading ? "Signing in..." : "Sign In"}
             </Button>
             <p className="text-sm text-muted-foreground text-center">
               Don&apos;t have an account?{" "}
-              <Link href={ROUTES.signup} className="text-primary hover:underline">Sign up</Link>
+              <Link href={buildAuthUrl(ROUTES.signup, { redirect: redirectTo })} className="text-primary hover:underline">Sign up</Link>
             </p>
           </CardFooter>
         </form>

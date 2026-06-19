@@ -3,15 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Loader2, Menu, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { UserInitials } from "@/components/shared/UserInitials";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
-import { isStaffRole } from "@/lib/auth-utils";
+import { useWatchLiveAccess } from "@/hooks/useWatchLiveAccess";
+import { isBaseUserRole, isStaffRole } from "@/lib/auth-utils";
 import { BrandLogo } from "@/components/shared/BrandLogo";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -24,11 +25,12 @@ const navLinks = [
 export function LandingNavbar() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuthStore();
-  const { isRegistered } = useEventRegistration();
-  const canWatchLive = isAuthenticated && user && (isStaffRole(user.role) || isRegistered);
+  const { user, isAuthenticated, logout, isLoggingOut } = useAuthStore();
+  const { isRegistered, upcomingEvent } = useEventRegistration();
+  const { canWatchLive, disabledTitle, showSignInToWatch } = useWatchLiveAccess(upcomingEvent);
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
     await logout();
     router.push("/");
     setOpen(false);
@@ -36,23 +38,39 @@ export function LandingNavbar() {
 
   const authButtons = isAuthenticated && user ? (
     <>
-      {canWatchLive ? (
+      {/* {canWatchLive ? (
         <Button variant="outline" asChild>
           <Link href="/streaming">Watch Live</Link>
         </Button>
+      ) : showSignInToWatch ? (
+        <Button variant="outline" asChild>
+          <Link href={buildAuthUrl(ROUTES.login, { redirect: ROUTES.streaming })}>Watch Live</Link>
+        </Button>
       ) : (
-        <Button variant="outline" disabled title="Register for an event first to watch live">
+        <Button variant="outline" disabled title={disabledTitle}>
           Watch Live
         </Button>
-      )}
+      )} */}
       {isStaffRole(user.role) && (
         <Button asChild>
           <Link href="/dashboard">Dashboard</Link>
         </Button>
       )}
-      <Button variant="ghost" className="gap-2 px-2" onClick={handleLogout}>
-        <UserInitials name={`${user.firstName} ${user.lastName}`} size="sm" />
-        <span className="hidden lg:inline text-sm">Logout</span>
+      {isBaseUserRole(user.role) && (
+        <Button variant="ghost" className="gap-2" asChild>
+          <Link href={ROUTES.profile}>
+            <User className="h-4 w-4" />
+            <span className="hidden lg:inline text-sm">Profile</span>
+          </Link>
+        </Button>
+      )}
+      <Button variant="ghost" className="gap-2 px-2" onClick={handleLogout} disabled={isLoggingOut}>
+        {isLoggingOut ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <UserInitials name={`${user.firstName} ${user.lastName}`} size="sm" />
+        )}
+        <span className="hidden lg:inline text-sm">{isLoggingOut ? "Logging out..." : "Logout"}</span>
       </Button>
     </>
   ) : (
@@ -115,8 +133,17 @@ export function LandingNavbar() {
                   <Button variant="outline" asChild>
                     <Link href="/streaming" onClick={() => setOpen(false)}>Watch Live</Link>
                   </Button>
+                ) : showSignInToWatch ? (
+                  <Button variant="outline" asChild>
+                    <Link
+                      href={buildAuthUrl(ROUTES.login, { redirect: ROUTES.streaming })}
+                      onClick={() => setOpen(false)}
+                    >
+                      Watch Live
+                    </Link>
+                  </Button>
                 ) : (
-                  <Button variant="outline" disabled title="Register for an event first to watch live">
+                  <Button variant="outline" disabled title={disabledTitle}>
                     Watch Live
                   </Button>
                 )}
@@ -125,7 +152,18 @@ export function LandingNavbar() {
                     <Link href="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
                   </Button>
                 )}
-                <Button variant="ghost" onClick={handleLogout}>Logout</Button>
+                {isBaseUserRole(user.role) && (
+                  <Button variant="ghost" className="justify-start" asChild>
+                    <Link href={ROUTES.profile} onClick={() => setOpen(false)}>
+                      <User className="h-4 w-4 mr-2" />
+                      Profile
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={handleLogout} disabled={isLoggingOut}>
+                  {isLoggingOut && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isLoggingOut ? "Logging out..." : "Logout"}
+                </Button>
               </>
             ) : (
               <div className="flex gap-2">

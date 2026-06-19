@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { OTPInput } from "@/components/shared/OTPInput";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import type { OtpVerifyMethod } from "@/types";
 
 function OTPForm() {
@@ -21,6 +21,7 @@ function OTPForm() {
   const searchParams = useSearchParams();
   const prefilledEmail = searchParams.get("email") ?? "";
   const prefilledPhone = searchParams.get("phone") ?? "";
+  const redirectTo = searchParams.get("redirect");
 
   const { verifyOtp, isLoading, error, clearError } = useAuthStore();
   const [method, setMethod] = useState<OtpVerifyMethod>(prefilledPhone ? "phone" : "email");
@@ -55,11 +56,12 @@ function OTPForm() {
         email: method === "email" ? email : undefined,
       });
       setSuccess(true);
-      const params = new URLSearchParams({
-        verified: "1",
+      const loginUrl = buildAuthUrl(ROUTES.login, {
+        redirect: redirectTo,
+        verified: true,
         email: method === "email" ? email.trim().toLowerCase() : prefilledEmail || email.trim().toLowerCase(),
       });
-      setTimeout(() => router.push(`${ROUTES.login}?${params.toString()}`), 1500);
+      setTimeout(() => router.push(loginUrl), 1500);
     } catch {
       // error handled in store
     }
@@ -145,9 +147,9 @@ function OTPForm() {
         <CardFooter className="flex flex-col gap-3">
           <Button className="w-full" onClick={handleVerify} disabled={otp.length !== 6 || isLoading}>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Verify OTP
+            {isLoading ? "Verifying..." : "Verify OTP"}
           </Button>
-          <Link href={ROUTES.login} className="text-sm text-primary hover:underline">Back to sign in</Link>
+          <Link href={buildAuthUrl(ROUTES.login, { redirect: redirectTo })} className="text-sm text-primary hover:underline">Back to sign in</Link>
         </CardFooter>
       </Card>
     </motion.div>

@@ -206,7 +206,7 @@ export function VideoPlayer({
             ref={videoRef}
             key={`${playbackUrl}-${reloadKey}`}
             src={playbackUrl}
-            className="absolute inset-0 h-full w-full object-contain bg-black"
+            className="absolute inset-0 h-full w-full object-cover bg-black"
             autoPlay
             playsInline
             controls={false}

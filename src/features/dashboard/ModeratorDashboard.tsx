@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Users, UserCheck, UserX, UserPlus, Activity } from "lucide-react";
+import { Users, UserCheck, UserX, UserPlus, Activity, Pause, Clock } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -41,7 +41,7 @@ export function ModeratorDashboard() {
 
   useEffect(() => {
     fetchAnalytics();
-    fetchEvents();
+    fetchEvents("upcoming");
   }, [fetchAnalytics, fetchEvents]);
 
   if (isLoading || !analytics) return <DashboardSkeleton />;
@@ -55,10 +55,12 @@ export function ModeratorDashboard() {
         <p className="text-sm text-muted-foreground">Overview of registrations and participant management</p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard title="Total Registered Users" value={summary.totalUsers} icon={Users} />
         <StatCard title="Event Participants" value={summary.eventParticipants} icon={UserPlus} />
         <StatCard title="Accepted Participants" value={summary.accepted} icon={UserCheck} />
+        <StatCard title="Pending Participants" value={summary.pending} icon={Clock} />
+        <StatCard title="On Hold Participants" value={summary.onHold} icon={Pause} />
         <StatCard title="Rejected Participants" value={summary.rejected} icon={UserX} />
       </div>
 

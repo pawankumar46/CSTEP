@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getUpcomingEvents } from "@/services/event.service";
+import { useEffect } from "react";
+import { useHomeDataStore } from "@/store/useHomeDataStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
-import type { UpcomingEvent } from "@/types";
 
 export function useEventRegistration() {
   const user = useAuthStore((s) => s.user);
@@ -12,28 +11,14 @@ export function useEventRegistration() {
   const isEventRegistered = useRegistrationStore((s) => s.isEventRegistered);
   const registeredEmail = useRegistrationStore((s) => s.registeredEmail);
 
-  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
-  const [checked, setChecked] = useState(false);
+  const authKey = `${isAuthenticated}:${user?.id ?? ""}`;
+  const upcomingEvents = useHomeDataStore((s) => s.upcomingEvents);
+  const checked = useHomeDataStore((s) => s.upcomingLoaded);
+  const load = useHomeDataStore((s) => s.load);
 
   useEffect(() => {
-    let cancelled = false;
-    setChecked(false);
-
-    getUpcomingEvents()
-      .then((events) => {
-        if (!cancelled) setUpcomingEvents(events);
-      })
-      .catch(() => {
-        if (!cancelled) setUpcomingEvents([]);
-      })
-      .finally(() => {
-        if (!cancelled) setChecked(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, user?.id]);
+    void load(authKey);
+  }, [authKey, load]);
 
   const localIsRegistered =
     isAuthenticated &&

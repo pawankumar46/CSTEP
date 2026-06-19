@@ -24,9 +24,9 @@ export const mockNotifications = [
 ];
 
 export const mockChatMessages = [
-  { id: "chat-1", userId: "user-001", userName: "James Smith", message: "Great keynote so far!", timestamp: "2025-06-08T09:15:00Z" },
-  { id: "chat-2", userId: "user-002", userName: "Mary Johnson", message: "The AI panel was incredibly insightful", timestamp: "2025-06-08T09:18:00Z" },
-  { id: "chat-3", userId: "user-moderator", userName: "Emily Rodriguez", message: "Q&A session starting in 5 minutes", timestamp: "2025-06-08T09:20:00Z" },
-  { id: "chat-4", userId: "user-003", userName: "Robert Williams", message: "Anyone attending the networking lunch?", timestamp: "2025-06-08T09:25:00Z" },
-  { id: "chat-5", userId: "user-004", userName: "Patricia Brown", message: "Yes! See you there", timestamp: "2025-06-08T09:26:00Z" },
+  { id: "chat-1", userId: "user-001", userName: "Arjun Menon", message: "Great keynote so far!", timestamp: "2025-06-08T09:15:00Z" },
+  { id: "chat-2", userId: "user-002", userName: "Priya Nair", message: "The AI panel was incredibly insightful", timestamp: "2025-06-08T09:18:00Z" },
+  { id: "chat-3", userId: "user-moderator", userName: "Ananya Desai", message: "Q&A session starting in 5 minutes", timestamp: "2025-06-08T09:20:00Z" },
+  { id: "chat-4", userId: "user-003", userName: "Vikram Singh", message: "Anyone attending the networking lunch?", timestamp: "2025-06-08T09:25:00Z" },
+  { id: "chat-5", userId: "user-004", userName: "Kavita Reddy", message: "Yes! See you there", timestamp: "2025-06-08T09:26:00Z" },
 ];

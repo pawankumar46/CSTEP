@@ -2,7 +2,7 @@
 
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 interface Step {
   title: string;
@@ -57,15 +57,16 @@ export function MultiStepForm({
       <div className="min-h-[300px]">{children}</div>
 
       <div className="flex justify-between pt-4 border-t">
-        <Button variant="outline" onClick={onBack} disabled={currentStep === 0}>
+        <Button variant="outline" onClick={onBack} disabled={currentStep === 0 || isSubmitting}>
           <ChevronLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         {isLastStep ? (
           <Button onClick={onSubmit} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {isSubmitting ? "Submitting..." : "Submit Registration"}
           </Button>
         ) : (
-          <Button onClick={onNext}>
+          <Button onClick={onNext} disabled={isSubmitting}>
             Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         )}

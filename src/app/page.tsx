@@ -12,6 +12,7 @@ import { useHomeEvent } from "@/hooks/useHomeEvent";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomCTASkeleton } from "@/components/shared/LoadingSkeleton";
+import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
 import {
   formatEventDateRange,
   formatEventDurationAdjective,
@@ -69,26 +70,12 @@ function BottomCTA() {
               <Link href={registerHref}>{registerLabel}</Link>
             </Button>
           )}
-          {!isAuthenticated && (
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-white bg-transparent text-white hover:bg-white/15 hover:text-white"
-              asChild
-            >
-              <Link href={`${ROUTES.login}?redirect=${ROUTES.streaming}`}>Sign In</Link>
-            </Button>
-          )}
-          {isAuthenticated && !isRegistered && (
-            <Button size="lg" variant="secondary" disabled title="Register for an event first to watch live">
-              Watch Live
-            </Button>
-          )}
-          {isAuthenticated && isRegistered && (
-            <Button size="lg" variant="secondary" asChild>
-              <Link href={ROUTES.streaming}>Watch Live</Link>
-            </Button>
-          )}
+          <WatchLiveButton
+            event={upcomingEvent}
+            size="lg"
+            variant="secondary"
+            className="border-white bg-transparent text-white hover:bg-white/15 hover:text-white disabled:opacity-50"
+          />
         </div>
       </div>
     </section>

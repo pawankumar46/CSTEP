@@ -12,6 +12,9 @@ interface LobbyState {
   updateStatus: (id: string, status: RegistrationStatus) => Promise<void>;
   updateTravelStatus: (id: string, status: "accepted" | "rejected") => Promise<void>;
   updateTranslationStatus: (id: string, status: "accepted" | "rejected") => Promise<void>;
+  bulkUpdateStatus: (ids: string[], status: RegistrationStatus) => Promise<void>;
+  bulkUpdateTravelStatus: (ids: string[], status: "accepted" | "rejected") => Promise<void>;
+  bulkUpdateTranslationStatus: (ids: string[], status: "accepted" | "rejected") => Promise<void>;
 }
 
 export const useLobbyStore = create<LobbyState>((set, get) => ({
@@ -76,6 +79,51 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
       set({ registrations, error: null });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to update translation status" });
+      throw err;
+    }
+  },
+
+  bulkUpdateStatus: async (ids, status) => {
+    const eventId = get().selectedEventId;
+    if (!eventId) throw new Error("No event selected");
+    if (ids.length === 0) return;
+
+    try {
+      await lobbyService.bulkUpdateLobbyStatus(ids, status);
+      const registrations = await lobbyService.getLobbyRegistrations(eventId);
+      set({ registrations, error: null });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to update lobby statuses" });
+      throw err;
+    }
+  },
+
+  bulkUpdateTravelStatus: async (ids, status) => {
+    const eventId = get().selectedEventId;
+    if (!eventId) throw new Error("No event selected");
+    if (ids.length === 0) return;
+
+    try {
+      await lobbyService.bulkUpdateTravelStatus(ids, status);
+      const registrations = await lobbyService.getLobbyRegistrations(eventId);
+      set({ registrations, error: null });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to update travel statuses" });
+      throw err;
+    }
+  },
+
+  bulkUpdateTranslationStatus: async (ids, status) => {
+    const eventId = get().selectedEventId;
+    if (!eventId) throw new Error("No event selected");
+    if (ids.length === 0) return;
+
+    try {
+      await lobbyService.bulkUpdateTranslationStatus(ids, status);
+      const registrations = await lobbyService.getLobbyRegistrations(eventId);
+      set({ registrations, error: null });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to update translation statuses" });
       throw err;
     }
   },

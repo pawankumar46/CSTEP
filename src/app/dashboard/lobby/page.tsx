@@ -1,19 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Pause, X } from "lucide-react";
+import { Check, Loader2, Pause, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
+import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { slugifyFilename } from "@/lib/export-utils";
+import {
+  LOBBY_EXPORT_COLUMNS,
+} from "@/lib/registration-export";
 import type { Registration, RegistrationStatus, UserRole } from "@/types";
 
 const statusVariant: Record<RegistrationStatus, "default" | "secondary" | "success" | "warning" | "destructive"> = {
@@ -44,14 +50,20 @@ function LobbyContent() {
     error,
     setSelectedEventId,
     fetchRegistrations,
-    updateStatus,
+    bulkUpdateStatus,
   } = useLobbyStore();
   const [statusFilter, setStatusFilter] = useState<RegistrationStatus | "all">("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [pendingBulkAction, setPendingBulkAction] = useState<RegistrationStatus | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const selectedIdsRef = useRef<string[]>([]);
+  selectedIdsRef.current = selectedIds;
 
   const canManage = user ? LOBBY_ACTION_ROLES.includes(user.role) : false;
 
   useEffect(() => {
-    fetchEvents();
+    fetchEvents("upcoming");
   }, [fetchEvents]);
 
   useEffect(() => {
@@ -65,8 +77,89 @@ function LobbyContent() {
     return registrations.filter((r) => r.status === statusFilter);
   }, [registrations, statusFilter]);
 
+  useEffect(() => {
+    const allowed = new Set(filteredRegistrations.map((r) => r.id));
+    setSelectedIds((prev) => prev.filter((id) => allowed.has(id)));
+  }, [filteredRegistrations]);
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const allVisibleIds = filteredRegistrations.map((r) => r.id);
+  const allVisibleSelected =
+    allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedSet.has(id));
+
+  const selectedCount = selectedIds.length;
+
+  const applyStatusAction = useCallback(async (status: RegistrationStatus, ids: string[]) => {
+    if (!selectedEventId || ids.length === 0) return;
+
+    if (ids.length > 1) {
+      setBulkLoading(true);
+      setPendingBulkAction(status);
+      try {
+        await bulkUpdateStatus(ids, status);
+        setSelectedIds([]);
+      } finally {
+        setBulkLoading(false);
+        setPendingBulkAction(null);
+      }
+      return;
+    }
+
+    const id = ids[0];
+    setActionLoadingId(id);
+    try {
+      await bulkUpdateStatus([id], status);
+    } finally {
+      setActionLoadingId(null);
+    }
+  }, [bulkUpdateStatus, selectedEventId]);
+
+  const runBulkAction = useCallback(async (action: RegistrationStatus) => {
+    await applyStatusAction(action, [...selectedIdsRef.current]);
+  }, [applyStatusAction]);
+
+  const resolveActionIds = useCallback((rowId: string) => {
+    const currentSelected = selectedIdsRef.current;
+    return currentSelected.length > 1 ? [...currentSelected] : [rowId];
+  }, []);
+
   const columns = useMemo<ColumnDef<Registration>[]>(() => {
+    const selectionColumn: ColumnDef<Registration>[] = canManage
+      ? [{
+        id: "select",
+        header: () => (
+          <Checkbox
+            checked={allVisibleSelected}
+            disabled={bulkLoading}
+            onCheckedChange={(checked) => {
+              if (checked) {
+                setSelectedIds(allVisibleIds);
+              } else {
+                setSelectedIds([]);
+              }
+            }}
+            aria-label="Select all visible rows"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={selectedSet.has(row.original.id)}
+            disabled={bulkLoading}
+            onCheckedChange={(checked) => {
+              setSelectedIds((prev) =>
+                checked
+                  ? [...prev, row.original.id]
+                  : prev.filter((id) => id !== row.original.id)
+              );
+            }}
+            aria-label={`Select ${row.original.userName}`}
+          />
+        ),
+      }]
+      : [];
+
     const baseColumns: ColumnDef<Registration>[] = [
+      ...selectionColumn,
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "phone", header: "Phone Number" },
       { accessorKey: "email", header: "Email" },
@@ -98,53 +191,78 @@ function LobbyContent() {
       {
         id: "actions",
         header: "Actions",
-        cell: ({ row }) => (
+        cell: ({ row }) => {
+          const isRowLoading = actionLoadingId === row.original.id;
+          const bulkFromRow = selectedIds.length > 1;
+          return (
           <div className="flex gap-1">
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-emerald-600"
-              title="Accept"
-              onClick={() => updateStatus(row.original.id, "accepted")}
+              title={bulkFromRow ? `Approve ${selectedIds.length} selected` : "Accept"}
+              disabled={bulkLoading || isRowLoading}
+              onClick={() => void applyStatusAction("accepted", resolveActionIds(row.original.id))}
             >
-              <Check className="h-3 w-3" />
+              {(isRowLoading || (bulkLoading && pendingBulkAction === "accepted")) ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Check className="h-3 w-3" />
+              )}
             </Button>
             <Button
               size="sm"
               variant="outline"
               className="h-7"
-              title="Hold"
-              onClick={() => updateStatus(row.original.id, "on_hold")}
+              title={bulkFromRow ? `Hold ${selectedIds.length} selected` : "Hold"}
+              disabled={bulkLoading || isRowLoading}
+              onClick={() => void applyStatusAction("on_hold", resolveActionIds(row.original.id))}
             >
-              <Pause className="h-3 w-3" />
+              {(isRowLoading || (bulkLoading && pendingBulkAction === "on_hold")) ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Pause className="h-3 w-3" />
+              )}
             </Button>
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-destructive"
-              title="Reject"
-              onClick={() => updateStatus(row.original.id, "rejected")}
+              title={bulkFromRow ? `Reject ${selectedIds.length} selected` : "Reject"}
+              disabled={bulkLoading || isRowLoading}
+              onClick={() => void applyStatusAction("rejected", resolveActionIds(row.original.id))}
             >
-              <X className="h-3 w-3" />
+              {(isRowLoading || (bulkLoading && pendingBulkAction === "rejected")) ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <X className="h-3 w-3" />
+              )}
             </Button>
           </div>
-        ),
+          );
+        },
       },
     ];
-  }, [canManage, updateStatus]);
+  }, [actionLoadingId, allVisibleIds, allVisibleSelected, applyStatusAction, bulkLoading, canManage, pendingBulkAction, resolveActionIds, selectedIds, selectedSet]);
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
     setStatusFilter("all");
+    setSelectedIds([]);
   };
+
+  const selectedEvent = events.find((event) => event.id === selectedEventId);
+  const exportFilename = slugifyFilename(
+    selectedEvent ? `lobby-${selectedEvent.name}` : "lobby-registrations",
+  );
 
   if (eventsLoading && events.length === 0) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Event Lobby</h1>
-        <p className="text-muted-foreground">Manage participant registrations</p>
+        <h1 className="text-2xl font-bold">Manage Lobby</h1>
+        <p className="text-muted-foreground">Review and update participant registration status</p>
       </div>
 
       <EventSelectCard
@@ -167,33 +285,105 @@ function LobbyContent() {
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               {filteredRegistrations.length} registered participant{filteredRegistrations.length === 1 ? "" : "s"}
             </p>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as RegistrationStatus | "all")}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Filter status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              {canManage && selectedCount > 0 && (
+                <span className="text-xs text-muted-foreground">{selectedCount} selected</span>
+              )}
+              {canManage && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-emerald-600"
+                    disabled={bulkLoading || actionLoadingId !== null || selectedCount === 0}
+                    onClick={() => runBulkAction("accepted")}
+                  >
+                    {pendingBulkAction === "accepted" ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Approving...
+                      </>
+                    ) : (
+                      "Approve"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={bulkLoading || actionLoadingId !== null || selectedCount === 0}
+                    onClick={() => runBulkAction("on_hold")}
+                  >
+                    {pendingBulkAction === "on_hold" ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Holding...
+                      </>
+                    ) : (
+                      "Hold"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive"
+                    disabled={bulkLoading || actionLoadingId !== null || selectedCount === 0}
+                    onClick={() => runBulkAction("rejected")}
+                  >
+                    {pendingBulkAction === "rejected" ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Rejecting...
+                      </>
+                    ) : (
+                      "Reject"
+                    )}
+                  </Button>
+                </>
+              )}
+              <ExportMenu
+                filename={exportFilename}
+                title={selectedEvent ? `Manage Lobby — ${selectedEvent.name}` : "Manage Lobby"}
+                columns={LOBBY_EXPORT_COLUMNS}
+                data={filteredRegistrations}
+              />
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as RegistrationStatus | "all")}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Filter status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <DataTable
-            columns={columns}
-            data={filteredRegistrations}
-            searchKey="userName"
-            searchPlaceholder="Search participants..."
-            pageSize={10}
-          />
+          <div className="relative">
+            {bulkLoading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/70">
+                <div className="flex items-center gap-2 rounded-md border bg-background px-4 py-2 text-sm text-muted-foreground shadow-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Updating registrations...
+                </div>
+              </div>
+            )}
+            <DataTable
+              columns={columns}
+              data={filteredRegistrations}
+              searchKey="userName"
+              searchPlaceholder="Search participants..."
+              pageSize={10}
+            />
+          </div>
         </>
       )}
     </div>

@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { getDefaultRouteForRole } from "@/lib/auth-utils";
+import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import type { UserRole } from "@/types";
 
 interface RouteGuardProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
+  loginRedirect?: string;
 }
 
-export function RouteGuard({ children, allowedRoles }: RouteGuardProps) {
+export function RouteGuard({ children, allowedRoles, loginRedirect }: RouteGuardProps) {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
 
@@ -24,14 +26,15 @@ export function RouteGuard({ children, allowedRoles }: RouteGuardProps) {
     if (!authReady) return;
 
     if (!isAuthenticated) {
-      router.replace("/login?redirect=/dashboard");
+      const redirectPath = loginRedirect ?? "/dashboard";
+      router.replace(buildAuthUrl(ROUTES.login, { redirect: redirectPath }));
       return;
     }
 
     if (user && allowedRoles && !allowedRoles.includes(user.role)) {
       router.replace(getDefaultRouteForRole(user.role));
     }
-  }, [authReady, isAuthenticated, user, allowedRoles, router]);
+  }, [authReady, isAuthenticated, user, allowedRoles, router, loginRedirect]);
 
   if (!authReady) {
     return (

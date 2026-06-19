@@ -204,6 +204,22 @@ function extractParticipationDatesFromApi(raw: Record<string, unknown>): string[
   return [];
 }
 
+export function toRegistrationPreferencesPayload(
+  preferences: Pick<
+    RegistrationFormData,
+    "travelRequired" | "travelType" | "medicalSupportRequired" | "medicalSupportType"
+  >,
+) {
+  return {
+    travel_arrangement: preferences.travelRequired && preferences.travelType
+      ? TRAVEL_ARRANGEMENT_MAP[preferences.travelType]
+      : null,
+    medical_support: preferences.medicalSupportRequired && preferences.medicalSupportType
+      ? toApiEnum(preferences.medicalSupportType)
+      : null,
+  };
+}
+
 export function toRegistrationApiPayload(
   data: RegistrationFormData,
   event?: Pick<Event, "date" | "endDate"> | null,
