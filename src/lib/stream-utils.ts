@@ -13,8 +13,6 @@ const GOOGLE_DRIVE_FOLDER_REGEX = /drive\.google\.com\/drive\/folders\/([a-zA-Z0
 const GOOGLE_DRIVE_OPEN_REGEX = /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/;
 const GOOGLE_DRIVE_UC_REGEX = /drive\.google\.com\/uc\?(?:[^#]*&)?id=([a-zA-Z0-9_-]+)/;
 
-export const DEFAULT_LIVE_STREAM_FILE_ID = "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
-
 export function buildDriveEmbedUrl(fileId: string, autoplay = true): string {
   const base = `https://drive.google.com/file/d/${fileId}/preview`;
   return autoplay ? `${base}?autoplay=1` : base;
@@ -34,7 +32,7 @@ function toDriveFileSource(fileId: string, originalUrl: string): StreamSource {
   };
 }
 
-export function parseStreamUrl(url: string, fallbackFileId = DEFAULT_LIVE_STREAM_FILE_ID): StreamSource {
+export function parseStreamUrl(url: string, fallbackFileId?: string): StreamSource {
   const trimmed = url.trim();
   if (!trimmed) {
     return { type: "unknown", originalUrl: trimmed };
@@ -45,7 +43,7 @@ export function parseStreamUrl(url: string, fallbackFileId = DEFAULT_LIVE_STREAM
     return toDriveFileSource(fileMatch[1], trimmed);
   }
 
-  if (trimmed.match(GOOGLE_DRIVE_FOLDER_REGEX)) {
+  if (trimmed.match(GOOGLE_DRIVE_FOLDER_REGEX) && fallbackFileId) {
     return toDriveFileSource(fallbackFileId, trimmed);
   }
 

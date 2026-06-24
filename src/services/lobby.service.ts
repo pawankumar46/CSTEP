@@ -100,6 +100,20 @@ export const bulkUpdateTranslationStatus = async (
   }
 };
 
+export const bulkUpdateMedicalStatus = async (
+  ids: string[],
+  status: "accepted" | "rejected"
+): Promise<void> => {
+  try {
+    await apiClient.patch("/registrations/bulk-medical-status/", {
+      ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
+      status: mapAppRequestStatusToApi(status),
+    });
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 export const updateTranslationStatus = async (
   registrationId: string,
   status: "accepted" | "rejected",
@@ -113,6 +127,26 @@ export const updateTranslationStatus = async (
       if (updated) return updated;
     }
     return mapApiRegistrationToRegistration({ id: registrationId }, eventId);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const updateMedicalStatus = async (
+  assistanceId: string,
+  status: "accepted" | "rejected",
+  eventId?: string
+): Promise<Registration> => {
+  try {
+    await bulkUpdateMedicalStatus([assistanceId], status);
+    if (eventId) {
+      const registrations = await getLobbyRegistrations(eventId);
+      const updated = registrations.find(
+        (registration) => registration.medicalAssistance?.id === assistanceId,
+      );
+      if (updated) return updated;
+    }
+    return mapApiRegistrationToRegistration({ id: assistanceId }, eventId);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

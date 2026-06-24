@@ -1,12 +1,12 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { API_BASE_URL } from "@/lib/constants";
+import { getApiBaseUrl } from "@/lib/env";
 import {
   isAuthRefreshRequest,
   refreshStoredAccessToken,
 } from "@/lib/auth-token";
 
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },

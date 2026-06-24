@@ -12,6 +12,8 @@ import type {
   RegistrationStatus,
   TranslationAssistanceItem,
   TranslationAssistanceRow,
+  MedicalAssistanceItem,
+  MedicalAssistanceRow,
   TranslationLanguage,
   TravelAssistanceItem,
   TravelAssistanceRow,
@@ -342,6 +344,24 @@ function mapApiTranslationAssistanceItem(
   };
 }
 
+function mapApiMedicalAssistanceItem(
+  raw: Record<string, unknown>,
+): MedicalAssistanceItem | undefined {
+  const entry = raw.medical_assistance;
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
+
+  const assistance = entry as Record<string, unknown>;
+  const medicalNeeds = String(assistance.medical_needs ?? "").trim();
+  if (!medicalNeeds) return undefined;
+
+  return {
+    id: String(assistance.id ?? ""),
+    medicalNeeds,
+    requiredDate: String(assistance.date ?? ""),
+    status: mapApiRequestStatus(assistance.status) ?? "pending",
+  };
+}
+
 export function flattenTravelAssistanceRows(registrations: Registration[]): TravelAssistanceRow[] {
   return registrations.flatMap((registration) =>
     (registration.travelAssistance ?? []).map((item) => ({
@@ -371,6 +391,23 @@ export function flattenTranslationAssistanceRows(
   });
 }
 
+export function flattenMedicalAssistanceRows(
+  registrations: Registration[],
+): MedicalAssistanceRow[] {
+  return registrations.flatMap((registration) => {
+    const assistance = registration.medicalAssistance;
+    if (!assistance) return [];
+
+    return [{
+      ...assistance,
+      registrationId: registration.id,
+      userName: registration.userName,
+      email: registration.email,
+      phone: registration.phone,
+    }];
+  });
+}
+
 export function mapApiRegistrationToRegistration(
   raw: Record<string, unknown>,
   eventId?: string
@@ -379,6 +416,7 @@ export function mapApiRegistrationToRegistration(
   const details = resolveRegistrationDetails(raw);
   const travelAssistance = mapApiTravelAssistanceItems(raw);
   const translationAssistance = mapApiTranslationAssistanceItem(raw);
+  const medicalAssistance = mapApiMedicalAssistanceItem(raw);
   const firstTravel = travelAssistance[0];
   const travelKey = firstTravel?.transportMode ?? "";
   const legacyTravelArrangement = details.travel_arrangement ?? raw.travel_arrangement;
@@ -411,6 +449,7 @@ export function mapApiRegistrationToRegistration(
     foodPreference: mapApiFoodPreference(raw.food_preference ?? details.food_preference),
     travelAssistance,
     translationAssistance,
+    medicalAssistance,
     travelRequired: travelAssistance.length > 0 || (legacyTravelKey !== "" && legacyTravelKey !== "SELF_ARRANGED"),
     travelType:
       legacyTravelKey && legacyTravelKey !== "SELF_ARRANGED"
@@ -422,6 +461,7 @@ export function mapApiRegistrationToRegistration(
       ?? (legacyTravelKey ? formatTravelArrangementLabel(legacyTravelKey) : undefined),
     travelStatus: firstTravel?.status ?? mapApiRequestStatus(raw.travel_status),
     medicalSupportRequired:
+      medicalAssistance != null ||
       raw.medical_assistance != null ||
       ((details.medical_support ?? raw.medical_support) != null &&
         (details.medical_support ?? raw.medical_support) !== ""),

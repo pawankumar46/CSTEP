@@ -28,7 +28,6 @@ export function toSignupPayload(data: SignupCredentials) {
     first_name: data.firstName,
     middle_name: data.middleName ?? "",
     last_name: data.lastName,
-    role: data.role,
     phone_number: formatPhoneForApi(data.phone),
     email: normalizeAuthIdentifier(data.email),
     password: data.password,

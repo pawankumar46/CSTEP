@@ -5,6 +5,7 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Loader2, RefreshCw } from "luc
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
+import { LIVE_STREAM_FILE_ID } from "@/lib/constants";
 
 const BUFFERING_TIMEOUT_MS = 20000;
 const IFRAME_LOAD_TIMEOUT_MS = 20000;
@@ -61,7 +62,7 @@ export function VideoPlayer({
     setIsBuffering(true);
     setPlaybackError(false);
     setNeedsUserPlay(false);
-    setSource(parseStreamUrl(streamUrl));
+    setSource(parseStreamUrl(streamUrl, LIVE_STREAM_FILE_ID));
   }, [streamUrl, reloadKey]);
 
   const usesIframe =

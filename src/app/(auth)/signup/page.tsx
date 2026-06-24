@@ -18,7 +18,6 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
-import { API_USER_ROLE_VALUES, USER_ROLE_OPTIONS, type ApiUserRole } from "@/lib/user-roles";
 
 const signupSchema = z.object({
   salutation: z.string().min(1, "Salutation is required"),
@@ -29,7 +28,6 @@ const signupSchema = z.object({
     .string()
     .regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
   email: z.string().email("Valid email is required"),
-  role: z.enum(API_USER_ROLE_VALUES as [string, ...string[]]),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(1, "Please confirm your password"),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -54,7 +52,6 @@ function SignupForm() {
       lastName: "",
       phone: "",
       email: "",
-      role: "BASE_USER",
       password: "",
       confirmPassword: "",
     },
@@ -70,7 +67,6 @@ function SignupForm() {
         lastName: data.lastName,
         phone: data.phone,
         email: data.email,
-        role: data.role as ApiUserRole,
         password: data.password,
       });
       const params = new URLSearchParams({
@@ -180,21 +176,6 @@ function SignupForm() {
                   <Input id="email" type="email" placeholder="you@example.com" {...register("email")} />
                   {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <Controller name="role" control={control} render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                    <SelectContent>
-                      {USER_ROLE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )} />
-                {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">

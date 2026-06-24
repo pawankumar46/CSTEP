@@ -1,15 +1,15 @@
 import type { NextConfig } from "next";
 
 const apiUrl =
-  process.env.NEXT_PUBLIC_API_URL?.trim() ||
-  process.env.API_URL?.trim() ||
-  "https://cstep-django.vercel.app";
+  process.env.NEXT_PUBLIC_API_URL?.trim() || process.env.API_URL?.trim();
+
+const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
 
 const nextConfig: NextConfig = {
   devIndicators: false,
   env: {
-    NEXT_PUBLIC_API_URL: apiUrl,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "",
+    ...(apiUrl ? { NEXT_PUBLIC_API_URL: apiUrl } : {}),
+    ...(appUrl ? { NEXT_PUBLIC_APP_URL: appUrl } : {}),
   },
   images: {
     remotePatterns: [

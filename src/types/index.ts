@@ -129,6 +129,13 @@ export interface TranslationAssistanceItem {
   status: "pending" | "accepted" | "rejected";
 }
 
+export interface MedicalAssistanceItem {
+  id: string;
+  medicalNeeds: string;
+  requiredDate: string;
+  status: "pending" | "accepted" | "rejected";
+}
+
 export interface TravelAssistanceRow extends TravelAssistanceItem {
   registrationId: string;
   userName: string;
@@ -137,6 +144,13 @@ export interface TravelAssistanceRow extends TravelAssistanceItem {
 }
 
 export interface TranslationAssistanceRow extends TranslationAssistanceItem {
+  registrationId: string;
+  userName: string;
+  email: string;
+  phone: string;
+}
+
+export interface MedicalAssistanceRow extends MedicalAssistanceItem {
   registrationId: string;
   userName: string;
   email: string;
@@ -157,6 +171,7 @@ export interface Registration {
   foodPreference: FoodPreference;
   travelAssistance?: TravelAssistanceItem[];
   translationAssistance?: TranslationAssistanceItem;
+  medicalAssistance?: MedicalAssistanceItem;
   travelRequired: boolean;
   travelType?: TravelType;
   travelArrangementLabel?: string;
@@ -350,7 +365,6 @@ export interface SignupCredentials {
   phone: string;
   email: string;
   password: string;
-  role: ApiUserRole;
 }
 
 export interface LoginCredentials {

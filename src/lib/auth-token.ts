@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_BASE_URL } from "@/lib/constants";
+import { getApiBaseUrl } from "@/lib/env";
 import { extractRefreshToken, extractToken } from "@/lib/auth-mappers";
 
 async function getAuthStore() {
@@ -43,7 +43,7 @@ export async function refreshStoredAccessToken(): Promise<string | null> {
     refreshPromise = (async () => {
       try {
         const { data } = await axios.post<Record<string, unknown>>(
-          `${API_BASE_URL}/auth/token/refresh/`,
+          `${getApiBaseUrl()}/auth/token/refresh/`,
           { refresh: refreshToken },
           { headers: { "Content-Type": "application/json" } },
         );

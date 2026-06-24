@@ -1,7 +1,7 @@
 import type { ExportColumn } from "@/lib/export-utils";
 import { formatParticipationDateDisplay } from "@/lib/registration-mappers";
 import { getRegistrationOptionLabel } from "@/lib/registration-options";
-import type { Registration, TranslationAssistanceRow, TravelAssistanceRow } from "@/types";
+import type { Registration, MedicalAssistanceRow, TranslationAssistanceRow, TravelAssistanceRow } from "@/types";
 
 function formatParticipationTime(value: Registration["participationTime"]): string {
   return value === "full_day" ? "Full Day" : "Half Day";
@@ -45,6 +45,18 @@ export const TRANSLATION_EXPORT_COLUMNS: ExportColumn<TranslationAssistanceRow>[
     header: "Requested Language",
     value: (row) => getRegistrationOptionLabel(row.language),
   },
+  {
+    header: "Required Date",
+    value: (row) => formatParticipationDateDisplay(row.requiredDate),
+  },
+  { header: "Status", value: (row) => row.status },
+];
+
+export const MEDICAL_EXPORT_COLUMNS: ExportColumn<MedicalAssistanceRow>[] = [
+  { header: "User Name", value: (row) => row.userName },
+  { header: "Email", value: (row) => row.email },
+  { header: "Phone", value: (row) => row.phone },
+  { header: "Medical Needs", value: (row) => row.medicalNeeds },
   {
     header: "Required Date",
     value: (row) => formatParticipationDateDisplay(row.requiredDate),

@@ -1,5 +1,5 @@
 import type { UserRole } from "@/types";
-import { getApiBaseUrl, readPublicEnv } from "@/lib/env";
+import { readPublicEnv } from "@/lib/env";
 
 export const APP_NAME = "CSTEP";
 export const APP_SHORT_NAME = "CS";
@@ -9,22 +9,17 @@ export const BRAND_LOGO_DARK_SRC =
 export const APP_DESCRIPTION =
   "CSTEP event management platform for registration, live streaming, and delegate coordination";
 
-export const API_BASE_URL = getApiBaseUrl();
-
 export const FEATURED_EVENT = {
   name: "CSTEP Annual Conference 2025",
   dates: "21st – 22nd August 2025",
   location: "Hybrid — In-person & Virtual",
 };
 
-/** Google Drive file preview URL for the live stream (C1581.mp4). */
-export const LIVE_STREAM_URL =
-  readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_URL") ??
-  "https://drive.google.com/file/d/1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-/preview";
+/** Live stream source URL — set NEXT_PUBLIC_LIVE_STREAM_URL in .env.local */
+export const LIVE_STREAM_URL = readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_URL");
 
-/** Direct Google Drive file ID for C1581.mp4 (used when folder resolution fails). */
-export const LIVE_STREAM_FILE_ID =
-  readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_ID") ?? "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
+/** Google Drive file ID fallback when stream URL is a folder link */
+export const LIVE_STREAM_FILE_ID = readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_ID");
 
 /** Vertical side banners shown beside the live stream (hidden in fullscreen). */
 export const STREAM_LEFT_BANNER_URL =
@@ -63,6 +58,7 @@ export type NavItem = {
 export const LOBBY_NAV_PATHS = [
   "/dashboard/lobby",
   "/dashboard/travel",
+  "/dashboard/medical",
   "/dashboard/translation",
 ] as const;
 
@@ -77,6 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Manage Lobby", href: "/dashboard/lobby" },
       { label: "Manage Travel Requests", href: "/dashboard/travel" },
+      { label: "Manage Medical Requests", href: "/dashboard/medical" },
       { label: "Manage Translation Requests", href: "/dashboard/translation" },
     ],
   },
