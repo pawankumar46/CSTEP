@@ -7,6 +7,8 @@ import {
   toRegistrationApiPayload,
   toRegistrationPreferencesPayload,
 } from "@/lib/registration-mappers";
+import { toMedicalRequestPayload, toTranslationRequestPayload, toTravelRequestPayload } from "@/lib/event-support-mappers";
+import type { EventSupportFormValues } from "@/features/profile/event-support.schema";
 
 export class AlreadyRegisteredError extends Error {
   constructor() {
@@ -16,12 +18,14 @@ export class AlreadyRegisteredError extends Error {
 }
 import { delay } from "@/lib/utils";
 import { mockRegistrations } from "@/mock/registrations";
-import type { Event, PaginatedResponse, Registration, RegistrationFormData, RegistrationStatus } from "@/types";
+import type { Event, MedicalSupportType, PaginatedResponse, Registration, RegistrationFormData, RegistrationStatus, TravelType } from "@/types";
 
-export type RegistrationPreferences = Pick<
-  RegistrationFormData,
-  "travelRequired" | "travelType" | "medicalSupportRequired" | "medicalSupportType"
->;
+export type RegistrationPreferences = {
+  travelRequired: boolean;
+  travelType?: TravelType;
+  medicalSupportRequired: boolean;
+  medicalSupportType?: MedicalSupportType;
+};
 
 let registrations = [...mockRegistrations];
 
@@ -124,6 +128,30 @@ export const submitRegistration = async (
     if (isDuplicateRegistrationError(error)) {
       throw new AlreadyRegisteredError();
     }
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const requestTravelSupport = async (data: EventSupportFormValues): Promise<void> => {
+  try {
+    await apiClient.post("/registrations/request-travel/", toTravelRequestPayload(data));
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const requestMedicalSupport = async (data: EventSupportFormValues): Promise<void> => {
+  try {
+    await apiClient.post("/registrations/request-medical/", toMedicalRequestPayload(data));
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const requestTranslationSupport = async (data: EventSupportFormValues): Promise<void> => {
+  try {
+    await apiClient.post("/registrations/request-translation/", toTranslationRequestPayload(data));
+  } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
 };

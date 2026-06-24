@@ -19,10 +19,7 @@ import { registrationSchema, REGISTRATION_STEPS, type RegistrationFormValues } f
 import {
   ATTENDANCE_MODES,
   FOOD_PREFERENCES,
-  MEDICAL_SUPPORT_TYPES,
   PARTICIPATION_TIMES,
-  TRANSLATION_LANGUAGES,
-  TRAVEL_TYPES,
   getRegistrationOptionLabel,
 } from "@/lib/registration-options";
 import { getParticipationDateLabel, getParticipationDateOptions } from "@/lib/participation-dates";
@@ -31,6 +28,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { AlreadyRegisteredError } from "@/services/registration.service";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
+import { buildProfileSupportUrl, PROFILE_SUPPORT_EVENT_KEY } from "@/lib/routes";
 
 export default function EventRegisterPage() {
   return (
@@ -49,7 +47,6 @@ function EventRegisterForm() {
   const user = useAuthStore((s) => s.user);
   const { events, isLoading: eventsLoading, fetchEvents } = useEventStore();
   const [step, setStep] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const { submitRegistration, isLoading } = useRegistrationStore();
 
@@ -63,7 +60,6 @@ function EventRegisterForm() {
       eventId: "",
       salutation: "", firstName: "", middleName: "", lastName: "", phone: "", email: "",
       participationDate: "", participationTime: "full_day", attendanceMode: "physical", foodPreference: "veg",
-      travelRequired: false, medicalSupportRequired: false, translationRequired: false,
     },
   });
 
@@ -93,9 +89,6 @@ function EventRegisterForm() {
         participationTime: "full_day",
         attendanceMode: "physical",
         foodPreference: "veg",
-        travelRequired: false,
-        medicalSupportRequired: false,
-        translationRequired: false,
       });
     }
   }, [user, reset, presetEventId, events]);
@@ -137,10 +130,12 @@ function EventRegisterForm() {
   const handleSubmit = async () => {
     if (!(await validateStep())) return;
 
+    const eventId = getValues().eventId;
+
     try {
       await submitRegistration(getValues(), selectedEvent);
-      setAlreadyRegistered(false);
-      setSubmitted(true);
+      sessionStorage.setItem(PROFILE_SUPPORT_EVENT_KEY, eventId);
+      router.replace(buildProfileSupportUrl(eventId));
     } catch (err) {
       if (err instanceof AlreadyRegisteredError) {
         setAlreadyRegistered(true);
@@ -149,20 +144,16 @@ function EventRegisterForm() {
     }
   };
 
-  if (submitted) {
+  if (alreadyRegistered) {
     return (
       <div className="min-h-screen flex flex-col">
         <LandingNavbar />
         <div className="flex-1 flex items-center justify-center p-4">
           <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-center space-y-6 max-w-md">
             <CheckCircle className="h-20 w-20 text-emerald-500 mx-auto" />
-            <h1 className="text-3xl font-bold">
-              {alreadyRegistered ? "Already Registered" : "Event Registration Successful!"}
-            </h1>
+            <h1 className="text-3xl font-bold">Already Registered</h1>
             <p className="text-muted-foreground">
-              {alreadyRegistered
-                ? "You are already registered for this event. You can watch the live stream when it begins."
-                : "You're registered for the conference. You can watch the live stream when the event begins."}
+              You are already registered for this event. You can watch the live stream when it begins.
             </p>
             <div className="flex gap-3 justify-center">
               <Button asChild><Link href="/">Back to Home</Link></Button>
@@ -343,94 +334,6 @@ function EventRegisterForm() {
               )}
 
               {step === 4 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Travel Required</Label>
-                    <Controller name="travelRequired" control={control} render={({ field }) => (
-                      <RadioGroup onValueChange={(v) => field.onChange(v === "yes")} value={field.value ? "yes" : "no"} className="flex gap-4">
-                        <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="travel-yes" /><Label htmlFor="travel-yes">Yes</Label></div>
-                        <div className="flex items-center gap-2"><RadioGroupItem value="no" id="travel-no" /><Label htmlFor="travel-no">No</Label></div>
-                      </RadioGroup>
-                    )} />
-                  </div>
-                  {values.travelRequired && (
-                    <div className="space-y-2">
-                      <Label>Travel Type</Label>
-                      <Controller name="travelType" control={control} render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger><SelectValue placeholder="Select travel type" /></SelectTrigger>
-                          <SelectContent>
-                            {TRAVEL_TYPES.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )} />
-                      {errors.travelType && <p className="text-xs text-destructive">{errors.travelType.message}</p>}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {step === 5 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Medical Support Required</Label>
-                    <Controller name="medicalSupportRequired" control={control} render={({ field }) => (
-                      <RadioGroup onValueChange={(v) => field.onChange(v === "yes")} value={field.value ? "yes" : "no"} className="flex gap-4">
-                        <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="med-yes" /><Label htmlFor="med-yes">Yes</Label></div>
-                        <div className="flex items-center gap-2"><RadioGroupItem value="no" id="med-no" /><Label htmlFor="med-no">No</Label></div>
-                      </RadioGroup>
-                    )} />
-                  </div>
-                  {values.medicalSupportRequired && (
-                    <div className="space-y-2">
-                      <Label>Support Type</Label>
-                      <Controller name="medicalSupportType" control={control} render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger><SelectValue placeholder="Select support type" /></SelectTrigger>
-                          <SelectContent>
-                            {MEDICAL_SUPPORT_TYPES.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )} />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {step === 6 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Translation Required</Label>
-                    <Controller name="translationRequired" control={control} render={({ field }) => (
-                      <RadioGroup onValueChange={(v) => field.onChange(v === "yes")} value={field.value ? "yes" : "no"} className="flex gap-4">
-                        <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="trans-yes" /><Label htmlFor="trans-yes">Yes</Label></div>
-                        <div className="flex items-center gap-2"><RadioGroupItem value="no" id="trans-no" /><Label htmlFor="trans-no">No</Label></div>
-                      </RadioGroup>
-                    )} />
-                  </div>
-                  {values.translationRequired && (
-                    <div className="space-y-2">
-                      <Label>Language</Label>
-                      <Controller name="translationLanguage" control={control} render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
-                          <SelectContent>
-                            {TRANSLATION_LANGUAGES.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )} />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {step === 7 && (
                 <Card>
                   <CardHeader><CardTitle>Registration Summary</CardTitle></CardHeader>
                   <CardContent className="space-y-4 text-sm">
@@ -450,11 +353,8 @@ function EventRegisterForm() {
                       </p>
                     </div>
                     <div>
-                      <h4 className="font-semibold mb-2">Preferences</h4>
-                      <p>Food: {getRegistrationOptionLabel(values.foodPreference)}</p>
-                      {values.travelRequired && <p>Travel: {values.travelType ? getRegistrationOptionLabel(values.travelType) : "—"}</p>}
-                      {values.medicalSupportRequired && <p>Medical: {values.medicalSupportType ? getRegistrationOptionLabel(values.medicalSupportType) : "—"}</p>}
-                      {values.translationRequired && <p>Translation: {values.translationLanguage ? getRegistrationOptionLabel(values.translationLanguage) : "—"}</p>}
+                      <h4 className="font-semibold mb-2">Food Preference</h4>
+                      <p>{getRegistrationOptionLabel(values.foodPreference)}</p>
                     </div>
                   </CardContent>
                 </Card>

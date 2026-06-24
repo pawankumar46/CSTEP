@@ -16,10 +16,11 @@ import { slugifyFilename } from "@/lib/export-utils";
 import {
   TRAVEL_EXPORT_COLUMNS,
 } from "@/lib/registration-export";
+import { flattenTravelAssistanceRows } from "@/lib/registration-mappers";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
-import type { Registration, UserRole } from "@/types";
+import type { TravelAssistanceRow, UserRole } from "@/types";
 
 const LOBBY_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
 type TravelActionStatus = "accepted" | "rejected";
@@ -71,18 +72,18 @@ function TravelContent() {
     }
   }, [selectedEventId, fetchRegistrations]);
 
-  const travelRegistrations = useMemo(
-    () => registrations.filter((r) => r.travelRequired),
-    [registrations]
+  const travelRows = useMemo(
+    () => flattenTravelAssistanceRows(registrations),
+    [registrations],
   );
 
   useEffect(() => {
-    const allowed = new Set(travelRegistrations.map((r) => r.id));
+    const allowed = new Set(travelRows.map((r) => r.id));
     setSelectedIds((prev) => prev.filter((id) => allowed.has(id)));
-  }, [travelRegistrations]);
+  }, [travelRows]);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const allVisibleIds = travelRegistrations.map((r) => r.id);
+  const allVisibleIds = travelRows.map((r) => r.id);
   const allVisibleSelected =
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedSet.has(id));
   const selectedCount = selectedIds.length;
@@ -126,8 +127,8 @@ function TravelContent() {
     return currentSelected.length > 1 ? [...currentSelected] : [rowId];
   }, []);
 
-  const columns = useMemo<ColumnDef<Registration>[]>(() => {
-    const selectionColumn: ColumnDef<Registration>[] = canManage
+  const columns = useMemo<ColumnDef<TravelAssistanceRow>[]>(() => {
+    const selectionColumn: ColumnDef<TravelAssistanceRow>[] = canManage
       ? [{
         id: "select",
         header: () => (
@@ -161,22 +162,34 @@ function TravelContent() {
       }]
       : [];
 
-    const baseColumns: ColumnDef<Registration>[] = [
+    const baseColumns: ColumnDef<TravelAssistanceRow>[] = [
       ...selectionColumn,
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "email", header: "Email" },
       { accessorKey: "phone", header: "Phone" },
       {
-        id: "travelArrangement",
-        header: "Travel Arrangement",
-        cell: ({ row }) => row.original.travelArrangementLabel ?? "—",
+        id: "transportMode",
+        header: "Transport Mode",
+        cell: ({ row }) => row.original.transportModeLabel,
       },
       {
-        accessorKey: "travelStatus",
-        header: "Travel Status",
+        accessorKey: "sourceLocation",
+        header: "From",
+      },
+      {
+        accessorKey: "destinationLocation",
+        header: "To",
+      },
+      {
+        accessorKey: "travelDate",
+        header: "Travel Date",
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
         cell: ({ row }) => (
-          <Badge variant={requestStatusVariant(row.original.travelStatus)} className="capitalize">
-            {row.original.travelStatus ?? "pending"}
+          <Badge variant={requestStatusVariant(row.original.status)} className="capitalize">
+            {row.original.status}
           </Badge>
         ),
       },
@@ -269,7 +282,7 @@ function TravelContent() {
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {travelRegistrations.length} travel request{travelRegistrations.length === 1 ? "" : "s"}
+              {travelRows.length} travel request{travelRows.length === 1 ? "" : "s"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canManage && selectedCount > 0 && (
@@ -315,7 +328,7 @@ function TravelContent() {
                 filename={exportFilename}
                 title={selectedEvent ? `Manage Travel — ${selectedEvent.name}` : "Manage Travel"}
                 columns={TRAVEL_EXPORT_COLUMNS}
-                data={travelRegistrations}
+                data={travelRows}
               />
             </div>
           </div>
@@ -330,7 +343,7 @@ function TravelContent() {
             )}
             <DataTable
               columns={columns}
-              data={travelRegistrations}
+              data={travelRows}
               searchKey="userName"
               searchPlaceholder="Search users..."
               pageSize={10}

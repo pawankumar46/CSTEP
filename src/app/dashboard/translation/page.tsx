@@ -17,10 +17,11 @@ import { getRegistrationOptionLabel } from "@/lib/registration-options";
 import {
   TRANSLATION_EXPORT_COLUMNS,
 } from "@/lib/registration-export";
+import { flattenTranslationAssistanceRows } from "@/lib/registration-mappers";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
-import type { Registration, UserRole } from "@/types";
+import type { TranslationAssistanceRow, UserRole } from "@/types";
 
 const LOBBY_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
 type TranslationActionStatus = "accepted" | "rejected";
@@ -72,18 +73,18 @@ function TranslationContent() {
     }
   }, [selectedEventId, fetchRegistrations]);
 
-  const translationRegistrations = useMemo(
-    () => registrations.filter((r) => r.translationRequired && r.translationLanguage),
-    [registrations]
+  const translationRows = useMemo(
+    () => flattenTranslationAssistanceRows(registrations),
+    [registrations],
   );
 
   useEffect(() => {
-    const allowed = new Set(translationRegistrations.map((r) => r.id));
+    const allowed = new Set(translationRows.map((r) => r.id));
     setSelectedIds((prev) => prev.filter((id) => allowed.has(id)));
-  }, [translationRegistrations]);
+  }, [translationRows]);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const allVisibleIds = translationRegistrations.map((r) => r.id);
+  const allVisibleIds = translationRows.map((r) => r.id);
   const allVisibleSelected =
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedSet.has(id));
   const selectedCount = selectedIds.length;
@@ -127,8 +128,8 @@ function TranslationContent() {
     return currentSelected.length > 1 ? [...currentSelected] : [rowId];
   }, []);
 
-  const columns = useMemo<ColumnDef<Registration>[]>(() => {
-    const selectionColumn: ColumnDef<Registration>[] = canManage
+  const columns = useMemo<ColumnDef<TranslationAssistanceRow>[]>(() => {
+    const selectionColumn: ColumnDef<TranslationAssistanceRow>[] = canManage
       ? [{
         id: "select",
         header: () => (
@@ -162,7 +163,7 @@ function TranslationContent() {
       }]
       : [];
 
-    const baseColumns: ColumnDef<Registration>[] = [
+    const baseColumns: ColumnDef<TranslationAssistanceRow>[] = [
       ...selectionColumn,
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "email", header: "Email" },
@@ -170,17 +171,18 @@ function TranslationContent() {
       {
         id: "language",
         header: "Requested Language",
-        cell: ({ row }) =>
-          row.original.translationLanguage
-            ? getRegistrationOptionLabel(row.original.translationLanguage)
-            : "—",
+        cell: ({ row }) => getRegistrationOptionLabel(row.original.language),
       },
       {
-        accessorKey: "translationStatus",
+        accessorKey: "requiredDate",
+        header: "Required Date",
+      },
+      {
+        accessorKey: "status",
         header: "Translation Status",
         cell: ({ row }) => (
-          <Badge variant={requestStatusVariant(row.original.translationStatus)} className="capitalize">
-            {row.original.translationStatus ?? "pending"}
+          <Badge variant={requestStatusVariant(row.original.status)} className="capitalize">
+            {row.original.status}
           </Badge>
         ),
       },
@@ -273,7 +275,7 @@ function TranslationContent() {
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {translationRegistrations.length} translation request{translationRegistrations.length === 1 ? "" : "s"}
+              {translationRows.length} translation request{translationRows.length === 1 ? "" : "s"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canManage && selectedCount > 0 && (
@@ -319,7 +321,7 @@ function TranslationContent() {
                 filename={exportFilename}
                 title={selectedEvent ? `Manage Translation — ${selectedEvent.name}` : "Manage Translation"}
                 columns={TRANSLATION_EXPORT_COLUMNS}
-                data={translationRegistrations}
+                data={translationRows}
               />
             </div>
           </div>
@@ -334,7 +336,7 @@ function TranslationContent() {
             )}
             <DataTable
               columns={columns}
-              data={translationRegistrations}
+              data={translationRows}
               searchKey="userName"
               searchPlaceholder="Search users..."
               pageSize={10}

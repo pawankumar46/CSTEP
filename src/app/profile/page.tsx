@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { LandingNavbar } from "@/components/layout/LandingNavbar";
 import { LandingFooter } from "@/components/layout/LandingFooter";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import {
-  MedicalPreferenceFields,
-  TravelPreferenceFields,
-} from "@/components/profile/TravelMedicalForm";
+import { EventSupportRequestForm } from "@/components/profile/EventSupportRequestForm";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useProfilePreferencesStore } from "@/store/useProfilePreferencesStore";
+import { useEventSupportStore } from "@/store/useEventSupportStore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -21,37 +19,33 @@ import { Button } from "@/components/ui/button";
 import { RoleBadge } from "@/components/shared/RoleBadge";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import {
-  profilePreferencesSchema,
-  type ProfilePreferencesFormValues,
-} from "@/features/profile/profile-preferences.schema";
-import { ROUTES } from "@/lib/routes";
+  eventSupportSchema,
+  EMPTY_EVENT_SUPPORT,
+  type EventSupportFormValues,
+} from "@/features/profile/event-support.schema";
+import { PROFILE_SUPPORT_EVENT_KEY, ROUTES } from "@/lib/routes";
+import { useHomeDataStore } from "@/store/useHomeDataStore";
 import {
-  getUserRegistration,
-  updateRegistrationPreferences,
+  requestMedicalSupport,
+  requestTranslationSupport,
+  requestTravelSupport,
 } from "@/services/registration.service";
-import type { Registration } from "@/types";
 
-const EMPTY_PREFERENCES: ProfilePreferencesFormValues = {
-  travelRequired: false,
-  medicalSupportRequired: false,
-};
-
-function toFormValues(registration: Registration): ProfilePreferencesFormValues {
-  return {
-    travelRequired: registration.travelRequired,
-    travelType: registration.travelType,
-    medicalSupportRequired: registration.medicalSupportRequired,
-    medicalSupportType: registration.medicalSupportType,
-  };
+function getHomeAuthKey(isAuthenticated: boolean, userId?: string): string {
+  return `${isAuthenticated}:${userId ?? ""}`;
 }
 
 function ProfileContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetEventId = searchParams.get("event");
   const user = useAuthStore((s) => s.user);
-  const getStoredPreferences = useProfilePreferencesStore((s) => s.getForEmail);
-  const setStoredPreferences = useProfilePreferencesStore((s) => s.setForEmail);
-  const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const loadHomeData = useHomeDataStore((s) => s.load);
+  const clearStoredSupport = useEventSupportStore((s) => s.clearForEmail);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [fromRegistration, setFromRegistration] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
   const {
     control,
@@ -60,9 +54,9 @@ function ProfileContent() {
     watch,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<ProfilePreferencesFormValues>({
-    resolver: zodResolver(profilePreferencesSchema),
-    defaultValues: EMPTY_PREFERENCES,
+  } = useForm<EventSupportFormValues>({
+    resolver: zodResolver(eventSupportSchema),
+    defaultValues: EMPTY_EVENT_SUPPORT,
   });
 
   const values = watch();
@@ -70,54 +64,50 @@ function ProfileContent() {
   useEffect(() => {
     if (!user?.email) return;
 
-    const stored = getStoredPreferences(user.email);
-    if (stored) {
-      reset(stored);
+    clearStoredSupport(user.email);
+
+    const initial: EventSupportFormValues = { ...EMPTY_EVENT_SUPPORT };
+    const pendingEventId = sessionStorage.getItem(PROFILE_SUPPORT_EVENT_KEY);
+
+    if (presetEventId && pendingEventId === presetEventId) {
+      initial.eventId = presetEventId;
+      initial.serviceType = "travel";
+      setFromRegistration(true);
+    } else {
+      setFromRegistration(false);
+      if (presetEventId) {
+        router.replace(ROUTES.profile);
+      }
     }
 
-    let cancelled = false;
+    reset(initial);
+    setFormKey((key) => key + 1);
+  }, [user?.email, presetEventId, clearStoredSupport, reset, router]);
 
-    getUserRegistration(user.email)
-      .then((result) => {
-        if (cancelled) return;
-        if (result) {
-          setRegistrationId(result.id);
-          reset(toFormValues(result));
-        }
-      })
-      .catch(() => {
-        // Keep locally stored or default values when registration is unavailable.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.email, getStoredPreferences, reset]);
-
-  const onSavePreferences = async (data: ProfilePreferencesFormValues) => {
+  const onSubmitRequest = async (data: EventSupportFormValues) => {
     if (!user?.email) return;
 
     setSaveError(null);
-    setSaveSuccess(false);
-
-    const payload: ProfilePreferencesFormValues = {
-      travelRequired: data.travelRequired,
-      travelType: data.travelRequired ? data.travelType : undefined,
-      medicalSupportRequired: data.medicalSupportRequired,
-      medicalSupportType: data.medicalSupportRequired ? data.medicalSupportType : undefined,
-    };
-
-    setStoredPreferences(user.email, payload);
 
     try {
-      if (registrationId) {
-        await updateRegistrationPreferences(registrationId, payload);
+      if (data.serviceType === "travel") {
+        await requestTravelSupport(data);
+      } else if (data.serviceType === "medical") {
+        await requestMedicalSupport(data);
+      } else {
+        await requestTranslationSupport(data);
       }
-      reset(payload);
-      setSaveSuccess(true);
+
+      sessionStorage.removeItem(PROFILE_SUPPORT_EVENT_KEY);
+      clearStoredSupport(user.email);
+      reset(EMPTY_EVENT_SUPPORT);
+      setFormKey((key) => key + 1);
+      await loadHomeData(getHomeAuthKey(isAuthenticated, user.id), { force: true });
+      router.replace(ROUTES.home);
+      router.refresh();
     } catch (error) {
       setSaveError(
-        error instanceof Error ? error.message : "Failed to sync preferences with the server",
+        error instanceof Error ? error.message : "Failed to submit support request",
       );
     }
   };
@@ -130,6 +120,39 @@ function ProfileContent() {
         <h1 className="text-2xl font-bold">Profile</h1>
         <p className="text-muted-foreground">View and manage your account details</p>
       </div>
+
+      {fromRegistration && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+          You&apos;re registered for the event. Submit a travel, medical, or translation support
+          request below if you need assistance.
+        </div>
+      )}
+      <form key={formKey} onSubmit={handleSubmit(onSubmitRequest)} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Event Support Request</CardTitle>
+            <CardDescription>
+              Request travel, medical, or translation assistance for an upcoming event
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EventSupportRequestForm
+              control={control}
+              values={values}
+              errors={errors}
+              setValue={setValue}
+              presetEventId={presetEventId}
+            />
+          </CardContent>
+        </Card>
+
+        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
+
+        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isSubmitting ? "Submitting..." : "Submit Request"}
+        </Button>
+      </form>
 
       <Card>
         <CardHeader>
@@ -162,51 +185,7 @@ function ProfileContent() {
         </CardContent>
       </Card>
 
-      {/* <form onSubmit={handleSubmit(onSavePreferences)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Travel</CardTitle>
-            <CardDescription>
-              Tell us if you need travel arrangements for the event
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TravelPreferenceFields
-              control={control}
-              values={values}
-              errors={errors}
-              setValue={setValue}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Medical</CardTitle>
-            <CardDescription>
-              Tell us if you need medical or accessibility support at the event
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MedicalPreferenceFields
-              control={control}
-              values={values}
-              errors={errors}
-              setValue={setValue}
-            />
-          </CardContent>
-        </Card>
-
-        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-        {saveSuccess && (
-          <p className="text-sm text-emerald-600">Your preferences have been saved.</p>
-        )}
-
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isSubmitting ? "Saving..." : "Save Preferences"}
-        </Button>
-      </form> */}
+      
 
       <Card>
         <CardHeader>
@@ -235,7 +214,9 @@ export default function ProfilePage() {
       <div className="flex min-h-screen flex-col">
         <LandingNavbar />
         <main className="container mx-auto flex-1 px-4 py-8">
-          <ProfileContent />
+          <Suspense fallback={null}>
+            <ProfileContent />
+          </Suspense>
         </main>
         <LandingFooter />
       </div>

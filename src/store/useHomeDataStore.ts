@@ -11,7 +11,8 @@ interface HomeDataState {
   participantsRegistered: number | null;
   summaryLoaded: boolean;
   authKey: string | null;
-  load: (authKey: string) => Promise<void>;
+  load: (authKey: string, options?: { force?: boolean }) => Promise<void>;
+  invalidate: () => void;
 }
 
 export const useHomeDataStore = create<HomeDataState>((set, get) => ({
@@ -21,9 +22,18 @@ export const useHomeDataStore = create<HomeDataState>((set, get) => ({
   summaryLoaded: false,
   authKey: null,
 
-  load: async (authKey) => {
+  invalidate: () => {
+    loadPromise = null;
+    set({
+      upcomingLoaded: false,
+      summaryLoaded: false,
+    });
+  },
+
+  load: async (authKey, options) => {
     const state = get();
     if (
+      !options?.force &&
       state.authKey === authKey &&
       state.upcomingLoaded &&
       state.summaryLoaded
@@ -38,6 +48,12 @@ export const useHomeDataStore = create<HomeDataState>((set, get) => ({
         upcomingEvents: [],
         upcomingLoaded: false,
         participantsRegistered: null,
+        summaryLoaded: false,
+      });
+    } else if (options?.force) {
+      loadPromise = null;
+      set({
+        upcomingLoaded: false,
         summaryLoaded: false,
       });
     }

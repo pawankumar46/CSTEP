@@ -10,7 +10,11 @@ import type {
   Registration,
   RegistrationFormData,
   RegistrationStatus,
+  TranslationAssistanceItem,
+  TranslationAssistanceRow,
   TranslationLanguage,
+  TravelAssistanceItem,
+  TravelAssistanceRow,
   TravelType,
 } from "@/types";
 
@@ -134,16 +138,22 @@ export function formatParticipationDateDisplay(value: unknown): string {
 
 function mapApiAttendanceMode(value: unknown): AttendanceMode {
   const normalized = String(value ?? "PHYSICAL").toUpperCase();
-  return normalized === "VIRTUAL" ? "virtual" : "physical";
+  if (normalized === "VIRTUAL" || normalized === "ONLINE") return "virtual";
+  return "physical";
 }
 
 function mapApiFoodPreference(value: unknown): FoodPreference {
-  const normalized = fromApiEnum(String(value ?? "VEG"));
+  if (value == null || value === "") return "veg";
+  const normalized = String(value).toUpperCase();
+  if (API_FOOD_TO_APP[normalized]) {
+    return API_FOOD_TO_APP[normalized];
+  }
+  const legacy = fromApiEnum(normalized);
   const allowed: FoodPreference[] = [
     "veg", "jain", "vegan", "satvik", "egg_veg", "pescetarian", "gluten_free",
     "lactose_free", "diabetic_friendly", "nut_allergy", "halal", "non_veg_chicken", "non_veg_any",
   ];
-  return allowed.includes(normalized as FoodPreference) ? (normalized as FoodPreference) : "veg";
+  return allowed.includes(legacy as FoodPreference) ? (legacy as FoodPreference) : "veg";
 }
 
 function mapApiMedicalSupport(value: unknown): MedicalSupportType | undefined {
@@ -180,8 +190,45 @@ const TRAVEL_ARRANGEMENT_MAP: Record<TravelType, string> = {
   train_only: "TRAIN_ONLY",
 };
 
-function toApiEnum(value: string): string {
-  return value.toUpperCase();
+const FOOD_PREFERENCE_TO_API: Record<FoodPreference, string> = {
+  veg: "VEG",
+  jain: "JAIN",
+  vegan: "VEGAN",
+  satvik: "SATVIK",
+  egg_veg: "EGG_VEG",
+  pescetarian: "PESCETARIAN",
+  gluten_free: "GLUTEN_FREE",
+  lactose_free: "LACTOSE_FREE",
+  diabetic_friendly: "DIABETIC_FRIENDLY",
+  nut_allergy: "NUT_ALLERGY",
+  halal: "HALAL",
+  non_veg_chicken: "NON_VEG_CHICKEN",
+  non_veg_any: "NON_VEG_ANY",
+};
+
+const API_FOOD_TO_APP: Record<string, FoodPreference> = Object.fromEntries(
+  Object.entries(FOOD_PREFERENCE_TO_API).map(([app, api]) => [api, app as FoodPreference]),
+) as Record<string, FoodPreference>;
+
+// Legacy API values
+API_FOOD_TO_APP.VEGETARIAN = "veg";
+API_FOOD_TO_APP.EGG_VEGETARIAN = "egg_veg";
+
+const ATTENDANCE_MODE_TO_API: Record<AttendanceMode, string> = {
+  physical: "PHYSICAL",
+  virtual: "VIRTUAL",
+};
+
+function mapAppParticipationTimeToApi(time: ParticipationTime): string {
+  return time === "full_day" ? "FULL_DAY" : "HALF_DAY";
+}
+
+function mapAppAttendanceModeToApi(mode: AttendanceMode): string {
+  return ATTENDANCE_MODE_TO_API[mode];
+}
+
+function mapAppFoodPreferenceToApi(preference: FoodPreference): string {
+  return FOOD_PREFERENCE_TO_API[preference];
 }
 
 function extractParticipationDatesFromApi(raw: Record<string, unknown>): string[] {
@@ -204,19 +251,36 @@ function extractParticipationDatesFromApi(raw: Record<string, unknown>): string[
   return [];
 }
 
+function resolveRegistrationDetails(raw: Record<string, unknown>): Record<string, unknown> {
+  const nested = raw.details;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  return raw;
+}
+
+function mapApiParticipationTime(value: unknown): ParticipationTime {
+  const normalized = String(value ?? "FULL_DAY").toUpperCase();
+  return normalized === "HALF_DAY" || normalized === "HALF" ? "half_day" : "full_day";
+}
+
 export function toRegistrationPreferencesPayload(
-  preferences: Pick<
-    RegistrationFormData,
-    "travelRequired" | "travelType" | "medicalSupportRequired" | "medicalSupportType"
-  >,
+  preferences: {
+    travelRequired: boolean;
+    travelType?: TravelType;
+    medicalSupportRequired: boolean;
+    medicalSupportType?: MedicalSupportType;
+  },
 ) {
   return {
-    travel_arrangement: preferences.travelRequired && preferences.travelType
-      ? TRAVEL_ARRANGEMENT_MAP[preferences.travelType]
-      : null,
-    medical_support: preferences.medicalSupportRequired && preferences.medicalSupportType
-      ? toApiEnum(preferences.medicalSupportType)
-      : null,
+    details: {
+      travel_arrangement: preferences.travelRequired && preferences.travelType
+        ? TRAVEL_ARRANGEMENT_MAP[preferences.travelType]
+        : "SELF_ARRANGED",
+      medical_support: preferences.medicalSupportRequired && preferences.medicalSupportType
+        ? preferences.medicalSupportType.toUpperCase()
+        : null,
+    },
   };
 }
 
@@ -226,19 +290,10 @@ export function toRegistrationApiPayload(
 ) {
   return {
     event: Number(data.eventId),
+    participation_time: mapAppParticipationTimeToApi(data.participationTime),
+    attendance_mode: mapAppAttendanceModeToApi(data.attendanceMode),
+    food_preference: mapAppFoodPreferenceToApi(data.foodPreference),
     participation_dates: resolveParticipationDatesForApi(data.participationDate, event),
-    attendance_mode: toApiEnum(data.attendanceMode),
-    participation_time: data.participationTime === "full_day" ? "FULL_DAY" : "HALF_DAY",
-    food_preference: toApiEnum(data.foodPreference),
-    travel_arrangement: data.travelRequired && data.travelType
-      ? TRAVEL_ARRANGEMENT_MAP[data.travelType]
-      : null,
-    medical_support: data.medicalSupportRequired && data.medicalSupportType
-      ? toApiEnum(data.medicalSupportType)
-      : null,
-    translation_language: data.translationRequired && data.translationLanguage
-      ? toApiEnum(data.translationLanguage)
-      : null,
   };
 }
 
@@ -250,18 +305,87 @@ export function extractRegistrationList(data: unknown): Record<string, unknown>[
   return [];
 }
 
+function mapApiTravelAssistanceItems(raw: Record<string, unknown>): TravelAssistanceItem[] {
+  const list = raw.travel_assistance;
+  if (!Array.isArray(list)) return [];
+
+  return list.map((item) => {
+    const entry = item as Record<string, unknown>;
+    const transportMode = String(entry.transport_mode ?? "").toUpperCase();
+    return {
+      id: String(entry.id ?? ""),
+      transportMode,
+      transportModeLabel: formatTravelArrangementLabel(transportMode),
+      sourceLocation: String(entry.source_location ?? ""),
+      destinationLocation: String(entry.destination_location ?? ""),
+      travelDate: String(entry.travel_date ?? ""),
+      status: mapApiRequestStatus(entry.status) ?? "pending",
+    };
+  });
+}
+
+function mapApiTranslationAssistanceItem(
+  raw: Record<string, unknown>,
+): TranslationAssistanceItem | undefined {
+  const entry = raw.translation_assistance;
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
+
+  const assistance = entry as Record<string, unknown>;
+  const language = mapApiTranslationLanguage(assistance.language);
+  if (!language) return undefined;
+
+  return {
+    id: String(assistance.id ?? ""),
+    language,
+    requiredDate: String(assistance.date ?? ""),
+    status: mapApiRequestStatus(assistance.status) ?? "pending",
+  };
+}
+
+export function flattenTravelAssistanceRows(registrations: Registration[]): TravelAssistanceRow[] {
+  return registrations.flatMap((registration) =>
+    (registration.travelAssistance ?? []).map((item) => ({
+      ...item,
+      registrationId: registration.id,
+      userName: registration.userName,
+      email: registration.email,
+      phone: registration.phone,
+    })),
+  );
+}
+
+export function flattenTranslationAssistanceRows(
+  registrations: Registration[],
+): TranslationAssistanceRow[] {
+  return registrations.flatMap((registration) => {
+    const assistance = registration.translationAssistance;
+    if (!assistance) return [];
+
+    return [{
+      ...assistance,
+      registrationId: registration.id,
+      userName: registration.userName,
+      email: registration.email,
+      phone: registration.phone,
+    }];
+  });
+}
+
 export function mapApiRegistrationToRegistration(
   raw: Record<string, unknown>,
   eventId?: string
 ): Registration {
   const now = new Date().toISOString();
-  const travelArrangement = raw.travel_arrangement;
-  const travelKey = travelArrangement ? String(travelArrangement).toUpperCase() : "";
-  const participationTime: ParticipationTime = String(raw.participation_time ?? "FULL_DAY")
-    .toUpperCase()
-    .includes("HALF")
-    ? "half_day"
-    : "full_day";
+  const details = resolveRegistrationDetails(raw);
+  const travelAssistance = mapApiTravelAssistanceItems(raw);
+  const translationAssistance = mapApiTranslationAssistanceItem(raw);
+  const firstTravel = travelAssistance[0];
+  const travelKey = firstTravel?.transportMode ?? "";
+  const legacyTravelArrangement = details.travel_arrangement ?? raw.travel_arrangement;
+  const legacyTravelKey = legacyTravelArrangement
+    ? String(legacyTravelArrangement).toUpperCase()
+    : travelKey;
+  const participationTime = mapApiParticipationTime(raw.participation_time);
 
   const apiParticipationDates = extractParticipationDatesFromApi(raw);
   const participationDate =
@@ -284,16 +408,34 @@ export function mapApiRegistrationToRegistration(
     participationDateLabel,
     participationTime,
     attendanceMode: mapApiAttendanceMode(raw.attendance_mode),
-    foodPreference: mapApiFoodPreference(raw.food_preference),
-    travelRequired: travelArrangement != null && travelArrangement !== "",
-    travelType: travelKey && travelKey !== "SELF_ARRANGED" ? API_TRAVEL_TO_APP[travelKey] : undefined,
-    travelArrangementLabel: travelKey ? formatTravelArrangementLabel(travelKey) : undefined,
-    travelStatus: mapApiRequestStatus(raw.travel_status),
-    medicalSupportRequired: raw.medical_support != null && raw.medical_support !== "",
-    medicalSupportType: mapApiMedicalSupport(raw.medical_support),
-    translationRequired: raw.translation_language != null && raw.translation_language !== "",
-    translationLanguage: mapApiTranslationLanguage(raw.translation_language),
-    translationStatus: mapApiRequestStatus(raw.translation_status),
+    foodPreference: mapApiFoodPreference(raw.food_preference ?? details.food_preference),
+    travelAssistance,
+    translationAssistance,
+    travelRequired: travelAssistance.length > 0 || (legacyTravelKey !== "" && legacyTravelKey !== "SELF_ARRANGED"),
+    travelType:
+      legacyTravelKey && legacyTravelKey !== "SELF_ARRANGED"
+        ? API_TRAVEL_TO_APP[legacyTravelKey]
+        : firstTravel
+          ? API_TRAVEL_TO_APP[firstTravel.transportMode]
+          : undefined,
+    travelArrangementLabel: firstTravel?.transportModeLabel
+      ?? (legacyTravelKey ? formatTravelArrangementLabel(legacyTravelKey) : undefined),
+    travelStatus: firstTravel?.status ?? mapApiRequestStatus(raw.travel_status),
+    medicalSupportRequired:
+      raw.medical_assistance != null ||
+      ((details.medical_support ?? raw.medical_support) != null &&
+        (details.medical_support ?? raw.medical_support) !== ""),
+    medicalSupportType: mapApiMedicalSupport(details.medical_support ?? raw.medical_support),
+    translationRequired: translationAssistance != null || (
+      (details.translation_language ?? raw.translation_language) != null &&
+      (details.translation_language ?? raw.translation_language) !== ""
+    ),
+    translationLanguage:
+      translationAssistance?.language
+      ?? mapApiTranslationLanguage(details.translation_language ?? raw.translation_language),
+    translationStatus:
+      translationAssistance?.status
+      ?? mapApiRequestStatus(raw.translation_status),
     status: mapApiStatus(raw.status),
     createdAt: String(raw.created_at ?? now),
     updatedAt: String(raw.updated_at ?? now),

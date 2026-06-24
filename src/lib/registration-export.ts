@@ -1,6 +1,7 @@
 import type { ExportColumn } from "@/lib/export-utils";
+import { formatParticipationDateDisplay } from "@/lib/registration-mappers";
 import { getRegistrationOptionLabel } from "@/lib/registration-options";
-import type { Registration } from "@/types";
+import type { Registration, TranslationAssistanceRow, TravelAssistanceRow } from "@/types";
 
 function formatParticipationTime(value: Registration["participationTime"]): string {
   return value === "full_day" ? "Full Day" : "Half Day";
@@ -22,22 +23,31 @@ export const LOBBY_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
   { header: "Status", value: (row) => formatStatus(row.status) },
 ];
 
-export const TRAVEL_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
+export const TRAVEL_EXPORT_COLUMNS: ExportColumn<TravelAssistanceRow>[] = [
   { header: "User Name", value: (row) => row.userName },
   { header: "Email", value: (row) => row.email },
   { header: "Phone", value: (row) => row.phone },
-  { header: "Travel Arrangement", value: (row) => row.travelArrangementLabel ?? "" },
-  { header: "Travel Status", value: (row) => row.travelStatus ?? "pending" },
+  { header: "Transport Mode", value: (row) => row.transportModeLabel },
+  { header: "From", value: (row) => row.sourceLocation },
+  { header: "To", value: (row) => row.destinationLocation },
+  {
+    header: "Travel Date",
+    value: (row) => formatParticipationDateDisplay(row.travelDate),
+  },
+  { header: "Status", value: (row) => row.status },
 ];
 
-export const TRANSLATION_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
+export const TRANSLATION_EXPORT_COLUMNS: ExportColumn<TranslationAssistanceRow>[] = [
   { header: "User Name", value: (row) => row.userName },
   { header: "Email", value: (row) => row.email },
   { header: "Phone", value: (row) => row.phone },
   {
     header: "Requested Language",
-    value: (row) =>
-      row.translationLanguage ? getRegistrationOptionLabel(row.translationLanguage) : "",
+    value: (row) => getRegistrationOptionLabel(row.language),
   },
-  { header: "Translation Status", value: (row) => row.translationStatus ?? "pending" },
+  {
+    header: "Required Date",
+    value: (row) => formatParticipationDateDisplay(row.requiredDate),
+  },
+  { header: "Status", value: (row) => row.status },
 ];

@@ -76,6 +76,14 @@ export function getHomeRegisterHref(
   return ROUTES.home;
 }
 
+export const PROFILE_SUPPORT_EVENT_KEY = "profile-support-event";
+
+export function buildProfileSupportUrl(eventId?: string): string {
+  if (!eventId) return ROUTES.profile;
+  const search = new URLSearchParams({ event: eventId });
+  return `${ROUTES.profile}?${search.toString()}`;
+}
+
 export function getHomeRegisterLabel(isAuthenticated: boolean, isEventRegistered: boolean): string | null {
   if (!isAuthenticated) return "Register";
   if (!isEventRegistered) return "Register for Event";

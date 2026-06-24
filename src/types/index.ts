@@ -112,6 +112,37 @@ export type TranslationLanguage =
   | "assamese"
   | "urdu";
 
+export interface TravelAssistanceItem {
+  id: string;
+  transportMode: string;
+  transportModeLabel: string;
+  sourceLocation: string;
+  destinationLocation: string;
+  travelDate: string;
+  status: "pending" | "accepted" | "rejected";
+}
+
+export interface TranslationAssistanceItem {
+  id: string;
+  language: TranslationLanguage;
+  requiredDate: string;
+  status: "pending" | "accepted" | "rejected";
+}
+
+export interface TravelAssistanceRow extends TravelAssistanceItem {
+  registrationId: string;
+  userName: string;
+  email: string;
+  phone: string;
+}
+
+export interface TranslationAssistanceRow extends TranslationAssistanceItem {
+  registrationId: string;
+  userName: string;
+  email: string;
+  phone: string;
+}
+
 export interface Registration {
   id: string;
   userId: string;
@@ -124,6 +155,8 @@ export interface Registration {
   participationTime: ParticipationTime;
   attendanceMode: AttendanceMode;
   foodPreference: FoodPreference;
+  travelAssistance?: TravelAssistanceItem[];
+  translationAssistance?: TranslationAssistanceItem;
   travelRequired: boolean;
   travelType?: TravelType;
   travelArrangementLabel?: string;
@@ -296,12 +329,6 @@ export interface RegistrationFormData {
   participationTime: ParticipationTime;
   attendanceMode: AttendanceMode;
   foodPreference: FoodPreference;
-  travelRequired: boolean;
-  travelType?: TravelType;
-  medicalSupportRequired: boolean;
-  medicalSupportType?: MedicalSupportType;
-  translationRequired: boolean;
-  translationLanguage?: TranslationLanguage;
 }
 
 export type ApiUserRole = "BASE_USER" | "MODERATOR" | "EVENT_ADMIN" | "SUPER_ADMIN";
