@@ -1,4 +1,4 @@
-export type StreamSourceType = "google-drive-file" | "direct-video" | "unknown";
+export type StreamSourceType = "google-drive-file" | "direct-video" | "hls-stream" | "unknown";
 
 export interface StreamSource {
   type: StreamSourceType;
@@ -57,7 +57,15 @@ export function parseStreamUrl(url: string, fallbackFileId?: string): StreamSour
     return toDriveFileSource(ucMatch[1], trimmed);
   }
 
-  if (/\.(mp4|webm|ogg|m3u8)(\?|$)/i.test(trimmed) || trimmed.startsWith("blob:")) {
+  if (/\.m3u8(\?|$)/i.test(trimmed)) {
+    return {
+      type: "hls-stream",
+      directUrl: trimmed,
+      originalUrl: trimmed,
+    };
+  }
+
+  if (/\.(mp4|webm|ogg)(\?|$)/i.test(trimmed) || trimmed.startsWith("blob:")) {
     return {
       type: "direct-video",
       directUrl: trimmed,

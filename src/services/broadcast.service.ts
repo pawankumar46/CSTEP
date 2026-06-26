@@ -64,3 +64,18 @@ export const fetchBroadcastUrl = async (
   if (!data.url) throw new Error("URL not returned");
   return data.url;
 };
+
+export const resolveLivePlaybackUrl = async (): Promise<string | null> => {
+  try {
+    const sessions = await getBroadcastSessions();
+    const candidate =
+      sessions.find((session) => session.isPrimary && session.isActive) ??
+      sessions.find((session) => session.isActive);
+
+    if (!candidate) return null;
+
+    return await fetchBroadcastUrl(candidate.id, "playback.hls");
+  } catch {
+    return null;
+  }
+};

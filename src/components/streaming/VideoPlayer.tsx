@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 import { Play, Pause, Volume2, VolumeX, Maximize, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -65,10 +66,12 @@ export function VideoPlayer({
     setSource(parseStreamUrl(streamUrl, LIVE_STREAM_FILE_ID));
   }, [streamUrl, reloadKey]);
 
+  const isHlsStream = source?.type === "hls-stream";
   const usesIframe =
     source?.type === "google-drive-file" && Boolean(source.embedUrl) && useIframeFallback;
   const usesVideo =
     (source?.type === "direct-video" && Boolean(source.directUrl)) ||
+    (isHlsStream && Boolean(source.directUrl)) ||
     (source?.type === "google-drive-file" && Boolean(source.directUrl) && !useIframeFallback);
 
   const playbackUrl = usesVideo ? source?.directUrl : undefined;
@@ -92,7 +95,7 @@ export function VideoPlayer({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !playbackUrl) return;
+    if (!video || !playbackUrl || isHlsStream) return;
 
     video.muted = isMuted;
 
@@ -102,7 +105,65 @@ export function VideoPlayer({
     }
 
     void tryPlayVideo();
-  }, [isPaused, isMuted, playbackUrl, tryPlayVideo]);
+  }, [isPaused, isMuted, playbackUrl, tryPlayVideo, isHlsStream]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isHlsStream || !playbackUrl || playbackError) return;
+
+    let hls: Hls | null = null;
+    let cancelled = false;
+
+    const startPlayback = async () => {
+      video.muted = isMuted;
+
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = playbackUrl;
+      } else if (Hls.isSupported()) {
+        hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+        hls.loadSource(playbackUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            setPlaybackError(true);
+            setIsBuffering(false);
+          }
+        });
+      } else {
+        setPlaybackError(true);
+        setIsBuffering(false);
+        return;
+      }
+
+      if (!isPaused && !cancelled) {
+        await tryPlayVideo();
+      }
+    };
+
+    void startPlayback();
+
+    return () => {
+      cancelled = true;
+      hls?.destroy();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [isHlsStream, playbackUrl, reloadKey, playbackError, isMuted, isPaused, tryPlayVideo]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isHlsStream) return;
+
+    video.muted = isMuted;
+    if (isPaused) {
+      video.pause();
+      return;
+    }
+
+    if (!playbackError) {
+      void tryPlayVideo();
+    }
+  }, [isPaused, isMuted, isHlsStream, playbackError, tryPlayVideo]);
 
   useEffect(() => {
     if (!usesVideo || isPaused || !isBuffering || needsUserPlay || playbackError) return;
@@ -205,8 +266,8 @@ export function VideoPlayer({
           )}
           <video
             ref={videoRef}
-            key={`${playbackUrl}-${reloadKey}`}
-            src={playbackUrl}
+            key={`${source?.type}-${playbackUrl}-${reloadKey}`}
+            src={isHlsStream ? undefined : playbackUrl}
             className="absolute inset-0 h-full w-full object-cover bg-black"
             autoPlay
             playsInline

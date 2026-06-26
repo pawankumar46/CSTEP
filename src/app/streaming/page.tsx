@@ -17,6 +17,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useMinRole } from "@/hooks/useRoleGuard";
 import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
 import { mockChatMessages } from "@/mock/feedback";
+import { resolveLivePlaybackUrl } from "@/services/broadcast.service";
 import {
   APP_NAME,
   LIVE_STREAM_URL,
@@ -45,7 +46,25 @@ export default function StreamingPage() {
   const [newMessage, setNewMessage] = useState("");
   const [reactions, setReactions] = useState<Record<string, number>>({ "👍": 42, "❤️": 28, "👏": 15 });
   const [linkCopied, setLinkCopied] = useState(false);
+  const [streamUrl, setStreamUrl] = useState<string | undefined>(LIVE_STREAM_URL || undefined);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStreamUrl = async () => {
+      const hlsUrl = await resolveLivePlaybackUrl();
+      if (!cancelled && hlsUrl) {
+        setStreamUrl(hlsUrl);
+      }
+    };
+
+    void loadStreamUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -102,7 +121,7 @@ export default function StreamingPage() {
         <div className="grid lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2 space-y-4">
             <StreamPlayerFrame
-              streamUrl={LIVE_STREAM_URL}
+              streamUrl={streamUrl}
               isLive
               isPaused={isPaused}
               isMuted={isMuted}
