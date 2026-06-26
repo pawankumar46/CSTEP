@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Loader2, Pause, X } from "lucide-react";
+import { Check, Loader2, Pause, Pencil, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
+import { AddLobbyUsersDialog } from "@/components/dashboard/AddLobbyUsersDialog";
+import { EditRegistrationDialog } from "@/components/dashboard/EditRegistrationDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +22,8 @@ import { slugifyFilename } from "@/lib/export-utils";
 import {
   LOBBY_EXPORT_COLUMNS,
 } from "@/lib/registration-export";
-import type { Registration, RegistrationStatus, UserRole } from "@/types";
+import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
+import type { Event, Registration, RegistrationStatus, UserRole } from "@/types";
 
 const statusVariant: Record<RegistrationStatus, "default" | "secondary" | "success" | "warning" | "destructive"> = {
   pending: "warning",
@@ -51,9 +54,14 @@ function LobbyContent() {
     setSelectedEventId,
     fetchRegistrations,
     bulkUpdateStatus,
+    updateRegistration,
+    registerLobbyUser,
+    signUpLobbyUser,
   } = useLobbyStore();
   const [statusFilter, setStatusFilter] = useState<RegistrationStatus | "all">("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [editRegistrationOpen, setEditRegistrationOpen] = useState(false);
+  const [editingRegistration, setEditingRegistration] = useState<Registration | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState<RegistrationStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -117,6 +125,19 @@ function LobbyContent() {
   const runBulkAction = useCallback(async (action: RegistrationStatus) => {
     await applyStatusAction(action, [...selectedIdsRef.current]);
   }, [applyStatusAction]);
+
+  const handleEditRegistration = async (
+    id: string,
+    values: RegistrationEditFormValues,
+    event?: Pick<Event, "date" | "endDate"> | null,
+  ) => {
+    await updateRegistration(id, values, event);
+  };
+
+  const openEditDialog = (registration: Registration) => {
+    setEditingRegistration(registration);
+    setEditRegistrationOpen(true);
+  };
 
   const resolveActionIds = useCallback((rowId: string) => {
     const currentSelected = selectedIdsRef.current;
@@ -199,6 +220,16 @@ function LobbyContent() {
             <Button
               size="sm"
               variant="outline"
+              className="h-7"
+              title="Edit"
+              disabled={bulkLoading || isRowLoading}
+              onClick={() => openEditDialog(row.original)}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               className="h-7 text-emerald-600"
               title={bulkFromRow ? `Approve ${selectedIds.length} selected` : "Accept"}
               disabled={bulkLoading || isRowLoading}
@@ -270,6 +301,16 @@ function LobbyContent() {
         eventsLoading={eventsLoading}
         selectedEventId={selectedEventId}
         onEventChange={handleEventChange}
+      />
+
+      <EditRegistrationDialog
+        open={editRegistrationOpen}
+        onOpenChange={setEditRegistrationOpen}
+        registration={editingRegistration}
+        events={events}
+        eventsLoading={eventsLoading}
+        defaultEventId={selectedEventId}
+        onSubmit={handleEditRegistration}
       />
 
       {!selectedEventId ? (
@@ -381,6 +422,16 @@ function LobbyContent() {
               data={filteredRegistrations}
               searchKey="userName"
               searchPlaceholder="Search participants..."
+              searchExtra={
+                canManage ? (
+                  <AddLobbyUsersDialog
+                    events={events}
+                    defaultEventId={selectedEventId}
+                    onSignUp={signUpLobbyUser}
+                    onRegister={registerLobbyUser}
+                  />
+                ) : undefined
+              }
               pageSize={10}
             />
           </div>

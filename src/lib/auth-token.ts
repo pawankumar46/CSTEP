@@ -1,28 +1,19 @@
 import axios from "axios";
 import { getApiBaseUrl } from "@/lib/env";
 import { extractRefreshToken, extractToken } from "@/lib/auth-mappers";
+import {
+  getRefreshToken,
+  notifySessionRefreshed,
+  setSessionTokens,
+} from "@/lib/auth-session";
 
 async function getAuthStore() {
   const { useAuthStore } = await import("@/store/useAuthStore");
   return useAuthStore;
 }
 
-function getStoredRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-
-  const refreshFromStorage = localStorage.getItem("auth_refresh");
-  if (refreshFromStorage) return refreshFromStorage;
-
-  return null;
-}
-
 async function applyTokens(accessToken: string, refreshToken: string | null) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("auth_token", accessToken);
-    if (refreshToken) {
-      localStorage.setItem("auth_refresh", refreshToken);
-    }
-  }
+  setSessionTokens(accessToken, refreshToken ?? undefined);
 
   const useAuthStore = await getAuthStore();
   useAuthStore.setState((state) => ({
@@ -30,13 +21,15 @@ async function applyTokens(accessToken: string, refreshToken: string | null) {
     refreshToken: refreshToken ?? state.refreshToken,
     isAuthenticated: true,
   }));
+
+  notifySessionRefreshed();
 }
 
 let refreshPromise: Promise<string | null> | null = null;
 
 export async function refreshStoredAccessToken(): Promise<string | null> {
   const useAuthStore = await getAuthStore();
-  const refreshToken = useAuthStore.getState().refreshToken ?? getStoredRefreshToken();
+  const refreshToken = useAuthStore.getState().refreshToken ?? getRefreshToken();
   if (!refreshToken) return null;
 
   if (!refreshPromise) {

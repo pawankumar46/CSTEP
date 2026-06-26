@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { AUTH_SESSION_REFRESHED_EVENT } from "@/lib/auth-session";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
   ACCESS_TOKEN_REFRESH_INTERVAL_MS,
@@ -10,6 +11,7 @@ import {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const refreshToken = useAuthStore((s) => s.refreshToken);
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +53,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [isAuthenticated, refreshToken]);
+
+  useEffect(() => {
+    const refetchAfterRefresh = () => {
+      const authKey = user?.id ?? "guest";
+      void import("@/store/useHomeDataStore").then(({ useHomeDataStore }) => {
+        useHomeDataStore.getState().load(authKey, { force: true });
+      });
+      void import("@/store/useLobbyStore").then(({ useLobbyStore }) => {
+        const { selectedEventId } = useLobbyStore.getState();
+        if (!selectedEventId) return;
+
+        const path = window.location.pathname;
+        if (path.includes("/dashboard/travel")) {
+          void useLobbyStore.getState().fetchTravelAssistance(selectedEventId);
+          return;
+        }
+        if (path.includes("/dashboard/medical")) {
+          void useLobbyStore.getState().fetchMedicalAssistance(selectedEventId);
+          return;
+        }
+        if (path.includes("/dashboard/translation")) {
+          void useLobbyStore.getState().fetchTranslationAssistance(selectedEventId);
+          return;
+        }
+        if (path.includes("/dashboard/accommodation")) {
+          void useLobbyStore.getState().fetchAccommodationAssistance(selectedEventId);
+          return;
+        }
+
+        void useLobbyStore.getState().fetchRegistrations(selectedEventId);
+      });
+    };
+
+    window.addEventListener(AUTH_SESSION_REFRESHED_EVENT, refetchAfterRefresh);
+    return () => window.removeEventListener(AUTH_SESSION_REFRESHED_EVENT, refetchAfterRefresh);
+  }, [user?.id]);
 
   return <>{children}</>;
 }

@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, Pencil, Stethoscope, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
+import { AddMedicalAssistanceDialog } from "@/components/dashboard/AddMedicalAssistanceDialog";
+import { EditMedicalAssistanceDialog } from "@/components/dashboard/EditMedicalAssistanceDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,10 +16,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { slugifyFilename } from "@/lib/export-utils";
 import { MEDICAL_EXPORT_COLUMNS } from "@/lib/registration-export";
-import { flattenMedicalAssistanceRows } from "@/lib/registration-mappers";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
+import type { AdminMedicalAssistFormValues, MedicalEditFormValues } from "@/features/dashboard/admin-medical.schema";
 import type { MedicalAssistanceRow, UserRole } from "@/types";
 
 const LOBBY_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
@@ -44,14 +46,20 @@ function MedicalContent() {
   const { events, isLoading: eventsLoading, fetchEvents } = useEventStore();
   const {
     selectedEventId,
-    registrations,
-    registrationsLoading,
+    medicalAssistance,
+    medicalAssistanceLoading,
+    medicalPagination,
     error,
     setSelectedEventId,
-    fetchRegistrations,
+    fetchMedicalAssistance,
     bulkUpdateMedicalStatus,
+    addMedicalAssistance,
+    updateMedicalAssistance,
   } = useLobbyStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [addMedicalOpen, setAddMedicalOpen] = useState(false);
+  const [editMedicalOpen, setEditMedicalOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<MedicalAssistanceRow | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState<MedicalActionStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -66,14 +74,17 @@ function MedicalContent() {
 
   useEffect(() => {
     if (selectedEventId) {
-      fetchRegistrations(selectedEventId);
+      void fetchMedicalAssistance(selectedEventId, 1);
     }
-  }, [selectedEventId, fetchRegistrations]);
+  }, [selectedEventId, fetchMedicalAssistance]);
 
-  const medicalRows = useMemo(
-    () => flattenMedicalAssistanceRows(registrations),
-    [registrations],
-  );
+  const handleMedicalPageChange = useCallback((page: number) => {
+    if (selectedEventId) {
+      void fetchMedicalAssistance(selectedEventId, page);
+    }
+  }, [fetchMedicalAssistance, selectedEventId]);
+
+  const medicalRows = medicalAssistance;
 
   useEffect(() => {
     const allowed = new Set(medicalRows.map((r) => r.id));
@@ -89,6 +100,19 @@ function MedicalContent() {
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
     setSelectedIds([]);
+  };
+
+  const handleAddMedical = async (values: AdminMedicalAssistFormValues) => {
+    await addMedicalAssistance(values);
+  };
+
+  const handleEditMedical = async (id: string, values: MedicalEditFormValues) => {
+    await updateMedicalAssistance(id, values);
+  };
+
+  const openEditDialog = (row: MedicalAssistanceRow) => {
+    setEditingRow(row);
+    setEditMedicalOpen(true);
   };
 
   const applyStatusAction = useCallback(async (status: MedicalActionStatus, ids: string[]) => {
@@ -204,6 +228,17 @@ function MedicalContent() {
               <Button
                 size="sm"
                 variant="outline"
+                className="h-7"
+                title="Edit"
+                disabled={bulkLoading || isRowLoading}
+                onClick={() => openEditDialog(row.original)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 className="h-7 text-emerald-600"
                 title={bulkFromRow ? `Accept ${selectedIds.length} selected` : "Accept"}
                 disabled={bulkLoading || isRowLoading}
@@ -251,9 +286,17 @@ function MedicalContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Manage Medical Requests</h1>
-        <p className="text-muted-foreground">Review medical support requests for registered participants</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Manage Medical Requests</h1>
+          <p className="text-muted-foreground">Review medical support requests for registered participants</p>
+        </div>
+        {canManage && (
+          <Button size="sm" onClick={() => setAddMedicalOpen(true)}>
+            <Stethoscope className="h-4 w-4 mr-2" />
+            Add medical assistance
+          </Button>
+        )}
       </div>
 
       <EventSelectCard
@@ -263,20 +306,39 @@ function MedicalContent() {
         onEventChange={handleEventChange}
       />
 
+      <AddMedicalAssistanceDialog
+        open={addMedicalOpen}
+        onOpenChange={setAddMedicalOpen}
+        events={events}
+        eventsLoading={eventsLoading}
+        defaultEventId={selectedEventId}
+        onSubmit={handleAddMedical}
+      />
+
+      <EditMedicalAssistanceDialog
+        open={editMedicalOpen}
+        onOpenChange={setEditMedicalOpen}
+        row={editingRow}
+        events={events}
+        eventsLoading={eventsLoading}
+        defaultEventId={selectedEventId}
+        onSubmit={handleEditMedical}
+      />
+
       {!selectedEventId ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             Select an event to view medical requests.
           </CardContent>
         </Card>
-      ) : registrationsLoading ? (
+      ) : medicalAssistanceLoading ? (
         <DashboardSkeleton />
       ) : (
         <>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {medicalRows.length} medical request{medicalRows.length === 1 ? "" : "s"}
+              {medicalPagination.total} medical request{medicalPagination.total === 1 ? "" : "s"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canManage && selectedCount > 0 && (
@@ -340,7 +402,13 @@ function MedicalContent() {
               data={medicalRows}
               searchKey="userName"
               searchPlaceholder="Search users..."
-              pageSize={10}
+              serverPagination={{
+                page: medicalPagination.page,
+                totalPages: medicalPagination.totalPages,
+                hasNext: medicalPagination.hasNext,
+                hasPrevious: medicalPagination.hasPrevious,
+                onPageChange: handleMedicalPageChange,
+              }}
             />
           </div>
         </>

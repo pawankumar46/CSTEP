@@ -79,6 +79,15 @@ export function getParticipationDateOptions(
   return dayOptions;
 }
 
+export function getDefaultParticipationDate(
+  event?: Pick<Event, "date" | "endDate"> | null,
+): string {
+  const options = getParticipationDateOptions(event);
+  if (options.length === 0) return "both_days";
+  if (options.length === 1) return options[0].value;
+  return options.find((option) => option.value === "both_days")?.value ?? options[0].value;
+}
+
 export function formatParticipationDatesFaqAnswer(
   event?: Pick<Event, "date" | "endDate"> | null,
 ): string {

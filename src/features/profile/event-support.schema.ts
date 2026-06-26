@@ -4,7 +4,7 @@ import {
   type TranslationLanguageValue,
 } from "@/lib/registration-options";
 
-export const SERVICE_TYPES = ["travel", "medical", "translation"] as const;
+export const SERVICE_TYPES = ["travel", "medical", "translation", "accommodation"] as const;
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 
 export const TRANSPORT_MODES = ["flight", "train", "taxi"] as const;
@@ -29,6 +29,11 @@ export const eventSupportSchema = z
     medicalRequiredDate: z.string().optional(),
     translationLanguage: translationLanguageEnum.optional(),
     translationRequiredDate: z.string().optional(),
+    hotelName: z.string().optional(),
+    hotelAddress: z.string().optional(),
+    roomNo: z.string().optional(),
+    accommodationFromDate: z.string().optional(),
+    accommodationToDate: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.eventId?.trim()) {
@@ -130,6 +135,44 @@ export const eventSupportSchema = z
         });
       }
     }
+
+    if (data.serviceType === "accommodation") {
+      if (!data.hotelName?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Hotel name is required",
+          path: ["hotelName"],
+        });
+      }
+      if (!data.hotelAddress?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Address is required",
+          path: ["hotelAddress"],
+        });
+      }
+      if (!data.roomNo?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Room number is required",
+          path: ["roomNo"],
+        });
+      }
+      if (!data.accommodationFromDate?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "From date is required",
+          path: ["accommodationFromDate"],
+        });
+      }
+      if (!data.accommodationToDate?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "To date is required",
+          path: ["accommodationToDate"],
+        });
+      }
+    }
   });
 
 export type EventSupportFormValues = z.infer<typeof eventSupportSchema>;
@@ -146,4 +189,9 @@ export const EMPTY_EVENT_SUPPORT: EventSupportFormValues = {
   medicalRequirement: "",
   medicalRequiredDate: "",
   translationRequiredDate: "",
+  hotelName: "",
+  hotelAddress: "",
+  roomNo: "",
+  accommodationFromDate: "",
+  accommodationToDate: "",
 };

@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, Pencil, Plane, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
+import { AddTravelAssistanceDialog } from "@/components/dashboard/AddTravelAssistanceDialog";
+import { EditTravelAssistanceDialog } from "@/components/dashboard/EditTravelAssistanceDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,10 +18,10 @@ import { slugifyFilename } from "@/lib/export-utils";
 import {
   TRAVEL_EXPORT_COLUMNS,
 } from "@/lib/registration-export";
-import { flattenTravelAssistanceRows } from "@/lib/registration-mappers";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
+import type { AdminTravelAssistFormValues, TravelEditFormValues } from "@/features/dashboard/admin-travel.schema";
 import type { TravelAssistanceRow, UserRole } from "@/types";
 
 const LOBBY_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
@@ -46,14 +48,20 @@ function TravelContent() {
   const { events, isLoading: eventsLoading, fetchEvents } = useEventStore();
   const {
     selectedEventId,
-    registrations,
-    registrationsLoading,
+    travelAssistance,
+    travelAssistanceLoading,
+    travelPagination,
     error,
     setSelectedEventId,
-    fetchRegistrations,
+    fetchTravelAssistance,
     bulkUpdateTravelStatus,
+    addTravelAssistance,
+    updateTravelAssistance,
   } = useLobbyStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [addTravelOpen, setAddTravelOpen] = useState(false);
+  const [editTravelOpen, setEditTravelOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<TravelAssistanceRow | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState<TravelActionStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -68,14 +76,17 @@ function TravelContent() {
 
   useEffect(() => {
     if (selectedEventId) {
-      fetchRegistrations(selectedEventId);
+      void fetchTravelAssistance(selectedEventId, 1);
     }
-  }, [selectedEventId, fetchRegistrations]);
+  }, [selectedEventId, fetchTravelAssistance]);
 
-  const travelRows = useMemo(
-    () => flattenTravelAssistanceRows(registrations),
-    [registrations],
-  );
+  const handleTravelPageChange = useCallback((page: number) => {
+    if (selectedEventId) {
+      void fetchTravelAssistance(selectedEventId, page);
+    }
+  }, [fetchTravelAssistance, selectedEventId]);
+
+  const travelRows = travelAssistance;
 
   useEffect(() => {
     const allowed = new Set(travelRows.map((r) => r.id));
@@ -91,6 +102,19 @@ function TravelContent() {
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
     setSelectedIds([]);
+  };
+
+  const handleAddTravel = async (values: AdminTravelAssistFormValues) => {
+    await addTravelAssistance(values);
+  };
+
+  const handleEditTravel = async (id: string, values: TravelEditFormValues) => {
+    await updateTravelAssistance(id, values);
+  };
+
+  const openEditDialog = (row: TravelAssistanceRow) => {
+    setEditingRow(row);
+    setEditTravelOpen(true);
   };
 
   const applyStatusAction = useCallback(async (status: TravelActionStatus, ids: string[]) => {
@@ -210,6 +234,17 @@ function TravelContent() {
               <Button
                 size="sm"
                 variant="outline"
+                className="h-7"
+                title="Edit"
+                disabled={bulkLoading || isRowLoading}
+                onClick={() => openEditDialog(row.original)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 className="h-7 text-emerald-600"
                 title={bulkFromRow ? `Accept ${selectedIds.length} selected` : "Accept"}
                 disabled={bulkLoading || isRowLoading}
@@ -257,9 +292,17 @@ function TravelContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Manage Travel Requests</h1>
-        <p className="text-muted-foreground">Review travel arrangements for registered participants</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Manage Travel Requests</h1>
+          <p className="text-muted-foreground">Review travel arrangements for registered participants</p>
+        </div>
+        {canManage && (
+          <Button size="sm" onClick={() => setAddTravelOpen(true)}>
+            <Plane className="h-4 w-4 mr-2" />
+            Add travel assistance
+          </Button>
+        )}
       </div>
 
       <EventSelectCard
@@ -269,20 +312,39 @@ function TravelContent() {
         onEventChange={handleEventChange}
       />
 
+      <AddTravelAssistanceDialog
+        open={addTravelOpen}
+        onOpenChange={setAddTravelOpen}
+        events={events}
+        eventsLoading={eventsLoading}
+        defaultEventId={selectedEventId}
+        onSubmit={handleAddTravel}
+      />
+
+      <EditTravelAssistanceDialog
+        open={editTravelOpen}
+        onOpenChange={setEditTravelOpen}
+        row={editingRow}
+        events={events}
+        eventsLoading={eventsLoading}
+        defaultEventId={selectedEventId}
+        onSubmit={handleEditTravel}
+      />
+
       {!selectedEventId ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             Select an event to view travel requests.
           </CardContent>
         </Card>
-      ) : registrationsLoading ? (
+      ) : travelAssistanceLoading ? (
         <DashboardSkeleton />
       ) : (
         <>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {travelRows.length} travel request{travelRows.length === 1 ? "" : "s"}
+              {travelPagination.total} travel request{travelPagination.total === 1 ? "" : "s"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canManage && selectedCount > 0 && (
@@ -346,7 +408,13 @@ function TravelContent() {
               data={travelRows}
               searchKey="userName"
               searchPlaceholder="Search users..."
-              pageSize={10}
+              serverPagination={{
+                page: travelPagination.page,
+                totalPages: travelPagination.totalPages,
+                hasNext: travelPagination.hasNext,
+                hasPrevious: travelPagination.hasPrevious,
+                onPageChange: handleTravelPageChange,
+              }}
             />
           </div>
         </>

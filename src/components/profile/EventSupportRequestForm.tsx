@@ -7,7 +7,7 @@ import {
   type FieldErrors,
   type UseFormSetValue,
 } from "react-hook-form";
-import { Loader2, Plane, Stethoscope, Languages } from "lucide-react";
+import { Loader2, Plane, Stethoscope, Languages, Hotel } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +29,7 @@ const SERVICE_OPTIONS = [
   { value: "travel" as const, label: "Travel Assistance", icon: Plane },
   { value: "medical" as const, label: "Medical Assistance", icon: Stethoscope },
   { value: "translation" as const, label: "Translation Assistance", icon: Languages },
+  { value: "accommodation" as const, label: "Accommodation Assistance", icon: Hotel },
 ];
 
 const TRANSPORT_OPTIONS = [
@@ -72,6 +73,14 @@ function clearServiceFields(
   if (serviceType !== "translation") {
     setValue("translationLanguage", undefined);
     setValue("translationRequiredDate", "");
+  }
+
+  if (serviceType !== "accommodation") {
+    setValue("hotelName", "");
+    setValue("hotelAddress", "");
+    setValue("roomNo", "");
+    setValue("accommodationFromDate", "");
+    setValue("accommodationToDate", "");
   }
 }
 
@@ -479,6 +488,112 @@ export function EventSupportRequestForm({
             {errors.translationRequiredDate && (
               <p className="text-xs text-destructive">{errors.translationRequiredDate.message}</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {values.serviceType === "accommodation" && (
+        <div className="space-y-5 rounded-xl border bg-muted/30 p-5">
+          <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-400">
+            Accommodation Assistance
+          </h3>
+
+          <EventSelect {...eventSelectProps} />
+
+          <div className="space-y-2">
+            <Label htmlFor="hotelName">Hotel name</Label>
+            <Controller
+              name="hotelName"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="hotelName"
+                  placeholder="e.g. Taj Palace"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            {errors.hotelName && (
+              <p className="text-xs text-destructive">{errors.hotelName.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="hotelAddress">Address</Label>
+            <Controller
+              name="hotelAddress"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="hotelAddress"
+                  placeholder="Hotel address"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            {errors.hotelAddress && (
+              <p className="text-xs text-destructive">{errors.hotelAddress.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="roomNo">Room number</Label>
+            <Controller
+              name="roomNo"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="roomNo"
+                  placeholder="e.g. 204"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            {errors.roomNo && (
+              <p className="text-xs text-destructive">{errors.roomNo.message}</p>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="accommodationFromDate">From date</Label>
+              <Controller
+                name="accommodationFromDate"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="accommodationFromDate"
+                    type="date"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              {errors.accommodationFromDate && (
+                <p className="text-xs text-destructive">{errors.accommodationFromDate.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="accommodationToDate">To date</Label>
+              <Controller
+                name="accommodationToDate"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="accommodationToDate"
+                    type="date"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              {errors.accommodationToDate && (
+                <p className="text-xs text-destructive">{errors.accommodationToDate.message}</p>
+              )}
+            </div>
           </div>
         </div>
       )}

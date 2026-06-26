@@ -7,9 +7,20 @@ interface PaginationProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  hasNext?: boolean;
+  hasPrevious?: boolean;
 }
 
-export function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
+export function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+  hasNext,
+  hasPrevious,
+}: PaginationProps) {
+  const canGoPrevious = hasPrevious ?? page > 1;
+  const canGoNext = hasNext ?? page < totalPages;
+
   return (
     <div className="flex items-center justify-between px-2 py-4">
       <p className="text-sm text-muted-foreground">
@@ -20,7 +31,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
           variant="outline"
           size="sm"
           onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
+          disabled={!canGoPrevious}
         >
           <ChevronLeft className="h-4 w-4" />
           Previous
@@ -29,7 +40,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
           variant="outline"
           size="sm"
           onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
+          disabled={!canGoNext}
         >
           Next
           <ChevronRight className="h-4 w-4" />

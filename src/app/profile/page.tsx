@@ -26,6 +26,7 @@ import {
 import { PROFILE_SUPPORT_EVENT_KEY, ROUTES } from "@/lib/routes";
 import { useHomeDataStore } from "@/store/useHomeDataStore";
 import {
+  requestAccommodationSupport,
   requestMedicalSupport,
   requestTranslationSupport,
   requestTravelSupport,
@@ -94,8 +95,10 @@ function ProfileContent() {
         await requestTravelSupport(data);
       } else if (data.serviceType === "medical") {
         await requestMedicalSupport(data);
-      } else {
+      } else if (data.serviceType === "translation") {
         await requestTranslationSupport(data);
+      } else {
+        await requestAccommodationSupport(data);
       }
 
       sessionStorage.removeItem(PROFILE_SUPPORT_EVENT_KEY);
@@ -123,8 +126,8 @@ function ProfileContent() {
 
       {fromRegistration && (
         <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-          You&apos;re registered for the event. Submit a travel, medical, or translation support
-          request below if you need assistance.
+          You&apos;re registered for the event. Submit a travel, medical, translation, or accommodation
+          support request below if you need assistance.
         </div>
       )}
       <form key={formKey} onSubmit={handleSubmit(onSubmitRequest)} className="space-y-6">
@@ -132,7 +135,7 @@ function ProfileContent() {
           <CardHeader>
             <CardTitle>Event Support Request</CardTitle>
             <CardDescription>
-              Request travel, medical, or translation assistance for an upcoming event
+              Request travel, medical, translation, or accommodation assistance for an upcoming event
             </CardDescription>
           </CardHeader>
           <CardContent>

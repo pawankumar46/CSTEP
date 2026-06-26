@@ -60,12 +60,19 @@ export const LOBBY_NAV_PATHS = [
   "/dashboard/travel",
   "/dashboard/medical",
   "/dashboard/translation",
+  "/dashboard/accommodation",
 ] as const;
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/", icon: "Home", roles: ["moderator", "event_administrator", "super_administrator"] },
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard", roles: ["moderator", "event_administrator", "super_administrator"] },
   { label: "Events", href: "/dashboard/events", icon: "Calendar", roles: ["moderator", "event_administrator", "super_administrator"] },
+  {
+    label: "Video Management",
+    href: "/dashboard/video-management",
+    icon: "Video",
+    roles: ["event_administrator"],
+  },
   {
     label: "Lobby",
     icon: "Users",
@@ -75,6 +82,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: "Manage Travel Requests", href: "/dashboard/travel" },
       { label: "Manage Medical Requests", href: "/dashboard/medical" },
       { label: "Manage Translation Requests", href: "/dashboard/translation" },
+      { label: "Manage Accommodation Requests", href: "/dashboard/accommodation" },
     ],
   },
   { label: "Analytics", href: "/dashboard/analytics", icon: "BarChart3", roles: ["moderator", "event_administrator", "super_administrator"] },

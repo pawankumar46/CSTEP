@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as authService from "@/services/auth.service";
+import {
+  clearSessionTokens,
+  setSessionTokens,
+} from "@/lib/auth-session";
 import { refreshStoredAccessToken } from "@/lib/auth-token";
 import type { LoginCredentials, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
@@ -22,12 +26,12 @@ interface AuthState {
   clearError: () => void;
 }
 
-function syncTokenToStorage(token: string | null) {
+function syncTokenToStorage(token: string | null, refreshToken?: string | null) {
   if (typeof window === "undefined") return;
   if (token) {
-    localStorage.setItem("auth_token", token);
+    setSessionTokens(token, refreshToken ?? undefined);
   } else {
-    localStorage.removeItem("auth_token");
+    clearSessionTokens();
   }
 }
 
@@ -70,7 +74,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const { user, token, refreshToken } = await authService.login(credentials);
-          syncTokenToStorage(token);
+          syncTokenToStorage(token, refreshToken || null);
           syncRefreshToStorage(refreshToken || null);
           set({
             user,
@@ -211,8 +215,7 @@ export const useAuthStore = create<AuthState>()(
       skipHydration: true,
       onRehydrateStorage: () => (state) => {
         if (state?.token) {
-          syncTokenToStorage(state.token);
-          syncRefreshToStorage(state.refreshToken ?? null);
+          setSessionTokens(state.token, state.refreshToken ?? undefined);
           if (state.user) {
             state.isAuthenticated = true;
           }

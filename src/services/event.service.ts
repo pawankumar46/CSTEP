@@ -27,6 +27,16 @@ export const getEvents = async (type: EventListType = "upcoming"): Promise<Event
   }
 };
 
+/** All events for admin dropdowns (no type filter). */
+export const getAllEvents = async (): Promise<Event[]> => {
+  try {
+    const { data } = await apiClient.get<unknown>("/events/");
+    return extractEventList(data).map(mapApiEventToEvent);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 export const getEventById = async (id: string): Promise<Event | null> => {
   try {
     const { data } = await apiClient.get<Record<string, unknown>>(`/events/${id}/`);

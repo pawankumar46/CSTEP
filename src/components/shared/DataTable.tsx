@@ -10,7 +10,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/shared/Pagination";
 import { SearchBar } from "@/components/shared/SearchBar";
@@ -22,7 +22,15 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   searchKey?: string;
   searchPlaceholder?: string;
+  searchExtra?: ReactNode;
   pageSize?: number;
+  serverPagination?: {
+    page: number;
+    totalPages: number;
+    hasNext?: boolean;
+    hasPrevious?: boolean;
+    onPageChange: (page: number) => void;
+  };
 }
 
 export function DataTable<TData, TValue>({
@@ -30,7 +38,9 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   searchPlaceholder = "Search...",
+  searchExtra,
   pageSize = 10,
+  serverPagination,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -39,24 +49,33 @@ export function DataTable<TData, TValue>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    ...(serverPagination
+      ? { manualPagination: true, pageCount: serverPagination.totalPages }
+      : {
+          getPaginationRowModel: getPaginationRowModel(),
+          initialState: { pagination: { pageSize } },
+        }),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     state: { sorting, globalFilter },
-    initialState: { pagination: { pageSize } },
   });
 
   return (
     <div className="space-y-4">
-      {searchKey && (
-        <SearchBar
-          value={globalFilter}
-          onChange={setGlobalFilter}
-          placeholder={searchPlaceholder}
-          className="max-w-sm"
-        />
+      {(searchKey || searchExtra) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {searchKey && (
+            <SearchBar
+              value={globalFilter}
+              onChange={setGlobalFilter}
+              placeholder={searchPlaceholder}
+              className="max-w-sm"
+            />
+          )}
+          {searchExtra}
+        </div>
       )}
       <div className="rounded-md border">
         <Table>
@@ -98,11 +117,21 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <Pagination
-        page={table.getState().pagination.pageIndex + 1}
-        totalPages={table.getPageCount()}
-        onPageChange={(p) => table.setPageIndex(p - 1)}
-      />
+      {serverPagination ? (
+        <Pagination
+          page={serverPagination.page}
+          totalPages={serverPagination.totalPages}
+          hasNext={serverPagination.hasNext}
+          hasPrevious={serverPagination.hasPrevious}
+          onPageChange={serverPagination.onPageChange}
+        />
+      ) : (
+        <Pagination
+          page={table.getState().pagination.pageIndex + 1}
+          totalPages={table.getPageCount()}
+          onPageChange={(p) => table.setPageIndex(p - 1)}
+        />
+      )}
     </div>
   );
 }

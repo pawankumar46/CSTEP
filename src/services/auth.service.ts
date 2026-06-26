@@ -1,6 +1,10 @@
 import axios from "axios";
 import { apiClient } from "@/lib/api-client";
 import {
+  clearSessionTokens,
+  getAccessToken,
+} from "@/lib/auth-session";
+import {
   extractApiErrorFromData,
   extractApiErrorMessage,
   extractRefreshToken,
@@ -8,29 +12,52 @@ import {
   mapApiUser,
   normalizeAuthIdentifier,
   toLoginPayload,
+  extractUserIdFromSignupResponse,
   toSignupPayload,
+  toLobbySignupPayload,
   toVerifyOtpPayload,
 } from "@/lib/auth-mappers";
 import type { AuthResponse, LoginCredentials, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
-async function fetchCurrentUser(token: string, fallbackEmail?: string): Promise<User | null> {
+async function fetchCurrentUser(fallbackEmail?: string): Promise<User | null> {
   try {
-    const { data } = await apiClient.get<Record<string, unknown>>("/auth/me/", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await apiClient.get<Record<string, unknown>>("/auth/me/");
     return mapApiUser(data, fallbackEmail);
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
+    if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
       return null;
     }
     throw error;
   }
 }
 
-export const signUp = async (data: SignupCredentials): Promise<{ success: boolean }> => {
+export const signUp = async (data: SignupCredentials): Promise<{ success: boolean; userId: string }> => {
   try {
-    await apiClient.post("/auth/sign_up/", toSignupPayload(data));
-    return { success: true };
+    const { data: response } = await apiClient.post<Record<string, unknown>>(
+      "/auth/sign_up/",
+      toSignupPayload(data),
+    );
+    return {
+      success: true,
+      userId: extractUserIdFromSignupResponse(response),
+    };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const signUpLobbyUser = async (
+  data: SignupCredentials,
+): Promise<{ success: boolean; userId: string }> => {
+  try {
+    const { data: response } = await apiClient.post<Record<string, unknown>>(
+      "/auth/sign_up/",
+      toLobbySignupPayload(data),
+    );
+    return {
+      success: true,
+      userId: extractUserIdFromSignupResponse(response),
+    };
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
@@ -59,7 +86,7 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
     let user = mapApiUser(responseUser ?? data, identifier);
 
     if (!user.firstName || !user.lastName) {
-      const profile = await fetchCurrentUser(token, identifier);
+      const profile = await fetchCurrentUser(identifier);
       if (profile) {
         user = profile;
       }
@@ -99,16 +126,14 @@ export const forgotPassword = async (email: string): Promise<{ success: boolean 
 
 export const getCurrentUser = async (): Promise<User | null> => {
   if (typeof window === "undefined") return null;
-  const token = localStorage.getItem("auth_token");
-  if (!token) return null;
+  if (!getAccessToken()) return null;
 
-  return fetchCurrentUser(token);
+  return fetchCurrentUser();
 };
 
 export const clearAuthStorage = (): void => {
   if (typeof window === "undefined") return;
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("auth_refresh");
+  clearSessionTokens();
   localStorage.removeItem("auth_user");
   localStorage.removeItem("auth-storage");
 };

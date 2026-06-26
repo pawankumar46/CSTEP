@@ -34,6 +34,41 @@ export function toSignupPayload(data: SignupCredentials) {
   };
 }
 
+/** Manage Lobby step 1 — matches POST /auth/sign_up/ admin payload */
+export function toLobbySignupPayload(data: SignupCredentials) {
+  const digits = data.phone.replace(/\D/g, "");
+
+  return {
+    salutation: data.salutation,
+    first_name: data.firstName,
+    middle_name: data.middleName ?? "",
+    last_name: data.lastName,
+    role: "BASE_USER",
+    phone_number: digits,
+    email: normalizeAuthIdentifier(data.email),
+    password: data.password,
+  };
+}
+
+export function extractUserIdFromSignupResponse(data: unknown): string {
+  if (!data || typeof data !== "object") return "";
+
+  const record = data as Record<string, unknown>;
+  if (record.id != null && record.id !== "") {
+    return String(record.id);
+  }
+
+  const user = record.user;
+  if (user && typeof user === "object") {
+    const userRecord = user as Record<string, unknown>;
+    if (userRecord.id != null && userRecord.id !== "") {
+      return String(userRecord.id);
+    }
+  }
+
+  return "";
+}
+
 export function toLoginPayload(identifier: string, password: string) {
   return {
     username: normalizeAuthIdentifier(identifier),
@@ -54,7 +89,10 @@ export function mapApiUser(raw: Record<string, unknown>, fallbackEmail?: string)
     email: String(raw.email ?? fallbackEmail ?? ""),
     phone: String(raw.phone_number ?? raw.phone ?? ""),
     role: mapApiRoleToAppRole(roleKey),
-    status: (raw.status as User["status"]) ?? "active",
+    status:
+      raw.is_active === false
+        ? "suspended"
+        : ((raw.status as User["status"]) ?? "active"),
     createdAt: String(raw.created_at ?? raw.createdAt ?? now),
     updatedAt: String(raw.updated_at ?? raw.updatedAt ?? now),
   };

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { resolveParticipationDatesForApi } from "@/lib/participation-dates";
+import { getEventDayDates, resolveParticipationDatesForApi } from "@/lib/participation-dates";
 import type { Event } from "@/types";
 import type {
   FoodPreference,
@@ -14,6 +14,7 @@ import type {
   TranslationAssistanceRow,
   MedicalAssistanceItem,
   MedicalAssistanceRow,
+  AccommodationAssistanceRow,
   TranslationLanguage,
   TravelAssistanceItem,
   TravelAssistanceRow,
@@ -299,6 +300,82 @@ export function toRegistrationApiPayload(
   };
 }
 
+export function toRegistrationUpdatePayload(
+  data: Pick<
+    RegistrationFormData,
+    "eventId" | "participationDate" | "participationTime" | "attendanceMode" | "foodPreference"
+  >,
+  event?: Pick<Event, "date" | "endDate"> | null,
+) {
+  return toRegistrationApiPayload(
+    {
+      ...data,
+      salutation: "",
+      firstName: "",
+      lastName: "",
+      phone: "",
+      email: "",
+    },
+    event,
+  );
+}
+
+export function resolveParticipationDateStringsForApi(
+  participationDates: string[],
+  event?: Pick<Event, "date" | "endDate"> | null,
+): string[] {
+  if (participationDates.length === 0) {
+    return getEventDayDates(event);
+  }
+
+  if (participationDates.includes("both_days")) {
+    return getEventDayDates(event);
+  }
+
+  return participationDates.filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date));
+}
+
+export function toLobbyRegistrationApiPayload(
+  userId: string,
+  data: {
+    eventId: string;
+    participationDates: string[];
+    participationTime?: ParticipationTime;
+    attendanceMode?: AttendanceMode;
+    foodPreference?: FoodPreference;
+  },
+  event?: Pick<Event, "date" | "endDate"> | null,
+) {
+  return {
+    user: Number(userId),
+    event: Number(data.eventId),
+    participation_dates: resolveParticipationDateStringsForApi(data.participationDates, event),
+    participation_time: data.participationTime
+      ? mapAppParticipationTimeToApi(data.participationTime)
+      : "",
+    attendance_mode: data.attendanceMode
+      ? mapAppAttendanceModeToApi(data.attendanceMode)
+      : "",
+    food_preference: data.foodPreference
+      ? mapAppFoodPreferenceToApi(data.foodPreference)
+      : "",
+  };
+}
+
+export function toAdminRegistrationApiPayload(
+  userId: string,
+  data: Pick<
+    RegistrationFormData,
+    "eventId" | "participationDate" | "participationTime" | "attendanceMode" | "foodPreference"
+  >,
+  event?: Pick<Event, "date" | "endDate"> | null,
+) {
+  return {
+    ...toRegistrationUpdatePayload(data, event),
+    user: Number(userId),
+  };
+}
+
 export function extractRegistrationList(data: unknown): Record<string, unknown>[] {
   if (Array.isArray(data)) return data as Record<string, unknown>[];
   if (data && typeof data === "object" && Array.isArray((data as { results?: unknown[] }).results)) {
@@ -371,6 +448,121 @@ export function flattenTravelAssistanceRows(registrations: Registration[]): Trav
       email: registration.email,
       phone: registration.phone,
     })),
+  );
+}
+
+function mapAssistanceUserFields(raw: Record<string, unknown>) {
+  return {
+    userName: String(raw.user_name ?? raw.userName ?? ""),
+    email: String(raw.user_email ?? raw.email ?? ""),
+    phone: String(raw.user_phone ?? raw.phone_number ?? raw.phone ?? ""),
+  };
+}
+
+function mapApiTravelAssistanceRow(raw: Record<string, unknown>): TravelAssistanceRow {
+  const transportMode = String(raw.transport_mode ?? "").toUpperCase();
+  return {
+    id: String(raw.id ?? ""),
+    transportMode,
+    transportModeLabel: formatTravelArrangementLabel(transportMode),
+    sourceLocation: String(raw.source_location ?? ""),
+    destinationLocation: String(raw.destination_location ?? ""),
+    travelDate: String(raw.travel_date ?? ""),
+    status: mapApiRequestStatus(raw.status) ?? "pending",
+    registrationId: String(raw.registration_id ?? raw.registration ?? ""),
+    ...mapAssistanceUserFields(raw),
+  };
+}
+
+function mapApiMedicalAssistanceRow(raw: Record<string, unknown>): MedicalAssistanceRow {
+  return {
+    id: String(raw.id ?? ""),
+    medicalNeeds: String(raw.medical_needs ?? "").trim(),
+    requiredDate: String(raw.date ?? ""),
+    status: mapApiRequestStatus(raw.status) ?? "pending",
+    registrationId: String(raw.registration_id ?? raw.registration ?? ""),
+    ...mapAssistanceUserFields(raw),
+  };
+}
+
+export function mapApiMedicalAssistanceList(data: unknown): MedicalAssistanceRow[] {
+  const list = extractRegistrationList(data);
+  if (list.length === 0) return [];
+
+  if (list[0].medical_needs != null) {
+    return list.map((raw) => mapApiMedicalAssistanceRow(raw));
+  }
+
+  return flattenMedicalAssistanceRows(
+    list.map((raw) => mapApiRegistrationToRegistration(raw)),
+  );
+}
+
+function mapApiAccommodationAssistanceRow(raw: Record<string, unknown>): AccommodationAssistanceRow {
+  return {
+    id: String(raw.id ?? ""),
+    eventId: String(raw.event_id ?? raw.event ?? raw.registration__event ?? ""),
+    hotelName: String(raw.hotel_name ?? "").trim(),
+    address: String(raw.address ?? "").trim(),
+    roomNo: String(raw.room_no ?? "").trim(),
+    fromDate: String(raw.from_date ?? ""),
+    toDate: String(raw.to_date ?? ""),
+    status: mapApiRequestStatus(raw.status) ?? "pending",
+    registrationId: String(raw.registration_id ?? raw.registration ?? ""),
+    ...mapAssistanceUserFields(raw),
+  };
+}
+
+export function mapApiAccommodationAssistanceList(data: unknown): AccommodationAssistanceRow[] {
+  const list = extractRegistrationList(data);
+  if (list.length === 0) return [];
+
+  if (list[0].hotel_name != null) {
+    return list.map((raw) => mapApiAccommodationAssistanceRow(raw));
+  }
+
+  return [];
+}
+
+function mapApiTranslationAssistanceRow(raw: Record<string, unknown>): TranslationAssistanceRow | null {
+  const language = mapApiTranslationLanguage(raw.language);
+  if (!language) return null;
+
+  return {
+    id: String(raw.id ?? ""),
+    language,
+    requiredDate: String(raw.date ?? ""),
+    status: mapApiRequestStatus(raw.status) ?? "pending",
+    registrationId: String(raw.registration_id ?? raw.registration ?? ""),
+    ...mapAssistanceUserFields(raw),
+  };
+}
+
+export function mapApiTranslationAssistanceList(data: unknown): TranslationAssistanceRow[] {
+  const list = extractRegistrationList(data);
+  if (list.length === 0) return [];
+
+  if (list[0].language != null && list[0].medical_needs == null && list[0].transport_mode == null) {
+    return list
+      .map((raw) => mapApiTranslationAssistanceRow(raw))
+      .filter((row): row is TranslationAssistanceRow => row != null);
+  }
+
+  return flattenTranslationAssistanceRows(
+    list.map((raw) => mapApiRegistrationToRegistration(raw)),
+  );
+}
+
+export function mapApiTravelAssistanceList(data: unknown): TravelAssistanceRow[] {
+  const list = extractRegistrationList(data);
+  if (list.length === 0) return [];
+
+  if (list[0].transport_mode != null) {
+    return list.map((raw) => mapApiTravelAssistanceRow(raw));
+  }
+
+  return flattenTravelAssistanceRows(
+    list.map((raw) => mapApiRegistrationToRegistration(raw)),
   );
 }
 

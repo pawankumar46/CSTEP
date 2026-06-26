@@ -136,6 +136,17 @@ export interface MedicalAssistanceItem {
   status: "pending" | "accepted" | "rejected";
 }
 
+export interface AccommodationAssistanceItem {
+  id: string;
+  eventId: string;
+  hotelName: string;
+  address: string;
+  roomNo: string;
+  fromDate: string;
+  toDate: string;
+  status: "pending" | "accepted" | "rejected";
+}
+
 export interface TravelAssistanceRow extends TravelAssistanceItem {
   registrationId: string;
   userName: string;
@@ -151,6 +162,13 @@ export interface TranslationAssistanceRow extends TranslationAssistanceItem {
 }
 
 export interface MedicalAssistanceRow extends MedicalAssistanceItem {
+  registrationId: string;
+  userName: string;
+  email: string;
+  phone: string;
+}
+
+export interface AccommodationAssistanceRow extends AccommodationAssistanceItem {
   registrationId: string;
   userName: string;
   email: string;
@@ -390,4 +408,60 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+export interface CreateBroadcastSessionPayload {
+  eventId: string;
+  broadcasterId: string;
+  name: string;
+  isPrimary: boolean;
+}
+
+export interface BroadcastSessionSummary {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  broadcasterId: string;
+  broadcasterName: string;
+  name: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+}
+
+export type BroadcastUrlTarget =
+  | "ingest.rtmp"
+  | "ingest.rtsp"
+  | "ingest.webrtc"
+  | "playback.hls"
+  | "playback.rtsp"
+  | "playback.webrtc"
+  | "stream_key";
+
+export interface BroadcastStreamUrls {
+  rtmp?: string;
+  rtsp?: string;
+  webrtc?: string;
+  hls?: string;
+}
+
+export interface BroadcastSession {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  broadcasterId: string;
+  broadcasterName: string;
+  name: string;
+  isPrimary: boolean;
+  streamKey: string;
+  ingestUrls: BroadcastStreamUrls;
+  playbackUrls: BroadcastStreamUrls;
+  isActive: boolean;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  /** Convenience: HLS playback URL for viewers */
+  liveVideoUrl?: string;
 }

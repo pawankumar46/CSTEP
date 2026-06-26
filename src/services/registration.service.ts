@@ -4,10 +4,12 @@ import {
   extractRegistrationList,
   isDuplicateRegistrationError,
   mapApiRegistrationToRegistration,
+  toAdminRegistrationApiPayload,
+  toLobbyRegistrationApiPayload,
   toRegistrationApiPayload,
   toRegistrationPreferencesPayload,
 } from "@/lib/registration-mappers";
-import { toMedicalRequestPayload, toTranslationRequestPayload, toTravelRequestPayload } from "@/lib/event-support-mappers";
+import { toAccommodationRequestPayload, toMedicalRequestPayload, toTranslationRequestPayload, toTravelRequestPayload } from "@/lib/event-support-mappers";
 import type { EventSupportFormValues } from "@/features/profile/event-support.schema";
 
 export class AlreadyRegisteredError extends Error {
@@ -18,7 +20,18 @@ export class AlreadyRegisteredError extends Error {
 }
 import { delay } from "@/lib/utils";
 import { mockRegistrations } from "@/mock/registrations";
-import type { Event, MedicalSupportType, PaginatedResponse, Registration, RegistrationFormData, RegistrationStatus, TravelType } from "@/types";
+import type {
+  Event,
+  AttendanceMode,
+  FoodPreference,
+  MedicalSupportType,
+  PaginatedResponse,
+  ParticipationTime,
+  Registration,
+  RegistrationFormData,
+  RegistrationStatus,
+  TravelType,
+} from "@/types";
 
 export type RegistrationPreferences = {
   travelRequired: boolean;
@@ -120,10 +133,57 @@ export const submitRegistration = async (
 ): Promise<Registration> => {
   try {
     const { data: response } = await apiClient.post<Record<string, unknown>>(
-      "/registrations/",
+      "/registrations/registration/",
       toRegistrationApiPayload(data, event)
     );
     return mapApiRegistrationToRegistration(response);
+  } catch (error) {
+    if (isDuplicateRegistrationError(error)) {
+      throw new AlreadyRegisteredError();
+    }
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const submitLobbyRegistration = async (
+  userId: string,
+  data: {
+    eventId: string;
+    participationDates: string[];
+    participationTime?: ParticipationTime;
+    attendanceMode?: AttendanceMode;
+    foodPreference?: FoodPreference;
+  },
+  event?: Pick<Event, "date" | "endDate"> | null,
+): Promise<Registration> => {
+  try {
+    const { data: response } = await apiClient.post<Record<string, unknown>>(
+      "/registrations/registration/",
+      toLobbyRegistrationApiPayload(userId, data, event),
+    );
+    return mapApiRegistrationToRegistration(response, data.eventId);
+  } catch (error) {
+    if (isDuplicateRegistrationError(error)) {
+      throw new AlreadyRegisteredError();
+    }
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const submitAdminRegistration = async (
+  userId: string,
+  data: Pick<
+    RegistrationFormData,
+    "eventId" | "participationDate" | "participationTime" | "attendanceMode" | "foodPreference"
+  >,
+  event?: Pick<Event, "date" | "endDate"> | null,
+): Promise<Registration> => {
+  try {
+    const { data: response } = await apiClient.post<Record<string, unknown>>(
+      "/registrations/registration/",
+      toAdminRegistrationApiPayload(userId, data, event),
+    );
+    return mapApiRegistrationToRegistration(response, data.eventId);
   } catch (error) {
     if (isDuplicateRegistrationError(error)) {
       throw new AlreadyRegisteredError();
@@ -151,6 +211,17 @@ export const requestMedicalSupport = async (data: EventSupportFormValues): Promi
 export const requestTranslationSupport = async (data: EventSupportFormValues): Promise<void> => {
   try {
     await apiClient.post("/registrations/request-translation/", toTranslationRequestPayload(data));
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const requestAccommodationSupport = async (data: EventSupportFormValues): Promise<void> => {
+  try {
+    await apiClient.post(
+      "/registrations/accommodation-assistance/",
+      toAccommodationRequestPayload(data),
+    );
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

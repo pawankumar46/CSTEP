@@ -2,31 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Languages, Loader2, Pencil, X } from "lucide-react";
+import { Check, Hotel, Loader2, Pencil, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
-import { AddTranslationAssistanceDialog } from "@/components/dashboard/AddTranslationAssistanceDialog";
-import { EditTranslationAssistanceDialog } from "@/components/dashboard/EditTranslationAssistanceDialog";
+import { AddAccommodationAssistanceDialog } from "@/components/dashboard/AddAccommodationAssistanceDialog";
+import { EditAccommodationAssistanceDialog } from "@/components/dashboard/EditAccommodationAssistanceDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { slugifyFilename } from "@/lib/export-utils";
-import { getRegistrationOptionLabel } from "@/lib/registration-options";
-import {
-  TRANSLATION_EXPORT_COLUMNS,
-} from "@/lib/registration-export";
+import { ACCOMMODATION_EXPORT_COLUMNS } from "@/lib/registration-export";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
-import type { AdminTranslationAssistFormValues, TranslationEditFormValues } from "@/features/dashboard/admin-translation.schema";
-import type { TranslationAssistanceRow, UserRole } from "@/types";
+import type { AccommodationEditFormValues } from "@/features/dashboard/admin-accommodation.schema";
+import type { AdminAccommodationAssistFormValues } from "@/features/dashboard/admin-accommodation.schema";
+import type { AccommodationAssistanceRow, UserRole } from "@/types";
 
 const LOBBY_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
-type TranslationActionStatus = "accepted" | "rejected";
+type AccommodationActionStatus = "accepted" | "rejected";
 
 const requestStatusVariant = (
   status?: "pending" | "accepted" | "rejected"
@@ -36,35 +34,35 @@ const requestStatusVariant = (
   return "warning";
 };
 
-export default function TranslationPage() {
+export default function AccommodationPage() {
   return (
     <RouteGuard allowedRoles={["moderator", "event_administrator", "super_administrator"]}>
-      <TranslationContent />
+      <AccommodationContent />
     </RouteGuard>
   );
 }
 
-function TranslationContent() {
+function AccommodationContent() {
   const user = useAuthStore((s) => s.user);
   const { events, isLoading: eventsLoading, fetchEvents } = useEventStore();
   const {
     selectedEventId,
-    translationAssistance,
-    translationAssistanceLoading,
-    translationPagination,
+    accommodationAssistance,
+    accommodationAssistanceLoading,
+    accommodationPagination,
     error,
     setSelectedEventId,
-    fetchTranslationAssistance,
-    bulkUpdateTranslationStatus,
-    addTranslationAssistance,
-    updateTranslationAssistance,
+    fetchAccommodationAssistance,
+    bulkUpdateAccommodationStatus,
+    addAccommodationAssistance,
+    updateAccommodationAssistance,
   } = useLobbyStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [addTranslationOpen, setAddTranslationOpen] = useState(false);
-  const [editTranslationOpen, setEditTranslationOpen] = useState(false);
-  const [editingRow, setEditingRow] = useState<TranslationAssistanceRow | null>(null);
+  const [addAccommodationOpen, setAddAccommodationOpen] = useState(false);
+  const [editAccommodationOpen, setEditAccommodationOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<AccommodationAssistanceRow | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [pendingBulkAction, setPendingBulkAction] = useState<TranslationActionStatus | null>(null);
+  const [pendingBulkAction, setPendingBulkAction] = useState<AccommodationActionStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const selectedIdsRef = useRef<string[]>([]);
   selectedIdsRef.current = selectedIds;
@@ -77,25 +75,25 @@ function TranslationContent() {
 
   useEffect(() => {
     if (selectedEventId) {
-      void fetchTranslationAssistance(selectedEventId, 1);
+      void fetchAccommodationAssistance(selectedEventId, 1);
     }
-  }, [selectedEventId, fetchTranslationAssistance]);
+  }, [selectedEventId, fetchAccommodationAssistance]);
 
-  const handleTranslationPageChange = useCallback((page: number) => {
+  const handleAccommodationPageChange = useCallback((page: number) => {
     if (selectedEventId) {
-      void fetchTranslationAssistance(selectedEventId, page);
+      void fetchAccommodationAssistance(selectedEventId, page);
     }
-  }, [fetchTranslationAssistance, selectedEventId]);
+  }, [fetchAccommodationAssistance, selectedEventId]);
 
-  const translationRows = translationAssistance;
+  const accommodationRows = accommodationAssistance;
 
   useEffect(() => {
-    const allowed = new Set(translationRows.map((r) => r.id));
+    const allowed = new Set(accommodationRows.map((r) => r.id));
     setSelectedIds((prev) => prev.filter((id) => allowed.has(id)));
-  }, [translationRows]);
+  }, [accommodationRows]);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const allVisibleIds = translationRows.map((r) => r.id);
+  const allVisibleIds = accommodationRows.map((r) => r.id);
   const allVisibleSelected =
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedSet.has(id));
   const selectedCount = selectedIds.length;
@@ -105,27 +103,27 @@ function TranslationContent() {
     setSelectedIds([]);
   };
 
-  const handleAddTranslation = async (values: AdminTranslationAssistFormValues) => {
-    await addTranslationAssistance(values);
+  const handleAddAccommodation = async (values: AdminAccommodationAssistFormValues) => {
+    await addAccommodationAssistance(values);
   };
 
-  const handleEditTranslation = async (id: string, values: TranslationEditFormValues) => {
-    await updateTranslationAssistance(id, values);
+  const handleEditAccommodation = async (id: string, values: AccommodationEditFormValues) => {
+    await updateAccommodationAssistance(id, values);
   };
 
-  const openEditDialog = (row: TranslationAssistanceRow) => {
+  const openEditDialog = (row: AccommodationAssistanceRow) => {
     setEditingRow(row);
-    setEditTranslationOpen(true);
+    setEditAccommodationOpen(true);
   };
 
-  const applyStatusAction = useCallback(async (status: TranslationActionStatus, ids: string[]) => {
+  const applyStatusAction = useCallback(async (status: AccommodationActionStatus, ids: string[]) => {
     if (!selectedEventId || ids.length === 0) return;
 
     if (ids.length > 1) {
       setBulkLoading(true);
       setPendingBulkAction(status);
       try {
-        await bulkUpdateTranslationStatus(ids, status);
+        await bulkUpdateAccommodationStatus(ids, status);
         setSelectedIds([]);
       } finally {
         setBulkLoading(false);
@@ -137,13 +135,13 @@ function TranslationContent() {
     const id = ids[0];
     setActionLoadingId(id);
     try {
-      await bulkUpdateTranslationStatus([id], status);
+      await bulkUpdateAccommodationStatus([id], status);
     } finally {
       setActionLoadingId(null);
     }
-  }, [bulkUpdateTranslationStatus, selectedEventId]);
+  }, [bulkUpdateAccommodationStatus, selectedEventId]);
 
-  const runBulkAction = useCallback(async (action: TranslationActionStatus) => {
+  const runBulkAction = useCallback(async (action: AccommodationActionStatus) => {
     await applyStatusAction(action, [...selectedIdsRef.current]);
   }, [applyStatusAction]);
 
@@ -152,8 +150,8 @@ function TranslationContent() {
     return currentSelected.length > 1 ? [...currentSelected] : [rowId];
   }, []);
 
-  const columns = useMemo<ColumnDef<TranslationAssistanceRow>[]>(() => {
-    const selectionColumn: ColumnDef<TranslationAssistanceRow>[] = canManage
+  const columns = useMemo<ColumnDef<AccommodationAssistanceRow>[]>(() => {
+    const selectionColumn: ColumnDef<AccommodationAssistanceRow>[] = canManage
       ? [{
         id: "select",
         header: () => (
@@ -187,23 +185,27 @@ function TranslationContent() {
       }]
       : [];
 
-    const baseColumns: ColumnDef<TranslationAssistanceRow>[] = [
+    const baseColumns: ColumnDef<AccommodationAssistanceRow>[] = [
       ...selectionColumn,
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "email", header: "Email" },
       { accessorKey: "phone", header: "Phone" },
+      { accessorKey: "hotelName", header: "Hotel" },
       {
-        id: "language",
-        header: "Requested Language",
-        cell: ({ row }) => getRegistrationOptionLabel(row.original.language),
+        accessorKey: "address",
+        header: "Address",
+        cell: ({ row }) => (
+          <span className="line-clamp-2 max-w-md" title={row.original.address}>
+            {row.original.address}
+          </span>
+        ),
       },
-      {
-        accessorKey: "requiredDate",
-        header: "Required Date",
-      },
+      { accessorKey: "roomNo", header: "Room" },
+      { accessorKey: "fromDate", header: "From" },
+      { accessorKey: "toDate", header: "To" },
       {
         accessorKey: "status",
-        header: "Translation Status",
+        header: "Status",
         cell: ({ row }) => (
           <Badge variant={requestStatusVariant(row.original.status)} className="capitalize">
             {row.original.status}
@@ -278,7 +280,7 @@ function TranslationContent() {
 
   const selectedEvent = events.find((event) => event.id === selectedEventId);
   const exportFilename = slugifyFilename(
-    selectedEvent ? `translation-${selectedEvent.name}` : "translation-requests",
+    selectedEvent ? `accommodation-${selectedEvent.name}` : "accommodation-requests",
   );
 
   if (eventsLoading && events.length === 0) return <DashboardSkeleton />;
@@ -287,13 +289,13 @@ function TranslationContent() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Manage Translation Requests</h1>
-          <p className="text-muted-foreground">Manage translation support for registered participants</p>
+          <h1 className="text-2xl font-bold">Manage Accommodation Requests</h1>
+          <p className="text-muted-foreground">Review accommodation support requests for registered participants</p>
         </div>
         {canManage && (
-          <Button size="sm" onClick={() => setAddTranslationOpen(true)}>
-            <Languages className="h-4 w-4 mr-2" />
-            Add translation assistance
+          <Button size="sm" onClick={() => setAddAccommodationOpen(true)}>
+            <Hotel className="h-4 w-4 mr-2" />
+            Add accommodation assistance
           </Button>
         )}
       </div>
@@ -305,39 +307,39 @@ function TranslationContent() {
         onEventChange={handleEventChange}
       />
 
-      <AddTranslationAssistanceDialog
-        open={addTranslationOpen}
-        onOpenChange={setAddTranslationOpen}
+      <AddAccommodationAssistanceDialog
+        open={addAccommodationOpen}
+        onOpenChange={setAddAccommodationOpen}
         events={events}
         eventsLoading={eventsLoading}
         defaultEventId={selectedEventId}
-        onSubmit={handleAddTranslation}
+        onSubmit={handleAddAccommodation}
       />
 
-      <EditTranslationAssistanceDialog
-        open={editTranslationOpen}
-        onOpenChange={setEditTranslationOpen}
+      <EditAccommodationAssistanceDialog
+        open={editAccommodationOpen}
+        onOpenChange={setEditAccommodationOpen}
         row={editingRow}
         events={events}
         eventsLoading={eventsLoading}
         defaultEventId={selectedEventId}
-        onSubmit={handleEditTranslation}
+        onSubmit={handleEditAccommodation}
       />
 
       {!selectedEventId ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            Select an event to view translation requests.
+            Select an event to view accommodation requests.
           </CardContent>
         </Card>
-      ) : translationAssistanceLoading ? (
+      ) : accommodationAssistanceLoading ? (
         <DashboardSkeleton />
       ) : (
         <>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {translationPagination.total} translation request{translationPagination.total === 1 ? "" : "s"}
+              {accommodationPagination.total} accommodation request{accommodationPagination.total === 1 ? "" : "s"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canManage && selectedCount > 0 && (
@@ -381,9 +383,9 @@ function TranslationContent() {
               )}
               <ExportMenu
                 filename={exportFilename}
-                title={selectedEvent ? `Manage Translation — ${selectedEvent.name}` : "Manage Translation"}
-                columns={TRANSLATION_EXPORT_COLUMNS}
-                data={translationRows}
+                title={selectedEvent ? `Manage Accommodation — ${selectedEvent.name}` : "Manage Accommodation"}
+                columns={ACCOMMODATION_EXPORT_COLUMNS}
+                data={accommodationRows}
               />
             </div>
           </div>
@@ -392,21 +394,21 @@ function TranslationContent() {
               <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/70">
                 <div className="flex items-center gap-2 rounded-md border bg-background px-4 py-2 text-sm text-muted-foreground shadow-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Updating translation requests...
+                  Updating accommodation requests...
                 </div>
               </div>
             )}
             <DataTable
               columns={columns}
-              data={translationRows}
+              data={accommodationRows}
               searchKey="userName"
               searchPlaceholder="Search users..."
               serverPagination={{
-                page: translationPagination.page,
-                totalPages: translationPagination.totalPages,
-                hasNext: translationPagination.hasNext,
-                hasPrevious: translationPagination.hasPrevious,
-                onPageChange: handleTranslationPageChange,
+                page: accommodationPagination.page,
+                totalPages: accommodationPagination.totalPages,
+                hasNext: accommodationPagination.hasNext,
+                hasPrevious: accommodationPagination.hasPrevious,
+                onPageChange: handleAccommodationPageChange,
               }}
             />
           </div>
