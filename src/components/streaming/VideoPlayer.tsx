@@ -76,6 +76,8 @@ export function VideoPlayer({
     (source?.type === "google-drive-file" && Boolean(source.directUrl) && !useIframeFallback);
 
   const playbackUrl = usesVideo ? source?.directUrl : undefined;
+  const iframePlaybackUrl =
+    usesIframe && source?.embedUrl && !isPaused ? source.embedUrl : undefined;
 
   const tryPlayVideo = useCallback(async () => {
     const video = videoRef.current;
@@ -191,7 +193,20 @@ export function VideoPlayer({
   ]);
 
   useEffect(() => {
-    if (!usesIframe || iframeReady) return;
+    if (!usesIframe || !iframePlaybackUrl) {
+      if (usesIframe && !iframePlaybackUrl) {
+        setIframeReady(false);
+        setIsBuffering(false);
+      }
+      return;
+    }
+
+    setIframeReady(false);
+    setIsBuffering(true);
+  }, [iframePlaybackUrl, usesIframe]);
+
+  useEffect(() => {
+    if (!usesIframe || iframeReady || !iframePlaybackUrl) return;
 
     const timeout = window.setTimeout(() => {
       setPlaybackError(true);
@@ -199,7 +214,7 @@ export function VideoPlayer({
     }, IFRAME_LOAD_TIMEOUT_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [usesIframe, iframeReady]);
+  }, [usesIframe, iframeReady, iframePlaybackUrl]);
 
   const showThumbnail = !streamUrl || playbackError || (!usesIframe && !usesVideo);
 
@@ -303,39 +318,40 @@ export function VideoPlayer({
 
       {usesIframe && source?.embedUrl && !playbackError && (
         <>
-          {!iframeReady && (
+          {!iframeReady && iframePlaybackUrl && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black">
               <Loader2 className="h-10 w-10 animate-spin text-white" />
             </div>
           )}
-          <div className={cn("absolute inset-0 overflow-hidden", isPaused && "pointer-events-none")}>
-            <iframe
-              src={source.embedUrl}
-              title={title}
-              className="absolute left-0 top-0 w-full border-0"
-              style={{ height: "calc(100% + 6rem)" }}
-              allow="autoplay; encrypted-media; fullscreen"
-              referrerPolicy="no-referrer-when-downgrade"
-              onLoad={() => {
-                setIframeReady(true);
-                setIsBuffering(false);
-              }}
-            />
+          <div className="absolute inset-0 overflow-hidden [container-type:size]">
+            {iframePlaybackUrl ? (
+              <iframe
+                key={`${iframePlaybackUrl}-${reloadKey}`}
+                src={iframePlaybackUrl}
+                title={title}
+                className="absolute left-1/2 top-1/2 aspect-video h-auto w-auto min-h-full min-w-full max-w-none -translate-x-1/2 -translate-y-1/2 border-0"
+                allow="autoplay; encrypted-media; fullscreen"
+                referrerPolicy="no-referrer-when-downgrade"
+                onLoad={() => {
+                  setIframeReady(true);
+                  setIsBuffering(false);
+                }}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-black" aria-hidden />
+            )}
           </div>
-          {!isPaused && (
-            <div
-              className="absolute bottom-0 left-0 right-0 z-[15] h-24 bg-black pointer-events-auto"
-              aria-hidden
-            />
-          )}
           {isPaused && (
             <button
               type="button"
-              className="absolute inset-0 z-[25] flex items-center justify-center bg-black/40"
+              className="absolute inset-0 z-[25] flex flex-col items-center justify-center gap-3 bg-black/60"
               onClick={onResume}
               aria-label="Resume stream"
             >
-              <Pause className="h-16 w-16 text-white/80" />
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+                <Play className="h-8 w-8 text-white fill-white" />
+              </span>
+              <span className="text-sm text-white/90">Stream paused</span>
             </button>
           )}
         </>
@@ -384,7 +400,7 @@ export function VideoPlayer({
       <div
         className={cn(
           "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",
-          usesIframe || playbackError ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity",
+          playbackError ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity",
         )}
       >
         <div className="flex items-center justify-between gap-4">
@@ -406,9 +422,11 @@ export function VideoPlayer({
                     <Pause className="h-4 w-4" />
                   </Button>
                 )}
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onMute}>
-                  {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                </Button>
+                {usesVideo && (
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onMute}>
+                    {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+                )}
               </>
             )}
             <Button

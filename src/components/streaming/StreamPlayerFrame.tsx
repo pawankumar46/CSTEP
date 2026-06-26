@@ -47,7 +47,6 @@ export function StreamPlayerFrame({
         <div className="hidden md:block" />
       )}
 
-      {/* Row height on desktop comes from banner images; video stretches to the same height */}
       <div className="relative min-w-0 aspect-video bg-black md:aspect-auto md:h-full">
         <VideoPlayer {...playerProps} fill className="rounded-none" />
       </div>

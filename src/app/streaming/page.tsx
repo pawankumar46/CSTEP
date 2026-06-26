@@ -48,6 +48,7 @@ export default function StreamingPage() {
   const [reactions, setReactions] = useState<Record<string, number>>({ "👍": 42, "❤️": 28, "👏": 15 });
   const [linkCopied, setLinkCopied] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | undefined>(LIVE_STREAM_URL || undefined);
+  const isDriveEmbed = Boolean(streamUrl && isGoogleDriveStreamUrl(streamUrl));
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -160,10 +161,12 @@ export default function StreamingPage() {
                     {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
                     {isPaused ? "Resume Stream" : "Pause Stream"}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setIsMuted(!isMuted)}>
-                    <VolumeX className="h-4 w-4 mr-1" />
-                    {isMuted ? "Unmute" : "Mute Stream"}
-                  </Button>
+                  {!isDriveEmbed && (
+                    <Button size="sm" variant="outline" onClick={() => setIsMuted(!isMuted)}>
+                      <VolumeX className="h-4 w-4 mr-1" />
+                      {isMuted ? "Unmute" : "Mute Stream"}
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={shareLink}>
                     <Share2 className="h-4 w-4 mr-1" /> Share Link
                   </Button>
