@@ -5,7 +5,7 @@ import Hls from "hls.js";
 import { Play, Pause, Volume2, VolumeX, Maximize, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
+import { parseStreamUrl, shouldPreferDriveEmbed, type StreamSource } from "@/lib/stream-utils";
 import { LIVE_STREAM_FILE_ID } from "@/lib/constants";
 
 const BUFFERING_TIMEOUT_MS = 20000;
@@ -59,11 +59,12 @@ export function VideoPlayer({
     }
 
     setIframeReady(false);
-    setUseIframeFallback(false);
     setIsBuffering(true);
     setPlaybackError(false);
     setNeedsUserPlay(false);
-    setSource(parseStreamUrl(streamUrl, LIVE_STREAM_FILE_ID));
+    const parsed = parseStreamUrl(streamUrl, LIVE_STREAM_FILE_ID);
+    setSource(parsed);
+    setUseIframeFallback(shouldPreferDriveEmbed(parsed));
   }, [streamUrl, reloadKey]);
 
   const isHlsStream = source?.type === "hls-stream";

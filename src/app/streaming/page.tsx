@@ -18,6 +18,7 @@ import { useMinRole } from "@/hooks/useRoleGuard";
 import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
 import { mockChatMessages } from "@/mock/feedback";
 import { resolveLivePlaybackUrl } from "@/services/broadcast.service";
+import { isGoogleDriveStreamUrl } from "@/lib/stream-utils";
 import {
   APP_NAME,
   LIVE_STREAM_URL,
@@ -50,6 +51,10 @@ export default function StreamingPage() {
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (LIVE_STREAM_URL && isGoogleDriveStreamUrl(LIVE_STREAM_URL)) {
+      return;
+    }
+
     let cancelled = false;
 
     const loadStreamUrl = async () => {

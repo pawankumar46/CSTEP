@@ -4,12 +4,16 @@ const apiUrl =
   process.env.NEXT_PUBLIC_API_URL?.trim() || process.env.API_URL?.trim();
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+const liveStreamUrl = process.env.NEXT_PUBLIC_LIVE_STREAM_URL?.trim();
+const liveStreamFileId = process.env.NEXT_PUBLIC_LIVE_STREAM_FILE_ID?.trim();
 
 const nextConfig: NextConfig = {
   devIndicators: false,
   env: {
     ...(apiUrl ? { NEXT_PUBLIC_API_URL: apiUrl } : {}),
     ...(appUrl ? { NEXT_PUBLIC_APP_URL: appUrl } : {}),
+    ...(liveStreamUrl ? { NEXT_PUBLIC_LIVE_STREAM_URL: liveStreamUrl } : {}),
+    ...(liveStreamFileId ? { NEXT_PUBLIC_LIVE_STREAM_FILE_ID: liveStreamFileId } : {}),
   },
   images: {
     remotePatterns: [

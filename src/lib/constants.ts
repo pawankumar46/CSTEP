@@ -1,5 +1,9 @@
 import type { UserRole } from "@/types";
 import { readPublicEnv } from "@/lib/env";
+import { buildDriveEmbedUrl } from "@/lib/stream-utils";
+
+/** Default Drive file when env is unset (e.g. missing Vercel build env). */
+const DEFAULT_LIVE_STREAM_FILE_ID = "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
 
 export const APP_NAME = "CSTEP";
 export const APP_SHORT_NAME = "CS";
@@ -15,11 +19,13 @@ export const FEATURED_EVENT = {
   location: "Hybrid — In-person & Virtual",
 };
 
-/** Live stream source URL — set NEXT_PUBLIC_LIVE_STREAM_URL in .env.local */
-export const LIVE_STREAM_URL = readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_URL");
+/** Live stream source URL — set NEXT_PUBLIC_LIVE_STREAM_URL in .env.local / Vercel */
+export const LIVE_STREAM_FILE_ID =
+  readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_ID") ?? DEFAULT_LIVE_STREAM_FILE_ID;
 
-/** Google Drive file ID fallback when stream URL is a folder link */
-export const LIVE_STREAM_FILE_ID = readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_ID");
+export const LIVE_STREAM_URL =
+  readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_URL") ??
+  buildDriveEmbedUrl(LIVE_STREAM_FILE_ID);
 
 /** Vertical side banners shown beside the live stream (hidden in fullscreen). */
 export const STREAM_LEFT_BANNER_URL =

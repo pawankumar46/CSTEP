@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { LIVE_STREAM_FILE_ID } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const DEFAULT_FILE_ID = "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
 const resolvedUrlCache = new Map<string, string>();
 
 const DRIVE_HEADERS: HeadersInit = {
@@ -60,7 +60,7 @@ async function resolveDriveStreamUrl(fileId: string): Promise<string> {
 }
 
 export async function GET(request: NextRequest) {
-  const fileId = request.nextUrl.searchParams.get("fileId") ?? DEFAULT_FILE_ID;
+  const fileId = request.nextUrl.searchParams.get("fileId") ?? LIVE_STREAM_FILE_ID;
   const range = request.headers.get("range");
 
   try {
