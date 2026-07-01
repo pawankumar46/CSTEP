@@ -17,12 +17,6 @@ export function isGoogleDriveStreamUrl(url: string): boolean {
   return /drive\.google\.com/i.test(url.trim());
 }
 
-export function shouldPreferDriveEmbed(source: StreamSource | null): boolean {
-  if (source?.type !== "google-drive-file" || !source.embedUrl) return false;
-  // Google Drive proxy (/api/stream/video) is unreliable on serverless hosts (e.g. Vercel).
-  return process.env.NODE_ENV === "production";
-}
-
 export function buildDriveEmbedUrl(fileId: string, autoplay = true): string {
   const base = `https://drive.google.com/file/d/${fileId}/preview`;
   return autoplay ? `${base}?autoplay=1` : base;

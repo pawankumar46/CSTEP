@@ -47,8 +47,8 @@ export function StreamPlayerFrame({
         <div className="hidden md:block" />
       )}
 
-      <div className="relative min-w-0 aspect-video bg-black md:aspect-auto md:h-full">
-        <VideoPlayer {...playerProps} fill className="rounded-none" />
+      <div className="relative min-w-0 aspect-video min-h-0 bg-black md:aspect-auto md:h-full">
+        <VideoPlayer {...playerProps} fill className="absolute inset-0 rounded-none" />
       </div>
 
       {rightBannerUrl ? (
