@@ -49,6 +49,7 @@ export function VideoPlayer({
   const [needsUserPlay, setNeedsUserPlay] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [iframeCoverScale, setIframeCoverScale] = useState(1);
 
   useEffect(() => {
     if (!streamUrl) {
@@ -80,6 +81,30 @@ export function VideoPlayer({
   const playbackUrl = usesVideo ? source?.directUrl : undefined;
   const iframePlaybackUrl =
     usesIframe && source?.embedUrl && !isPaused ? source.embedUrl : undefined;
+
+  const updateIframeCoverScale = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const { width, height } = el.getBoundingClientRect();
+    if (width <= 0 || height <= 0) return;
+
+    const videoHeightAtFullWidth = width * (9 / 16);
+    const scale = Math.max(1, height / videoHeightAtFullWidth) * 1.05;
+    setIframeCoverScale(scale);
+  }, []);
+
+  useEffect(() => {
+    if (!usesIframe || !iframePlaybackUrl) return;
+
+    const el = containerRef.current;
+    if (!el) return;
+
+    updateIframeCoverScale();
+    const observer = new ResizeObserver(updateIframeCoverScale);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [usesIframe, iframePlaybackUrl, reloadKey, updateIframeCoverScale]);
 
   const tryPlayVideo = useCallback(async () => {
     const video = videoRef.current;
@@ -325,29 +350,28 @@ export function VideoPlayer({
               <Loader2 className="h-10 w-10 animate-spin text-white" />
             </div>
           )}
-          <div className="absolute inset-0">
-            <div
-              className="absolute inset-x-0 top-0 overflow-hidden"
-              style={{ bottom: DRIVE_EMBED_CHROME }}
-            >
-              {iframePlaybackUrl ? (
-                <iframe
-                  key={`${iframePlaybackUrl}-${reloadKey}`}
-                  src={iframePlaybackUrl}
-                  title={title}
-                  className="pointer-events-none absolute left-1/2 top-0 aspect-video h-auto w-full min-h-full min-w-full max-w-none -translate-x-1/2 border-0"
-                  style={{ height: `calc(100% + ${DRIVE_EMBED_CHROME})` }}
-                  allow="autoplay; encrypted-media; fullscreen"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  onLoad={() => {
-                    setIframeReady(true);
-                    setIsBuffering(false);
-                  }}
-                />
-              ) : (
-                <div className="absolute inset-0 bg-black" aria-hidden />
-              )}
-            </div>
+          <div className="absolute inset-0 overflow-hidden">
+            {iframePlaybackUrl ? (
+              <iframe
+                key={`${iframePlaybackUrl}-${reloadKey}`}
+                src={iframePlaybackUrl}
+                title={title}
+                className="pointer-events-none absolute left-1/2 top-1/2 aspect-video w-full h-auto border-0"
+                style={{
+                  transform: `translate(-50%, calc(-50% - 0.75rem)) scale(${iframeCoverScale})`,
+                  transformOrigin: "center center",
+                }}
+                allow="autoplay; encrypted-media; fullscreen"
+                referrerPolicy="no-referrer-when-downgrade"
+                onLoad={() => {
+                  setIframeReady(true);
+                  setIsBuffering(false);
+                  updateIframeCoverScale();
+                }}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-black" aria-hidden />
+            )}
             <div
               className="absolute inset-x-0 bottom-0 z-[15] bg-black pointer-events-none"
               style={{ height: DRIVE_EMBED_CHROME }}
