@@ -10,6 +10,8 @@ import { LIVE_STREAM_FILE_ID } from "@/lib/constants";
 
 const BUFFERING_TIMEOUT_MS = 20000;
 const IFRAME_LOAD_TIMEOUT_MS = 20000;
+/** Google Drive preview player chrome clipped from the embed (control bar, progress, title). */
+const DRIVE_EMBED_CHROME = "4.5rem";
 
 export interface VideoPlayerProps {
   streamUrl?: string;
@@ -323,23 +325,34 @@ export function VideoPlayer({
               <Loader2 className="h-10 w-10 animate-spin text-white" />
             </div>
           )}
-          <div className="absolute inset-0 overflow-hidden [container-type:size]">
-            {iframePlaybackUrl ? (
-              <iframe
-                key={`${iframePlaybackUrl}-${reloadKey}`}
-                src={iframePlaybackUrl}
-                title={title}
-                className="absolute left-1/2 top-1/2 aspect-video h-auto w-auto min-h-full min-w-full max-w-none -translate-x-1/2 -translate-y-1/2 border-0"
-                allow="autoplay; encrypted-media; fullscreen"
-                referrerPolicy="no-referrer-when-downgrade"
-                onLoad={() => {
-                  setIframeReady(true);
-                  setIsBuffering(false);
-                }}
-              />
-            ) : (
-              <div className="absolute inset-0 bg-black" aria-hidden />
-            )}
+          <div className="absolute inset-0">
+            <div
+              className="absolute inset-x-0 top-0 overflow-hidden"
+              style={{ bottom: DRIVE_EMBED_CHROME }}
+            >
+              {iframePlaybackUrl ? (
+                <iframe
+                  key={`${iframePlaybackUrl}-${reloadKey}`}
+                  src={iframePlaybackUrl}
+                  title={title}
+                  className="pointer-events-none absolute left-1/2 top-0 aspect-video h-auto w-full min-h-full min-w-full max-w-none -translate-x-1/2 border-0"
+                  style={{ height: `calc(100% + ${DRIVE_EMBED_CHROME})` }}
+                  allow="autoplay; encrypted-media; fullscreen"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  onLoad={() => {
+                    setIframeReady(true);
+                    setIsBuffering(false);
+                  }}
+                />
+              ) : (
+                <div className="absolute inset-0 bg-black" aria-hidden />
+              )}
+            </div>
+            <div
+              className="absolute inset-x-0 bottom-0 z-[15] bg-black pointer-events-none"
+              style={{ height: DRIVE_EMBED_CHROME }}
+              aria-hidden
+            />
           </div>
           {isPaused && (
             <button
@@ -397,49 +410,49 @@ export function VideoPlayer({
         </div>
       )}
 
-      <div
-        className={cn(
-          "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",
-          playbackError ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity",
-        )}
-      >
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-white text-sm font-medium truncate">{title}</p>
-          <div className="flex items-center gap-2 shrink-0">
-            {(usesVideo || usesIframe) && !playbackError && (
-              <>
-                {isPaused || needsUserPlay ? (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-white hover:bg-white/20"
-                    onClick={needsUserPlay ? handleUserPlay : onResume}
-                  >
-                    <Play className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onPause}>
-                    <Pause className="h-4 w-4" />
-                  </Button>
-                )}
-                {usesVideo && (
+      {!usesIframe && (
+        <div
+          className={cn(
+            "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",
+            playbackError ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity",
+          )}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-white text-sm font-medium truncate">{title}</p>
+            <div className="flex items-center gap-2 shrink-0">
+              {usesVideo && !playbackError && (
+                <>
+                  {isPaused || needsUserPlay ? (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-white hover:bg-white/20"
+                      onClick={needsUserPlay ? handleUserPlay : onResume}
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onPause}>
+                      <Pause className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onMute}>
                     {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                   </Button>
-                )}
-              </>
-            )}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-white hover:bg-white/20"
-              onClick={toggleFullscreen}
-            >
-              <Maximize className="h-4 w-4" />
-            </Button>
+                </>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-white hover:bg-white/20"
+                onClick={toggleFullscreen}
+              >
+                <Maximize className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
