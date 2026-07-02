@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatEventDateRange } from "@/lib/event-display";
+import { getTodayDateInputMin } from "@/lib/date-input";
 import {
   accommodationEditSchema,
   EMPTY_ACCOMMODATION_EDIT,
@@ -53,11 +54,16 @@ export function EditAccommodationAssistanceDialog({
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<AccommodationEditFormValues>({
     resolver: zodResolver(accommodationEditSchema),
     defaultValues: EMPTY_ACCOMMODATION_EDIT,
   });
+
+  const minDate = getTodayDateInputMin();
+  const fromDate = watch("accommodationFromDate");
+  const toDateMin = fromDate && fromDate > minDate ? fromDate : minDate;
 
   useEffect(() => {
     if (!open || !row) return;
@@ -178,7 +184,7 @@ export function EditAccommodationAssistanceDialog({
                 name="accommodationFromDate"
                 control={control}
                 render={({ field }) => (
-                  <Input id="edit-accommodationFromDate" type="date" {...field} />
+                  <Input id="edit-accommodationFromDate" type="date" min={minDate} {...field} />
                 )}
               />
               {errors.accommodationFromDate && (
@@ -191,7 +197,7 @@ export function EditAccommodationAssistanceDialog({
                 name="accommodationToDate"
                 control={control}
                 render={({ field }) => (
-                  <Input id="edit-accommodationToDate" type="date" {...field} />
+                  <Input id="edit-accommodationToDate" type="date" min={toDateMin} {...field} />
                 )}
               />
               {errors.accommodationToDate && (

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatEventDateRange } from "@/lib/event-display";
+import { getTodayDateInputMin } from "@/lib/date-input";
 import {
   translationEditSchema,
   EMPTY_TRANSLATION_EDIT,
@@ -59,6 +60,8 @@ export function EditTranslationAssistanceDialog({
     resolver: zodResolver(translationEditSchema),
     defaultValues: EMPTY_TRANSLATION_EDIT,
   });
+
+  const minDate = getTodayDateInputMin();
 
   useEffect(() => {
     if (!open || !row) return;
@@ -157,7 +160,7 @@ export function EditTranslationAssistanceDialog({
               name="translationRequiredDate"
               control={control}
               render={({ field }) => (
-                <Input id="edit-translationRequiredDate" type="date" {...field} />
+                <Input id="edit-translationRequiredDate" type="date" min={minDate} {...field} />
               )}
             />
             {errors.translationRequiredDate && (

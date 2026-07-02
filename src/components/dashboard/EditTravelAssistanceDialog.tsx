@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatEventDateRange } from "@/lib/event-display";
+import { getTodayDateInputMin } from "@/lib/date-input";
 import {
   travelEditSchema,
   EMPTY_TRAVEL_EDIT,
@@ -86,6 +87,7 @@ export function EditTravelAssistanceDialog({
   });
 
   const transportMode = watch("transportMode");
+  const minDate = getTodayDateInputMin();
 
   useEffect(() => {
     if (!open || !row) return;
@@ -222,7 +224,7 @@ export function EditTravelAssistanceDialog({
                   name="departureDate"
                   control={control}
                   render={({ field }) => (
-                    <Input id="edit-departureDate" type="date" {...field} />
+                    <Input id="edit-departureDate" type="date" min={minDate} {...field} />
                   )}
                 />
                 {errors.departureDate && (
@@ -266,7 +268,7 @@ export function EditTravelAssistanceDialog({
                   name="travelDate"
                   control={control}
                   render={({ field }) => (
-                    <Input id="edit-travelDate" type="date" {...field} />
+                    <Input id="edit-travelDate" type="date" min={minDate} {...field} />
                   )}
                 />
                 {errors.travelDate && (

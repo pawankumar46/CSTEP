@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { refineDateNotInPast } from "@/lib/date-input";
 import {
   TRANSLATION_LANGUAGE_VALUES,
   type TranslationLanguageValue,
@@ -17,7 +18,16 @@ export const adminTranslationAssistSchema = z.object({
 
 export type AdminTranslationAssistFormValues = z.infer<typeof adminTranslationAssistSchema>;
 
-export const translationEditSchema = adminTranslationAssistSchema.omit({ userId: true });
+export const translationEditSchema = adminTranslationAssistSchema
+  .omit({ userId: true })
+  .superRefine((data, ctx) => {
+    refineDateNotInPast(
+      data.translationRequiredDate,
+      ctx,
+      "translationRequiredDate",
+      "Required date",
+    );
+  });
 
 export type TranslationEditFormValues = z.infer<typeof translationEditSchema>;
 

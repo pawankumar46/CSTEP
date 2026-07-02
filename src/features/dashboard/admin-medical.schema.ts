@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { refineDateNotInPast } from "@/lib/date-input";
 
 export const adminMedicalAssistSchema = z.object({
   eventId: z.string().min(1, "Please select an event"),
@@ -9,7 +10,11 @@ export const adminMedicalAssistSchema = z.object({
 
 export type AdminMedicalAssistFormValues = z.infer<typeof adminMedicalAssistSchema>;
 
-export const medicalEditSchema = adminMedicalAssistSchema.omit({ userId: true });
+export const medicalEditSchema = adminMedicalAssistSchema
+  .omit({ userId: true })
+  .superRefine((data, ctx) => {
+    refineDateNotInPast(data.medicalRequiredDate, ctx, "medicalRequiredDate", "Required date");
+  });
 
 export type MedicalEditFormValues = z.infer<typeof medicalEditSchema>;
 

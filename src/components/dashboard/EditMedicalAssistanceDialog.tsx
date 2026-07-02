@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatEventDateRange } from "@/lib/event-display";
+import { getTodayDateInputMin } from "@/lib/date-input";
 import {
   medicalEditSchema,
   EMPTY_MEDICAL_EDIT,
@@ -59,6 +60,8 @@ export function EditMedicalAssistanceDialog({
     resolver: zodResolver(medicalEditSchema),
     defaultValues: EMPTY_MEDICAL_EDIT,
   });
+
+  const minDate = getTodayDateInputMin();
 
   useEffect(() => {
     if (!open || !row) return;
@@ -151,7 +154,7 @@ export function EditMedicalAssistanceDialog({
               name="medicalRequiredDate"
               control={control}
               render={({ field }) => (
-                <Input id="edit-medicalRequiredDate" type="date" {...field} />
+                <Input id="edit-medicalRequiredDate" type="date" min={minDate} {...field} />
               )}
             />
             {errors.medicalRequiredDate && (

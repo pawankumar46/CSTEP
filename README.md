@@ -21,6 +21,7 @@ CSTEP is a **Next.js** web application for conference and event operations: dele
 - [Key workflows](#key-workflows)
 - [Scripts](#scripts)
 - [Deployment](#deployment)
+- [Changelog](#changelog)
 
 ---
 
@@ -31,7 +32,7 @@ CSTEP is a **Next.js** web application for conference and event operations: dele
 | **Public site** | Landing page, event info, sign up / login, event registration |
 | **Live streaming** | `/streaming` — video player with optional side banners; Google Drive or HLS sources |
 | **Profile** | Delegates request travel, medical, translation, and accommodation support |
-| **Dashboard** | Role-based admin tools for lobby, assistance requests, events, users, analytics |
+| **Dashboard** | Role-based admin tools for lobby, assistance requests (accept / hold / reject), events, users, analytics |
 | **Video management** | Broadcast session setup and stream URL management (event administrators) |
 
 The app uses **Zustand** for client state, **React Hook Form + Zod** for forms, **TanStack Table** for data grids, and **Axios** (`apiClient`) for authenticated backend calls.
@@ -143,6 +144,7 @@ c-step/
 │   │   ├── event-mappers.ts
 │   │   ├── broadcast-mappers.ts
 │   │   ├── stream-utils.ts    # Stream URL parsing (Drive, HLS, mp4)
+│   │   ├── date-input.ts      # Date input min values & past-date validation
 │   │   └── env.ts             # Public env readers
 │   ├── mock/                  # Fallback mock data (dev / API errors)
 │   ├── services/              # API service layer (calls Django or proxies)
@@ -387,6 +389,10 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 
 Moderators select rows in DataTable → **Accept** / **Hold** / **Reject** → `PATCH .../bulk-status/` with mapped API status.
 
+**Editing assistance requests** (travel, medical, translation, accommodation): date fields in the edit dialogs cannot be set to a past date. The date picker uses `min={today}` via `getTodayDateInputMin()` in `src/lib/date-input.ts`, and edit Zod schemas (`*-edit` in `features/dashboard/admin-*.schema.ts`) reject past dates on submit. Accommodation **to date** must also be on or after **from date**.
+
+Dashboard assistance schemas use shared field objects plus a `superRefine` callback — do not chain `.omit()` or `.merge()` on schemas that already have refinements (see `admin-travel.schema.ts` and `admin-accommodation.schema.ts`).
+
 ---
 
 ## Scripts
@@ -420,8 +426,22 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 | New dashboard page | `src/app/dashboard/`, schema in `features/dashboard/` |
 | Auth changes | `auth.service.ts`, `auth-mappers.ts`, `useAuthStore.ts` |
 | Registration payload | `registration-mappers.ts`, `registration.service.ts` |
-| Assistance forms | `event-support-mappers.ts`, `lobby.service.ts` |
+| Assistance forms | `event-support-mappers.ts`, `lobby.service.ts`, `date-input.ts`, `features/dashboard/admin-*.schema.ts` |
 | Streaming | `VideoPlayer.tsx`, `stream-utils.ts`, `streaming/page.tsx` |
+
+---
+
+## Changelog
+
+### 2026-07-02
+
+- **Accommodation dashboard:** Fixed page crash from Zod `.omit()` on a refined schema; `admin-accommodation.schema.ts` now uses shared `accommodationDetailFields` + `refineAccommodationDates()` (same pattern as travel).
+
+### 2026-06-17
+
+- **Assistance edit dialogs:** Past dates are blocked when editing travel, medical, translation, and accommodation requests in the manage dashboards (HTML `min` on date inputs + Zod validation on edit schemas).
+- **Assistance moderation:** Accept / Hold / Reject actions (single and bulk) on lobby and all four assistance dashboards.
+- **`src/lib/date-input.ts`:** Shared helpers for today’s minimum selectable date and past-date refinement.
 
 ---
 

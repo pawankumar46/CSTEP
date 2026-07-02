@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRANSPORT_MODES } from "@/features/profile/event-support.schema";
+import { isDateBeforeToday } from "@/lib/date-input";
 
 const travelTransportFields = {
   transportMode: z.enum(TRANSPORT_MODES),
@@ -71,12 +72,32 @@ function refineTravelTransport(data: TravelTransportValues, ctx: z.RefinementCtx
   }
 }
 
+function refineTravelEditDates(data: TravelTransportValues, ctx: z.RefinementCtx) {
+  refineTravelTransport(data, ctx);
+
+  if (data.departureDate?.trim() && isDateBeforeToday(data.departureDate.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Travel date cannot be in the past",
+      path: ["departureDate"],
+    });
+  }
+
+  if (data.travelDate?.trim() && isDateBeforeToday(data.travelDate.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Travel date cannot be in the past",
+      path: ["travelDate"],
+    });
+  }
+}
+
 export const travelEditSchema = z
   .object({
     eventId: z.string().min(1, "Please select an event"),
     ...travelTransportFields,
   })
-  .superRefine(refineTravelTransport);
+  .superRefine(refineTravelEditDates);
 
 export type TravelEditFormValues = z.infer<typeof travelEditSchema>;
 
