@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Loader2, Pencil, Stethoscope, X } from "lucide-react";
+import { Check, Loader2, Pause, Pencil, Stethoscope, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -14,24 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { assistanceStatusVariant, formatAssistanceStatus } from "@/lib/assistance-status";
 import { slugifyFilename } from "@/lib/export-utils";
 import { MEDICAL_EXPORT_COLUMNS } from "@/lib/registration-export";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
 import type { AdminMedicalAssistFormValues, MedicalEditFormValues } from "@/features/dashboard/admin-medical.schema";
-import type { MedicalAssistanceRow, UserRole } from "@/types";
+import type { AssistanceActionStatus, MedicalAssistanceRow, UserRole } from "@/types";
 
 const LOBBY_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
-type MedicalActionStatus = "accepted" | "rejected";
-
-const requestStatusVariant = (
-  status?: "pending" | "accepted" | "rejected"
-): "success" | "warning" | "destructive" => {
-  if (status === "accepted") return "success";
-  if (status === "rejected") return "destructive";
-  return "warning";
-};
 
 export default function MedicalPage() {
   return (
@@ -61,7 +53,7 @@ function MedicalContent() {
   const [editMedicalOpen, setEditMedicalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<MedicalAssistanceRow | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [pendingBulkAction, setPendingBulkAction] = useState<MedicalActionStatus | null>(null);
+  const [pendingBulkAction, setPendingBulkAction] = useState<AssistanceActionStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const selectedIdsRef = useRef<string[]>([]);
   selectedIdsRef.current = selectedIds;
@@ -115,7 +107,7 @@ function MedicalContent() {
     setEditMedicalOpen(true);
   };
 
-  const applyStatusAction = useCallback(async (status: MedicalActionStatus, ids: string[]) => {
+  const applyStatusAction = useCallback(async (status: AssistanceActionStatus, ids: string[]) => {
     if (!selectedEventId || ids.length === 0) return;
 
     if (ids.length > 1) {
@@ -140,7 +132,7 @@ function MedicalContent() {
     }
   }, [bulkUpdateMedicalStatus, selectedEventId]);
 
-  const runBulkAction = useCallback(async (action: MedicalActionStatus) => {
+  const runBulkAction = useCallback(async (action: AssistanceActionStatus) => {
     await applyStatusAction(action, [...selectedIdsRef.current]);
   }, [applyStatusAction]);
 
@@ -206,8 +198,8 @@ function MedicalContent() {
         accessorKey: "status",
         header: "Medical Status",
         cell: ({ row }) => (
-          <Badge variant={requestStatusVariant(row.original.status)} className="capitalize">
-            {row.original.status}
+          <Badge variant={assistanceStatusVariant[row.original.status]} className="capitalize">
+            {formatAssistanceStatus(row.original.status)}
           </Badge>
         ),
       },
@@ -250,6 +242,23 @@ function MedicalContent() {
                   <>
                     <Check className="h-3 w-3 mr-1" />
                     Accept
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                title={bulkFromRow ? `Hold ${selectedIds.length} selected` : "Hold"}
+                disabled={bulkLoading || isRowLoading}
+                onClick={() => void applyStatusAction("on_hold", resolveActionIds(row.original.id))}
+              >
+                {isRowLoading || (bulkLoading && pendingBulkAction === "on_hold") ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <Pause className="h-3 w-3 mr-1" />
+                    Hold
                   </>
                 )}
               </Button>
@@ -360,6 +369,21 @@ function MedicalContent() {
                       </>
                     ) : (
                       "Accept"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={bulkLoading || actionLoadingId !== null || selectedCount === 0}
+                    onClick={() => runBulkAction("on_hold")}
+                  >
+                    {pendingBulkAction === "on_hold" ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Holding...
+                      </>
+                    ) : (
+                      "Hold"
                     )}
                   </Button>
                   <Button

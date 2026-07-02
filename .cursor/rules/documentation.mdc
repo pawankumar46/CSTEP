@@ -1,0 +1,49 @@
+# Cursor Rule: Keep README.md Updated
+
+## Rule
+
+Whenever you make any changes to the project, you must also update the `README.md` file.
+
+This includes, but is not limited to:
+
+* Adding, removing, or modifying any files.
+* Implementing or modifying APIs.
+* Creating new pages, components, hooks, utilities, or services.
+* Making UI/UX changes.
+* Updating routing or navigation.
+* Adding, updating, or removing dependencies.
+* Changing project structure.
+* Adding new environment variables but don't include Base url.
+* Adding new features or fixing bugs.
+* Changing configuration files.
+
+## README Update Requirements
+
+After every change, update the appropriate sections of `README.md`, including:
+
+* **Features** – Document any new or modified functionality.
+* **Project Structure** – Reflect newly added, renamed, or removed files/folders.
+* **API Documentation** – Document new endpoints, request/response formats, authentication, and usage.
+* **UI Changes** – Briefly describe screens or components that were added or modified.
+* **Configuration** – Mention new environment variables or setup steps.
+* **Dependencies** – List newly added or removed packages when relevant.
+* **Changelog** – Add a dated entry summarizing what changed.
+
+## Expected Behavior
+
+* Never leave the README outdated after making code changes.
+* If multiple files are changed in one task, summarize all changes in a single README update.
+* Keep documentation concise, accurate, and easy to understand.
+* If no documentation changes are required, explicitly verify that the README is already up to date before finishing the task.
+
+## Completion Checklist
+
+Before marking any task as complete, verify:
+
+* ✓ Code changes are complete.
+* ✓ README.md has been updated.
+* ✓ New APIs are documented.
+* ✓ UI changes are documented.
+* ✓ New files/folders are documented if applicable.
+* ✓ Setup instructions remain accurate.
+* ✓ Changelog has been updated.

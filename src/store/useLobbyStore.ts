@@ -13,7 +13,7 @@ import type {
   LobbyUserRegistrationFormValues,
   LobbyUserSignupFormValues,
 } from "@/features/dashboard/admin-lobby-user.schema";
-import type { AccommodationAssistanceRow, Event, MedicalAssistanceRow, Registration, RegistrationStatus, TranslationAssistanceRow, TravelAssistanceRow } from "@/types";
+import type { AccommodationAssistanceRow, AssistanceActionStatus, Event, MedicalAssistanceRow, Registration, RegistrationStatus, TranslationAssistanceRow, TravelAssistanceRow } from "@/types";
 
 interface AssistancePaginationState {
   page: number;
@@ -65,13 +65,13 @@ interface LobbyState {
   fetchTranslationAssistance: (eventId: string, page?: number) => Promise<void>;
   fetchAccommodationAssistance: (eventId: string, page?: number) => Promise<void>;
   updateStatus: (id: string, status: RegistrationStatus) => Promise<void>;
-  updateTravelStatus: (id: string, status: "accepted" | "rejected") => Promise<void>;
-  updateTranslationStatus: (id: string, status: "accepted" | "rejected") => Promise<void>;
+  updateTravelStatus: (id: string, status: AssistanceActionStatus) => Promise<void>;
+  updateTranslationStatus: (id: string, status: AssistanceActionStatus) => Promise<void>;
   bulkUpdateStatus: (ids: string[], status: RegistrationStatus) => Promise<void>;
-  bulkUpdateTravelStatus: (ids: string[], status: "accepted" | "rejected") => Promise<void>;
-  bulkUpdateTranslationStatus: (ids: string[], status: "accepted" | "rejected") => Promise<void>;
-  bulkUpdateMedicalStatus: (ids: string[], status: "accepted" | "rejected") => Promise<void>;
-  bulkUpdateAccommodationStatus: (ids: string[], status: "accepted" | "rejected") => Promise<void>;
+  bulkUpdateTravelStatus: (ids: string[], status: AssistanceActionStatus) => Promise<void>;
+  bulkUpdateTranslationStatus: (ids: string[], status: AssistanceActionStatus) => Promise<void>;
+  bulkUpdateMedicalStatus: (ids: string[], status: AssistanceActionStatus) => Promise<void>;
+  bulkUpdateAccommodationStatus: (ids: string[], status: AssistanceActionStatus) => Promise<void>;
   addTravelAssistance: (values: AdminTravelAssistFormValues) => Promise<void>;
   addMedicalAssistance: (values: AdminMedicalAssistFormValues) => Promise<void>;
   addTranslationAssistance: (values: AdminTranslationAssistFormValues) => Promise<void>;

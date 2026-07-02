@@ -35,7 +35,7 @@ import type { AdminMedicalAssistFormValues, MedicalEditFormValues } from "@/feat
 import type { AdminTranslationAssistFormValues, TranslationEditFormValues } from "@/features/dashboard/admin-translation.schema";
 import type { AdminTravelAssistFormValues, TravelEditFormValues } from "@/features/dashboard/admin-travel.schema";
 import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
-import type { AccommodationAssistanceRow, Event, MedicalAssistanceRow, Registration, RegistrationStatus, TranslationAssistanceRow, TravelAssistanceRow } from "@/types";
+import type { AccommodationAssistanceRow, Event, MedicalAssistanceRow, Registration, RegistrationStatus, TranslationAssistanceRow, TravelAssistanceRow, AssistanceActionStatus } from "@/types";
 
 export const createLobbyUser = async (
   values: LobbyUserSignupFormValues,
@@ -460,7 +460,7 @@ export const updateLobbyStatus = async (
 
 export const bulkUpdateTravelStatus = async (
   ids: string[],
-  status: "accepted" | "rejected"
+  status: AssistanceActionStatus
 ): Promise<void> => {
   try {
     await apiClient.patch("/registrations/travel-assistance/bulk-status/", {
@@ -474,7 +474,7 @@ export const bulkUpdateTravelStatus = async (
 
 export const updateTravelStatus = async (
   travelAssistanceId: string,
-  status: "accepted" | "rejected",
+  status: AssistanceActionStatus,
   eventId?: string
 ): Promise<TravelAssistanceRow[]> => {
   try {
@@ -490,7 +490,7 @@ export const updateTravelStatus = async (
 
 export const bulkUpdateTranslationStatus = async (
   ids: string[],
-  status: "accepted" | "rejected"
+  status: AssistanceActionStatus
 ): Promise<void> => {
   try {
     await apiClient.patch("/registrations/translation-assistance/bulk-status/", {
@@ -504,7 +504,7 @@ export const bulkUpdateTranslationStatus = async (
 
 export const bulkUpdateMedicalStatus = async (
   ids: string[],
-  status: "accepted" | "rejected"
+  status: AssistanceActionStatus
 ): Promise<void> => {
   try {
     await apiClient.patch("/registrations/medical-assistance/bulk-status/", {
@@ -518,7 +518,7 @@ export const bulkUpdateMedicalStatus = async (
 
 export const bulkUpdateAccommodationStatus = async (
   ids: string[],
-  status: "accepted" | "rejected"
+  status: AssistanceActionStatus
 ): Promise<void> => {
   try {
     await apiClient.patch("/registrations/accommodation-assistance/bulk-status/", {
@@ -532,7 +532,7 @@ export const bulkUpdateAccommodationStatus = async (
 
 export const updateTranslationStatus = async (
   assistanceId: string,
-  status: "accepted" | "rejected",
+  status: AssistanceActionStatus,
   eventId?: string
 ): Promise<TranslationAssistanceRow[]> => {
   try {
@@ -548,7 +548,7 @@ export const updateTranslationStatus = async (
 
 export const updateMedicalStatus = async (
   assistanceId: string,
-  status: "accepted" | "rejected",
+  status: AssistanceActionStatus,
   eventId?: string
 ): Promise<MedicalAssistanceRow[]> => {
   try {

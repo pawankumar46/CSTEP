@@ -59,6 +59,10 @@ export type UpdateEventPayload = Partial<CreateEventPayload>;
 
 export type RegistrationStatus = "pending" | "accepted" | "rejected" | "on_hold";
 
+export type AssistanceRequestStatus = "pending" | "accepted" | "rejected" | "on_hold";
+
+export type AssistanceActionStatus = "accepted" | "rejected" | "on_hold";
+
 export type ParticipationDate = "21st" | "22nd" | "both_days" | (string & {});
 export type ParticipationTime = "half_day" | "full_day";
 export type AttendanceMode = "physical" | "virtual";
@@ -119,21 +123,21 @@ export interface TravelAssistanceItem {
   sourceLocation: string;
   destinationLocation: string;
   travelDate: string;
-  status: "pending" | "accepted" | "rejected";
+  status: AssistanceRequestStatus;
 }
 
 export interface TranslationAssistanceItem {
   id: string;
   language: TranslationLanguage;
   requiredDate: string;
-  status: "pending" | "accepted" | "rejected";
+  status: AssistanceRequestStatus;
 }
 
 export interface MedicalAssistanceItem {
   id: string;
   medicalNeeds: string;
   requiredDate: string;
-  status: "pending" | "accepted" | "rejected";
+  status: AssistanceRequestStatus;
 }
 
 export interface AccommodationAssistanceItem {
@@ -144,7 +148,7 @@ export interface AccommodationAssistanceItem {
   roomNo: string;
   fromDate: string;
   toDate: string;
-  status: "pending" | "accepted" | "rejected";
+  status: AssistanceRequestStatus;
 }
 
 export interface TravelAssistanceRow extends TravelAssistanceItem {
@@ -193,12 +197,12 @@ export interface Registration {
   travelRequired: boolean;
   travelType?: TravelType;
   travelArrangementLabel?: string;
-  travelStatus?: "pending" | "accepted" | "rejected";
+  travelStatus?: AssistanceRequestStatus;
   medicalSupportRequired: boolean;
   medicalSupportType?: MedicalSupportType;
   translationRequired: boolean;
   translationLanguage?: TranslationLanguage;
-  translationStatus?: "pending" | "accepted" | "rejected";
+  translationStatus?: AssistanceRequestStatus;
   status: RegistrationStatus;
   createdAt: string;
   updatedAt: string;

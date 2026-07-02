@@ -10,6 +10,8 @@ import type {
   Registration,
   RegistrationFormData,
   RegistrationStatus,
+  AssistanceActionStatus,
+  AssistanceRequestStatus,
   TranslationAssistanceItem,
   TranslationAssistanceRow,
   MedicalAssistanceItem,
@@ -93,11 +95,12 @@ function mapApiStatus(value: unknown): RegistrationStatus {
   return "pending";
 }
 
-function mapApiRequestStatus(value: unknown): "pending" | "accepted" | "rejected" | undefined {
-  if (value == null || value === "") return undefined;
+function mapApiRequestStatus(value: unknown): AssistanceRequestStatus {
+  if (value == null || value === "") return "pending";
   const normalized = String(value).toUpperCase();
   if (normalized === "ACCEPTED") return "accepted";
   if (normalized === "REJECTED") return "rejected";
+  if (normalized === "HELD" || normalized === "ON_HELD") return "on_hold";
   return "pending";
 }
 
@@ -111,8 +114,8 @@ export function mapAppStatusToApiStatus(status: RegistrationStatus): string {
   return map[status];
 }
 
-export function mapAppRequestStatusToApi(status: "accepted" | "rejected"): string {
-  return status === "accepted" ? "ACCEPTED" : "REJECTED";
+export function mapAppRequestStatusToApi(status: AssistanceActionStatus): string {
+  return mapAppStatusToApiStatus(status);
 }
 
 function mapApiParticipationDate(value: unknown): ParticipationDate {

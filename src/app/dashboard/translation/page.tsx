@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Languages, Loader2, Pencil, X } from "lucide-react";
+import { Check, Languages, Loader2, Pause, Pencil, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { assistanceStatusVariant, formatAssistanceStatus } from "@/lib/assistance-status";
 import { slugifyFilename } from "@/lib/export-utils";
 import { getRegistrationOptionLabel } from "@/lib/registration-options";
 import {
@@ -23,18 +24,9 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
 import type { AdminTranslationAssistFormValues, TranslationEditFormValues } from "@/features/dashboard/admin-translation.schema";
-import type { TranslationAssistanceRow, UserRole } from "@/types";
+import type { AssistanceActionStatus, TranslationAssistanceRow, UserRole } from "@/types";
 
 const LOBBY_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
-type TranslationActionStatus = "accepted" | "rejected";
-
-const requestStatusVariant = (
-  status?: "pending" | "accepted" | "rejected"
-): "success" | "warning" | "destructive" => {
-  if (status === "accepted") return "success";
-  if (status === "rejected") return "destructive";
-  return "warning";
-};
 
 export default function TranslationPage() {
   return (
@@ -64,7 +56,7 @@ function TranslationContent() {
   const [editTranslationOpen, setEditTranslationOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<TranslationAssistanceRow | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [pendingBulkAction, setPendingBulkAction] = useState<TranslationActionStatus | null>(null);
+  const [pendingBulkAction, setPendingBulkAction] = useState<AssistanceActionStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const selectedIdsRef = useRef<string[]>([]);
   selectedIdsRef.current = selectedIds;
@@ -118,7 +110,7 @@ function TranslationContent() {
     setEditTranslationOpen(true);
   };
 
-  const applyStatusAction = useCallback(async (status: TranslationActionStatus, ids: string[]) => {
+  const applyStatusAction = useCallback(async (status: AssistanceActionStatus, ids: string[]) => {
     if (!selectedEventId || ids.length === 0) return;
 
     if (ids.length > 1) {
@@ -143,7 +135,7 @@ function TranslationContent() {
     }
   }, [bulkUpdateTranslationStatus, selectedEventId]);
 
-  const runBulkAction = useCallback(async (action: TranslationActionStatus) => {
+  const runBulkAction = useCallback(async (action: AssistanceActionStatus) => {
     await applyStatusAction(action, [...selectedIdsRef.current]);
   }, [applyStatusAction]);
 
@@ -205,8 +197,8 @@ function TranslationContent() {
         accessorKey: "status",
         header: "Translation Status",
         cell: ({ row }) => (
-          <Badge variant={requestStatusVariant(row.original.status)} className="capitalize">
-            {row.original.status}
+          <Badge variant={assistanceStatusVariant[row.original.status]} className="capitalize">
+            {formatAssistanceStatus(row.original.status)}
           </Badge>
         ),
       },
@@ -249,6 +241,23 @@ function TranslationContent() {
                   <>
                     <Check className="h-3 w-3 mr-1" />
                     Accept
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                title={bulkFromRow ? `Hold ${selectedIds.length} selected` : "Hold"}
+                disabled={bulkLoading || isRowLoading}
+                onClick={() => void applyStatusAction("on_hold", resolveActionIds(row.original.id))}
+              >
+                {isRowLoading || (bulkLoading && pendingBulkAction === "on_hold") ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <Pause className="h-3 w-3 mr-1" />
+                    Hold
                   </>
                 )}
               </Button>
@@ -359,6 +368,21 @@ function TranslationContent() {
                       </>
                     ) : (
                       "Accept"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={bulkLoading || actionLoadingId !== null || selectedCount === 0}
+                    onClick={() => runBulkAction("on_hold")}
+                  >
+                    {pendingBulkAction === "on_hold" ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Holding...
+                      </>
+                    ) : (
+                      "Hold"
                     )}
                   </Button>
                   <Button
