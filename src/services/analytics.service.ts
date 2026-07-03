@@ -1,25 +1,41 @@
 import { apiClient } from "@/lib/api-client";
-import { buildStatusDistribution, mapApiUserSummary } from "@/lib/analytics-mappers";
+import {
+  buildStatusDistribution,
+  buildSummaryFromDashboard,
+  mapApiDashboardAnalytics,
+  mapApiEventAnalytics,
+} from "@/lib/analytics-mappers";
 import { extractApiErrorMessage } from "@/lib/auth-mappers";
 import { delay } from "@/lib/utils";
 import { mockAnalytics, mockAuditLogs, mockPermissions } from "@/mock/analytics";
-import type { AnalyticsData, AnalyticsSummary, AuditLog, Permission } from "@/types";
+import type { AnalyticsData, AuditLog, DashboardAnalytics, EventAnalytics, Permission } from "@/types";
 
-export const getUserSummary = async (): Promise<AnalyticsSummary> => {
+export const getDashboardAnalytics = async (): Promise<DashboardAnalytics> => {
   try {
-    const { data } = await apiClient.get<Record<string, unknown>>("/analytics/user-summary/");
-    return mapApiUserSummary(data);
+    const { data } = await apiClient.get<Record<string, unknown>>("/analytics/dashboard/");
+    return mapApiDashboardAnalytics(data);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const getEventAnalytics = async (eventId: string): Promise<EventAnalytics> => {
+  try {
+    const { data } = await apiClient.get<Record<string, unknown>>(`/analytics/events/${eventId}/`);
+    return mapApiEventAnalytics(data);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
 };
 
 export const getAnalytics = async (): Promise<AnalyticsData> => {
-  const summary = await getUserSummary();
+  const dashboard = await getDashboardAnalytics();
+  const summary = buildSummaryFromDashboard(dashboard);
 
   return {
     ...mockAnalytics,
     summary,
+    dashboard,
     statusDistribution: buildStatusDistribution(summary),
   };
 };

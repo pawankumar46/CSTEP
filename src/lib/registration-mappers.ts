@@ -229,7 +229,7 @@ function mapAppParticipationTimeToApi(time: ParticipationTime): string {
   return time === "full_day" ? "FULL_DAY" : "HALF_DAY";
 }
 
-function mapAppAttendanceModeToApi(mode: AttendanceMode): string {
+export function mapAppAttendanceModeToApi(mode: AttendanceMode): string {
   return ATTENDANCE_MODE_TO_API[mode];
 }
 

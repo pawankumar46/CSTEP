@@ -37,10 +37,10 @@ export function EventAdminDashboard() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Events" value={events.length} icon={Calendar} />
+        <StatCard title="Total Events" value={analytics.dashboard.events.total} icon={Calendar} />
         <StatCard title="Published" value={publishedEvents} icon={Radio} />
         <StatCard title="Live Now" value={liveEvents} icon={Radio} />
-        <StatCard title="Total Registrations" value={analytics.summary.eventParticipants} icon={Users} />
+        <StatCard title="Total Registrations" value={analytics.dashboard.registrations.total} icon={Users} />
       </div>
 
       <div>

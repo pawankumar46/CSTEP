@@ -139,16 +139,14 @@ export function getEventDayDates(event?: Pick<Event, "date" | "endDate"> | null)
 export function resolveParticipationDatesForApi(
   participationDate: string,
   event?: Pick<Event, "date" | "endDate"> | null,
-): { date: string }[] {
-  const eventDayDates = getEventDayDates(event);
-
+): string[] {
   if (participationDate === "both_days") {
-    return eventDayDates.map((date) => ({ date }));
+    return getEventDayDates(event);
   }
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(participationDate)) {
-    return [{ date: participationDate }];
+    return [participationDate];
   }
 
-  return [{ date: participationDate }];
+  return participationDate ? [participationDate] : getEventDayDates(event);
 }

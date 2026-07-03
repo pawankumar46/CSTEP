@@ -54,11 +54,9 @@ function UpcomingEventHeading({
 function HeroEventSlide({
   event,
   isAuthenticated,
-  participantsRegistered,
 }: {
   event: UpcomingEvent;
   isAuthenticated: boolean;
-  participantsRegistered: number | null;
 }) {
   const eventIsRegistered = isAuthenticated && event.isRegistered;
   const registerHref = getHomeRegisterHref(isAuthenticated, eventIsRegistered, event.id);
@@ -69,6 +67,7 @@ function HeroEventSlide({
     : getHomeRegisterLabel(isAuthenticated, eventIsRegistered);
 
   const dates = formatEventDateRange(event.date, event.endDate);
+  const participantsRegistered = event.summary?.totalRegisteredUsers ?? null;
 
   return (
     <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
@@ -158,7 +157,6 @@ export function HeroSection() {
     isLoading,
     hasEvent,
     upcomingEvents,
-    participantsRegistered,
   } = useHomeEvent();
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -232,7 +230,6 @@ export function HeroSection() {
               <HeroEventSlide
                 event={currentEvent}
                 isAuthenticated={isAuthenticated}
-                participantsRegistered={participantsRegistered}
               />
             </motion.div>
           </AnimatePresence>

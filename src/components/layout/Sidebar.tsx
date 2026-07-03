@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,7 +8,7 @@ import {
   Settings, UserCog, ChevronLeft, ChevronRight, Home, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LOBBY_NAV_PATHS, NAV_ITEMS, type NavItem } from "@/lib/constants";
+import { NAV_ITEMS, type NavChildItem, type NavItem } from "@/lib/constants";
 import { BrandLogo } from "@/components/shared/BrandLogo";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,15 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 function isPathActive(pathname: string, href: string): boolean {
-  return pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
+  if (pathname === href) return true;
+  if (href === "/dashboard/analytics") {
+    return pathname === "/dashboard/analytics";
+  }
+  return href !== "/dashboard" && pathname.startsWith(`${href}/`);
 }
 
-function isLobbySectionActive(pathname: string): boolean {
-  return LOBBY_NAV_PATHS.some((href) => isPathActive(pathname, href));
+function isNavSectionActive(pathname: string, children: readonly NavChildItem[]): boolean {
+  return children.some((child) => isPathActive(pathname, child.href));
 }
 
 interface SidebarProps {
@@ -40,17 +44,30 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
-  const [lobbyExpanded, setLobbyExpanded] = useState(() => isLobbySectionActive(pathname));
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  const userRole = user?.role;
+  const navItems = useMemo(
+    () => NAV_ITEMS.filter((item) => userRole && item.roles.includes(userRole)),
+    [userRole],
+  );
 
   useEffect(() => {
-    if (isLobbySectionActive(pathname)) {
-      setLobbyExpanded(true);
-    }
-  }, [pathname]);
+    setExpandedSections((prev) => {
+      let changed = false;
+      const next = { ...prev };
 
-  const navItems = NAV_ITEMS.filter(
-    (item) => user && item.roles.includes(user.role),
-  );
+      for (const item of NAV_ITEMS) {
+        if (!item.children || !userRole || !item.roles.includes(userRole)) continue;
+        if (isNavSectionActive(pathname, item.children) && !prev[item.label]) {
+          next[item.label] = true;
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [pathname, userRole]);
 
   const linkClass = (active: boolean) =>
     cn(
@@ -72,7 +89,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const Icon = iconMap[item.icon];
 
     if (item.children?.length) {
-      const sectionActive = isLobbySectionActive(pathname);
+      const sectionActive = isNavSectionActive(pathname, item.children);
+      const isExpanded = expandedSections[item.label] ?? false;
 
       if (collapsed) {
         return (
@@ -114,7 +132,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div key={item.label} className="space-y-1">
           <button
             type="button"
-            onClick={() => setLobbyExpanded((open) => !open)}
+            onClick={() =>
+              setExpandedSections((prev) => ({
+                ...prev,
+                [item.label]: !isExpanded,
+              }))
+            }
             className={cn(linkClass(sectionActive), "w-full justify-between")}
           >
             <span className="flex items-center gap-3">
@@ -124,11 +147,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <ChevronDown
               className={cn(
                 "h-4 w-4 shrink-0 transition-transform",
-                lobbyExpanded && "rotate-180",
+                isExpanded && "rotate-180",
               )}
             />
           </button>
-          {lobbyExpanded && (
+          {isExpanded && (
             <div className="space-y-0.5">
               {item.children.map((child) => (
                 <Link

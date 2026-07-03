@@ -12,8 +12,6 @@ export function useHomeEvent() {
     upcomingEvent,
   } = useEventRegistration();
 
-  const participantsRegistered = useHomeDataStore((s) => s.participantsRegistered);
-
   const isLoading = !upcomingLoaded;
   const hasEvent = upcomingLoaded && upcomingEvents.length > 0;
 
@@ -25,6 +23,5 @@ export function useHomeEvent() {
     hasEvent,
     upcomingEvents,
     upcomingEvent,
-    participantsRegistered,
   };
 }

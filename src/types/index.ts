@@ -42,8 +42,18 @@ export interface Event {
   updatedAt: string;
 }
 
+export interface EventRegistrationSummary {
+  totalRegisteredUsers: number;
+  participantsAttended: number;
+  participantsAccepted: number;
+  participantsRejected: number;
+  participantsPending: number;
+  participantsHeld: number;
+}
+
 export interface UpcomingEvent extends Event {
   isRegistered: boolean;
+  summary?: EventRegistrationSummary;
 }
 
 export interface CreateEventPayload {
@@ -263,6 +273,78 @@ export interface AnalyticsSummary {
   pending: number;
 }
 
+export interface DashboardTopEvent {
+  id: string;
+  title: string;
+  status: string;
+  registrationCount: number;
+}
+
+export interface DashboardAnalytics {
+  events: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  registrations: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  users: {
+    total: number;
+    byRole: Record<string, number>;
+  };
+  topEventsByRegistrations: DashboardTopEvent[];
+  viewers: {
+    totalSessions: number;
+    currentlyWatching: number;
+  };
+}
+
+export interface EventAnalyticsAssistance {
+  total: number;
+  byStatus: Record<string, number>;
+  byTransportMode?: Record<string, number>;
+  byLanguage?: Record<string, number>;
+}
+
+export interface EventAnalyticsParticipationDate {
+  date: string;
+  count: number;
+}
+
+export interface EventAnalytics {
+  event: {
+    id: string;
+    title: string;
+    status: string;
+  };
+  registrations: {
+    total: number;
+    byStatus: Record<string, number>;
+    byAttendanceMode: Record<string, number>;
+    byFoodPreference: Record<string, number>;
+    byParticipationTime: Record<string, number>;
+  };
+  participationDates: EventAnalyticsParticipationDate[];
+  assistanceRequests: {
+    travel: EventAnalyticsAssistance;
+    medical: EventAnalyticsAssistance;
+    translation: EventAnalyticsAssistance;
+    accommodation: EventAnalyticsAssistance;
+  };
+  streaming: {
+    broadcastSessions: number;
+    primaryBroadcastActive: boolean;
+    totalViewerSessions: number;
+    uniqueViewers: number;
+    currentlyWatching: number;
+    avgWatchDurationSeconds: number;
+    totalWatchTimeSeconds: number;
+    peakConcurrentViewers: number;
+    logins: number;
+  };
+}
+
 export interface TrendDataPoint {
   date: string;
   value: number;
@@ -277,6 +359,7 @@ export interface DistributionDataPoint {
 
 export interface AnalyticsData {
   summary: AnalyticsSummary;
+  dashboard: DashboardAnalytics;
   registrationTrend: TrendDataPoint[];
   participationTrend: TrendDataPoint[];
   foodPreferences: DistributionDataPoint[];

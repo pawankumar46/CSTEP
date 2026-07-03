@@ -1,20 +1,6 @@
 import type { AnalyticsData, AuditLog, Permission } from "@/types";
-import { mockRegistrations } from "./registrations";
 
-const accepted = mockRegistrations.filter((r) => r.status === "accepted").length;
-const rejected = mockRegistrations.filter((r) => r.status === "rejected").length;
-const onHold = mockRegistrations.filter((r) => r.status === "on_hold").length;
-const pending = mockRegistrations.filter((r) => r.status === "pending").length;
-
-export const mockAnalytics: AnalyticsData = {
-  summary: {
-    totalUsers: 54,
-    eventParticipants: mockRegistrations.length,
-    accepted,
-    rejected,
-    onHold,
-    pending,
-  },
+export const mockAnalytics: Omit<AnalyticsData, "summary" | "dashboard" | "statusDistribution"> = {
   registrationTrend: [
     { date: "Jan", value: 45 },
     { date: "Feb", value: 62 },
@@ -83,12 +69,6 @@ export const mockAnalytics: AnalyticsData = {
     { date: "Apr", value: 310 },
     { date: "May", value: 380 },
     { date: "Jun", value: 450 },
-  ],
-  statusDistribution: [
-    { name: "Accepted", value: accepted, color: "#22c55e" },
-    { name: "Pending", value: pending, color: "#f59e0b" },
-    { name: "On Hold", value: onHold, color: "#3b82f6" },
-    { name: "Rejected", value: rejected, color: "#ef4444" },
   ],
 };
 

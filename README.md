@@ -115,6 +115,17 @@ c-step/
 │   │   │   ├── broadcast-sessions/
 │   │   │   └── stream/        # Google Drive video proxy
 │   │   ├── dashboard/         # Admin dashboard pages
+│   │   │   ├── analytics/     # Overview + attendance-mode analytics
+│   │   │   ├── accommodation/
+│   │   │   ├── events/
+│   │   │   ├── feedback/
+│   │   │   ├── lobby/
+│   │   │   ├── medical/
+│   │   │   ├── translation/
+│   │   │   ├── travel/
+│   │   │   ├── users/
+│   │   │   ├── video-management/
+│   │   │   └── ...
 │   │   ├── event-register/    # Event registration flow
 │   │   ├── profile/           # Delegate profile & support requests
 │   │   ├── register/          # Legacy/alternate registration
@@ -123,7 +134,10 @@ c-step/
 │   │   └── page.tsx           # Landing / home
 │   ├── components/
 │   │   ├── auth/              # Auth guards
-│   │   ├── dashboard/         # Admin dialogs, event cards, lobby UI
+│   │   ├── dashboard/         # Admin dialogs, event cards, lobby & analytics UI
+│   │   │   ├── AttendanceModeAnalytics.tsx
+│   │   │   ├── EventSelectCard.tsx
+│   │   │   └── *AssistanceDialog.tsx
 │   │   ├── forms/             # Multi-step form shell
 │   │   ├── layout/            # Navbar, sidebar, dashboard shell
 │   │   ├── profile/           # Profile support forms
@@ -142,6 +156,8 @@ c-step/
 │   │   ├── registration-mappers.ts
 │   │   ├── event-support-mappers.ts
 │   │   ├── event-mappers.ts
+│   │   ├── analytics-mappers.ts
+│   │   ├── assistance-status.ts
 │   │   ├── broadcast-mappers.ts
 │   │   ├── stream-utils.ts    # Stream URL parsing (Drive, HLS, mp4)
 │   │   ├── date-input.ts      # Date input min values & past-date validation
@@ -188,7 +204,7 @@ Page / Component
 | `useAnalyticsStore` | Dashboard analytics |
 | `useFeedbackStore` | Feedback (mock-backed) |
 | `useRecordingStore` | Recordings (mock-backed) |
-| `useHomeDataStore` | Home page event data |
+| `useHomeDataStore` | Home page upcoming events (registration flag + per-event summary) |
 
 ---
 
@@ -219,7 +235,8 @@ Page / Component
 | `/dashboard/events` | Event list |
 | `/dashboard/video-management` | Broadcast sessions |
 | `/dashboard/users` | User admin (super admin) |
-| `/dashboard/analytics` | Analytics |
+| `/dashboard/analytics` | Analytics overview |
+| `/dashboard/analytics/attendance-mode` | Attendance mode analytics (event + virtual/physical filters, registration list) |
 | `/dashboard/feedback` | Feedback |
 | `/dashboard/recordings` | Recordings |
 
@@ -281,7 +298,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/events/upcoming/` | Upcoming events with registration flag |
+| `GET` | `/events/upcoming/` | Paginated upcoming events (`results[]` with `is_registered` + `summary`) |
 | `GET` | `/events/?type=upcoming\|live\|past` | Filtered event list |
 | `GET` | `/events/` | All events |
 | `GET` | `/events/:id/` | Single event |
@@ -294,7 +311,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/registrations/` | User's registrations |
-| `POST` | `/registrations/registration/` | Create registration (user / lobby / admin) |
+| `POST` | `/registrations/registration/` | Create registration (user / lobby / admin); `participation_dates` is `string[]` e.g. `["2025-03-01", "2025-03-02"]` |
 | `PUT` | `/registrations/registration/:id/` | Update registration |
 | `PATCH` | `/registrations/registration/bulk-status/` | Bulk status: `{ ids, status }` |
 | `PATCH` | `/registrations/:id/` | Update registration preferences |
@@ -312,7 +329,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/registrations/registration/?event=&page=` | Lobby registrations (paginated) |
+| `GET` | `/registrations/registration/?registration__event=&attendance_mode=&page=` | Paginated registrations (lobby, attendance-mode analytics) |
 | `GET` | `/registrations/travel-assistance/?event=&page=` | Travel rows |
 | `GET` | `/registrations/medical-assistance/?event=&page=` | Medical rows |
 | `GET` | `/registrations/translation-assistance/?event=&page=` | Translation rows |
@@ -334,7 +351,8 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/analytics/user-summary/` | Dashboard analytics summary |
+| `GET` | `/analytics/dashboard/` | Platform dashboard analytics (role dashboards) |
+| `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview page) |
 
 #### Broadcast (via Next proxy) — `broadcast.service.ts`
 
@@ -427,15 +445,27 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 | Auth changes | `auth.service.ts`, `auth-mappers.ts`, `useAuthStore.ts` |
 | Registration payload | `registration-mappers.ts`, `registration.service.ts` |
 | Assistance forms | `event-support-mappers.ts`, `lobby.service.ts`, `date-input.ts`, `features/dashboard/admin-*.schema.ts` |
+| Analytics | `analytics.service.ts`, `analytics-mappers.ts`, `app/dashboard/analytics/`, `AttendanceModeAnalytics.tsx` |
 | Streaming | `VideoPlayer.tsx`, `stream-utils.ts`, `streaming/page.tsx` |
 
 ---
 
 ## Changelog
 
+### 2026-07-03
+
+- **Analytics overview:** Event-scoped analytics via `GET /analytics/events/:id/` with event selection from `GET /events/`; shows registrations, attendance, food, assistance, and streaming metrics.
+- **Dashboard analytics:** Replaced `/analytics/user-summary/` with `GET /analytics/dashboard/`; role dashboards use `dashboard` payload (events/registrations/users by status, top events, viewer stats).
+- **Home page:** Removed `/analytics/user-summary/` call; hero registration count now comes from each event's `summary` on `/events/upcoming/`.
+- **Events API:** `mapApiUpcomingEvent` maps paginated `results[]` with `is_registered` and nested `summary` (`total_registered_users`, `participants_*`).
+- **Registration API:** `participation_dates` POST payload is now an array of ISO date strings (`["2025-03-01", "2025-03-02"]`) instead of `{ date }` objects.
+- **Analytics — Attendance Mode:** Loads `GET /registrations/registration/` with `registration__event` and `attendance_mode` (`VIRTUAL` / `PHYSICAL`); shows summary stats, status/food charts, and paginated registration table.
+
 ### 2026-07-02
 
 - **Accommodation dashboard:** Fixed page crash from Zod `.omit()` on a refined schema; `admin-accommodation.schema.ts` now uses shared `accommodationDetailFields` + `refineAccommodationDates()` (same pattern as travel).
+- **Manage assistance tables:** Removed horizontal scrolling on travel, translation, medical, and accommodation dashboards via compact icon actions, responsive columns, and fixed table layout.
+- **Video management:** Refreshed broadcast UI with clearer sections, grouped ingest/playback copy actions, improved form layout, and consistent empty/error states (functionality unchanged).
 
 ### 2026-06-17
 

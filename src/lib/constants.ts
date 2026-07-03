@@ -69,6 +69,11 @@ export const LOBBY_NAV_PATHS = [
   "/dashboard/accommodation",
 ] as const;
 
+export const ANALYTICS_NAV_PATHS = [
+  "/dashboard/analytics",
+  "/dashboard/analytics/attendance-mode",
+] as const;
+
 export const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/", icon: "Home", roles: ["moderator", "event_administrator", "super_administrator"] },
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard", roles: ["moderator", "event_administrator", "super_administrator"] },
@@ -91,7 +96,15 @@ export const NAV_ITEMS: NavItem[] = [
       { label: "Manage Accommodation Requests", href: "/dashboard/accommodation" },
     ],
   },
-  { label: "Analytics", href: "/dashboard/analytics", icon: "BarChart3", roles: ["moderator", "event_administrator", "super_administrator"] },
+  {
+    label: "Analytics",
+    icon: "BarChart3",
+    roles: ["moderator", "event_administrator", "super_administrator"],
+    children: [
+      { label: "Overview", href: "/dashboard/analytics" },
+      { label: "Attendance Mode", href: "/dashboard/analytics/attendance-mode" },
+    ],
+  },
   { label: "Feedback", href: "/dashboard/feedback", icon: "MessageSquare", roles: ["moderator", "event_administrator", "super_administrator"] },
   { label: "Users", href: "/dashboard/users", icon: "UserCog", roles: ["super_administrator"] },
   { label: "Settings", href: "/dashboard/settings", icon: "Settings", roles: ["moderator", "event_administrator", "super_administrator"] },

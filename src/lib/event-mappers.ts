@@ -1,4 +1,11 @@
-import type { CreateEventPayload, Event, EventStatus, UpcomingEvent, UpdateEventPayload } from "@/types";
+import type {
+  CreateEventPayload,
+  Event,
+  EventRegistrationSummary,
+  EventStatus,
+  UpcomingEvent,
+  UpdateEventPayload,
+} from "@/types";
 
 const DEFAULT_EVENT_IMAGE =
   "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80";
@@ -53,14 +60,30 @@ function mapEventStatus(raw: Record<string, unknown>): EventStatus {
   return valid.includes(status as EventStatus) ? (status as EventStatus) : "draft";
 }
 
-export function mapApiUpcomingEvent(raw: Record<string, unknown>): UpcomingEvent {
-  const hasRegistrationField = "is_registered" in raw || "isRegistered" in raw;
+function mapEventRegistrationSummary(raw: unknown): EventRegistrationSummary | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+
+  const summary = raw as Record<string, unknown>;
 
   return {
-    ...mapApiEventToEvent(raw),
-    isRegistered: hasRegistrationField
-      ? Boolean(raw.is_registered ?? raw.isRegistered)
-      : false,
+    totalRegisteredUsers: Number(summary.total_registered_users ?? 0),
+    participantsAttended: Number(summary.participants_attended ?? 0),
+    participantsAccepted: Number(summary.participants_accepted ?? 0),
+    participantsRejected: Number(summary.participants_rejected ?? 0),
+    participantsPending: Number(summary.participants_pending ?? 0),
+    participantsHeld: Number(summary.participants_held ?? 0),
+  };
+}
+
+export function mapApiUpcomingEvent(raw: Record<string, unknown>): UpcomingEvent {
+  const base = mapApiEventToEvent(raw);
+  const summary = mapEventRegistrationSummary(raw.summary);
+
+  return {
+    ...base,
+    isRegistered: Boolean(raw.is_registered ?? raw.isRegistered),
+    registeredCount: summary?.totalRegisteredUsers ?? base.registeredCount,
+    summary,
   };
 }
 

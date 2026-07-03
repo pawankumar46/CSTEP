@@ -4,6 +4,7 @@ import {
   extractRegistrationList,
   isDuplicateRegistrationError,
   mapApiRegistrationToRegistration,
+  mapAppAttendanceModeToApi,
   toAdminRegistrationApiPayload,
   toLobbyRegistrationApiPayload,
   toRegistrationApiPayload,
@@ -41,6 +42,106 @@ export type RegistrationPreferences = {
 };
 
 let registrations = [...mockRegistrations];
+
+const DEFAULT_REGISTRATION_PAGE_SIZE = 10;
+
+export interface EventRegistrationsPageResult {
+  registrations: Registration[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+export const getEventRegistrationsPage = async ({
+  eventId,
+  attendanceMode,
+  page = 1,
+  pageSize = DEFAULT_REGISTRATION_PAGE_SIZE,
+}: {
+  eventId: string;
+  attendanceMode?: AttendanceMode;
+  page?: number;
+  pageSize?: number;
+}): Promise<EventRegistrationsPageResult> => {
+  try {
+    const params: Record<string, string | number> = {
+      registration__event: eventId,
+      page,
+      page_size: pageSize,
+    };
+
+    if (attendanceMode) {
+      params.attendance_mode = mapAppAttendanceModeToApi(attendanceMode);
+    }
+
+    const { data } = await apiClient.get<unknown>("/registrations/registration/", { params });
+    const list = extractRegistrationList(data);
+    const mapped = list.map((raw) => mapApiRegistrationToRegistration(raw, eventId));
+
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      const record = data as {
+        count?: number;
+        total_pages?: number;
+        current_page?: number;
+        next?: string | null;
+        previous?: string | null;
+      };
+      const total = Number(record.count ?? mapped.length);
+      const totalPages = Number(record.total_pages ?? Math.max(1, Math.ceil(total / pageSize)));
+      const currentPage = Number(record.current_page ?? page);
+
+      return {
+        registrations: mapped,
+        page: currentPage,
+        pageSize,
+        total,
+        totalPages,
+        hasNext: Boolean(record.next),
+        hasPrevious: Boolean(record.previous),
+      };
+    }
+
+    return {
+      registrations: mapped,
+      page,
+      pageSize,
+      total: mapped.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+    };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const getEventRegistrationsByAttendanceMode = async (
+  eventId: string,
+  attendanceMode: AttendanceMode,
+): Promise<{ registrations: Registration[]; total: number }> => {
+  const allRegistrations: Registration[] = [];
+  let page = 1;
+  let hasMore = true;
+  let total = 0;
+
+  while (hasMore && page <= 100) {
+    const result = await getEventRegistrationsPage({
+      eventId,
+      attendanceMode,
+      page,
+      pageSize: 50,
+    });
+    allRegistrations.push(...result.registrations);
+    total = result.total;
+    hasMore = result.hasNext;
+    page += 1;
+  }
+
+  return { registrations: allRegistrations, total };
+};
 
 export const getRegistrations = async (): Promise<Registration[]> => {
   try {
