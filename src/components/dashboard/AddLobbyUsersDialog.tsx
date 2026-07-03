@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SignupAddressFields } from "@/components/auth/SignupAddressFields";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   addLobbyUserSchema,
@@ -70,6 +71,7 @@ export function AddLobbyUsersDialog({
     trigger,
     getValues,
     setValue,
+    register,
     formState: { errors },
   } = useForm<AddLobbyUserFormValues>({
     resolver: zodResolver(addLobbyUserSchema),
@@ -131,6 +133,7 @@ export function AddLobbyUsersDialog({
         "lastName",
         "phone",
         "email",
+        "address",
         "password",
         "confirmPassword",
       ],
@@ -149,6 +152,7 @@ export function AddLobbyUsersDialog({
         lastName: signupValues.lastName,
         phone: signupValues.phone,
         email: signupValues.email,
+        address: signupValues.address,
         password: signupValues.password,
         confirmPassword: signupValues.confirmPassword,
       });
@@ -307,6 +311,8 @@ export function AddLobbyUsersDialog({
                   <p className="text-xs text-destructive">{errors.email.message}</p>
                 )}
               </div>
+
+              <SignupAddressFields register={register} errors={errors} idPrefix="lobby" />
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">

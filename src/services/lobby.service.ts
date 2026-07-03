@@ -40,7 +40,7 @@ import type { AccommodationAssistanceRow, Event, MedicalAssistanceRow, Registrat
 export const createLobbyUser = async (
   values: LobbyUserSignupFormValues,
 ): Promise<string> => {
-  const { salutation, firstName, middleName, lastName, phone, email, password } = values;
+  const { salutation, firstName, middleName, lastName, phone, email, password, address } = values;
 
   const signupResult = await signUpLobbyUser({
     salutation,
@@ -49,6 +49,7 @@ export const createLobbyUser = async (
     lastName,
     phone,
     email: normalizeAuthIdentifier(email),
+    address,
     password,
   });
 

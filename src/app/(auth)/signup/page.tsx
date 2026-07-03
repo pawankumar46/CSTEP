@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { SignupAddressFields } from "@/components/auth/SignupAddressFields";
+import { EMPTY_SIGNUP_ADDRESS, signupAddressSchema } from "@/features/auth/signup.schema";
 import { useAuthStore } from "@/store/useAuthStore";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
@@ -28,6 +30,7 @@ const signupSchema = z.object({
     .string()
     .regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
   email: z.string().email("Valid email is required"),
+  address: signupAddressSchema,
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(1, "Please confirm your password"),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -52,6 +55,7 @@ function SignupForm() {
       lastName: "",
       phone: "",
       email: "",
+      address: { ...EMPTY_SIGNUP_ADDRESS },
       password: "",
       confirmPassword: "",
     },
@@ -67,6 +71,7 @@ function SignupForm() {
         lastName: data.lastName,
         phone: data.phone,
         email: data.email,
+        address: data.address,
         password: data.password,
       });
       const params = new URLSearchParams({
@@ -84,7 +89,7 @@ function SignupForm() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-lg"
+      className="w-full max-w-2xl"
     >
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-4">
@@ -177,6 +182,8 @@ function SignupForm() {
                   {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
                 </div>
               </div>
+
+              <SignupAddressFields register={register} errors={errors} />
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">

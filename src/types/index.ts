@@ -462,6 +462,16 @@ export interface VerifyOtpPayload {
   email?: string;
 }
 
+export interface SignupAddress {
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  district: string;
+  state: string;
+  country: string;
+  postalCode: string;
+}
+
 export interface SignupCredentials {
   salutation: string;
   firstName: string;
@@ -469,6 +479,7 @@ export interface SignupCredentials {
   lastName: string;
   phone: string;
   email: string;
+  address: SignupAddress;
   password: string;
 }
 

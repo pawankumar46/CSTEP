@@ -1,6 +1,6 @@
 import axios from "axios";
 import { mapApiRoleToAppRole } from "@/lib/user-roles";
-import type { SignupCredentials, User } from "@/types";
+import type { SignupAddress, SignupCredentials, User } from "@/types";
 
 export function normalizeAuthIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase();
@@ -22,14 +22,28 @@ export function toVerifyOtpPayload(method: "phone" | "email", otp: string, conta
   return { email: normalizeAuthIdentifier(contact), otp };
 }
 
+function toSignupAddressPayload(address: SignupAddress) {
+  return {
+    address_line_1: address.addressLine1,
+    address_line_2: address.addressLine2 ?? "",
+    city: address.city,
+    district: address.district,
+    state: address.state,
+    country: address.country,
+    postal_code: address.postalCode,
+  };
+}
+
 export function toSignupPayload(data: SignupCredentials) {
   return {
     salutation: data.salutation,
     first_name: data.firstName,
     middle_name: data.middleName ?? "",
     last_name: data.lastName,
+    role: "BASE_USER",
     phone_number: formatPhoneForApi(data.phone),
     email: normalizeAuthIdentifier(data.email),
+    address: toSignupAddressPayload(data.address),
     password: data.password,
   };
 }
@@ -46,6 +60,7 @@ export function toLobbySignupPayload(data: SignupCredentials) {
     role: "BASE_USER",
     phone_number: digits,
     email: normalizeAuthIdentifier(data.email),
+    address: toSignupAddressPayload(data.address),
     password: data.password,
   };
 }

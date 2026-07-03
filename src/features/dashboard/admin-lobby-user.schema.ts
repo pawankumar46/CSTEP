@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  EMPTY_SIGNUP_ADDRESS,
+  signupAddressSchema,
+} from "@/features/auth/signup.schema";
+import {
   FOOD_PREFERENCE_VALUES,
   type FoodPreferenceValue,
 } from "@/lib/registration-options";
@@ -13,6 +17,7 @@ const lobbyUserSignupFields = {
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
   email: z.string().email("Valid email is required"),
+  address: signupAddressSchema,
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(1, "Please confirm your password"),
 } as const;
@@ -62,6 +67,7 @@ export const EMPTY_LOBBY_USER_SIGNUP: LobbyUserSignupFormValues = {
   lastName: "",
   phone: "",
   email: "",
+  address: { ...EMPTY_SIGNUP_ADDRESS },
   password: "",
   confirmPassword: "",
 };

@@ -1,9 +1,7 @@
 import type { UserRole } from "@/types";
 import { readPublicEnv } from "@/lib/env";
 import { buildDriveEmbedUrl } from "@/lib/stream-utils";
-
-/** Default Drive file when env is unset (e.g. missing Vercel build env). */
-const DEFAULT_LIVE_STREAM_FILE_ID = "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
+import { ICAS_CONFERENCE } from "@/lib/icas-conference";
 
 export const APP_NAME = "CSTEP";
 export const APP_SHORT_NAME = "CS";
@@ -11,15 +9,17 @@ export const BRAND_LOGO_SRC = "/CstepLogo.png";
 export const BRAND_LOGO_DARK_SRC =
   readPublicEnv("NEXT_PUBLIC_BRAND_LOGO_DARK_SRC") ?? "/CSTEP_Primary-Logo%20copy.png";
 export const APP_DESCRIPTION =
-  "CSTEP event management platform for registration, live streaming, and delegate coordination";
+  "CSTEP event management platform for ICAS 2026 registration, live streaming, and delegate coordination";
 
 export const FEATURED_EVENT = {
-  name: "CSTEP Annual Conference 2025",
-  dates: "21st – 22nd August 2025",
-  location: "Hybrid — In-person & Virtual",
+  name: ICAS_CONFERENCE.name,
+  dates: ICAS_CONFERENCE.datesLabel,
+  location: ICAS_CONFERENCE.venue,
+  theme: ICAS_CONFERENCE.theme,
 };
 
-/** Live stream source URL — set NEXT_PUBLIC_LIVE_STREAM_URL in .env.local / Vercel */
+/** Default Drive file when env is unset (e.g. missing Vercel build env). */
+const DEFAULT_LIVE_STREAM_FILE_ID = "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
 export const LIVE_STREAM_FILE_ID =
   readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_ID") ?? DEFAULT_LIVE_STREAM_FILE_ID;
 

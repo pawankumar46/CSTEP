@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { APP_NAME, FEATURED_EVENT } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
+import { getConferenceVenue, ICAS_CONFERENCE, isIcasEventName } from "@/lib/icas-conference";
 import { formatEventDateRange, getUpcomingEventDays, getUpcomingEventMonthLabel } from "@/lib/event-display";
 import { useHomeEvent } from "@/hooks/useHomeEvent";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
@@ -68,6 +69,8 @@ function HeroEventSlide({
 
   const dates = formatEventDateRange(event.date, event.endDate);
   const participantsRegistered = event.summary?.totalRegisteredUsers ?? null;
+  const venue = getConferenceVenue(event.name, event.location);
+  const showTheme = isIcasEventName(event.name);
 
   return (
     <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
@@ -89,6 +92,11 @@ function HeroEventSlide({
             <Sparkles className="h-3 w-3" />
             {APP_NAME}
           </Badge>
+          {showTheme && (
+            <p className="text-sm font-medium text-primary leading-snug max-w-xl">
+              {ICAS_CONFERENCE.theme}
+            </p>
+          )}
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
             {event.name}
           </h1>
@@ -104,7 +112,7 @@ function HeroEventSlide({
           </span>
           <span className="flex items-center gap-1.5">
             <MapPin className="h-4 w-4 text-primary" />
-            {FEATURED_EVENT.location}
+            {venue}
           </span>
           {participantsRegistered !== null && (
             <span className="flex items-center gap-1.5">

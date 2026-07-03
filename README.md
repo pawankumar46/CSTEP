@@ -284,7 +284,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/sign_up/` | User registration |
+| `POST` | `/auth/sign_up/` | User registration (`role`, nested `address`, profile fields) |
 | `POST` | `/auth/login/` | Login → access + refresh tokens |
 | `POST` | `/auth/verify-otp/` | OTP verification |
 | `POST` | `/auth/forgot_password/` | Password reset request |
@@ -392,7 +392,7 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 
 ### 2. Lobby: add user (two-step wizard)
 
-1. **Signup** → `POST /auth/sign_up/` with `role: BASE_USER` (`auth-mappers.toLobbySignupPayload`)
+1. **Signup** → `POST /auth/sign_up/` with `role: BASE_USER` and nested `address` (`auth-mappers.toLobbySignupPayload` / `toSignupPayload`)
 2. **Register for event** → `POST /registrations/registration/` with `user` id (`registration-mappers.toLobbyRegistrationApiPayload`)
 
 Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
@@ -454,6 +454,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-03
 
+- **Home page:** ICAS 2026 content on hero and About section (theme, venue, highlights, contact) from [CSTEP ICAS 2026](https://cstep.in/events/india-clean-air-summit-icas-2026/).
 - **Analytics overview:** Event-scoped analytics via `GET /analytics/events/:id/` with event selection from `GET /events/`; shows registrations, attendance, food, assistance, and streaming metrics.
 - **Dashboard analytics:** Replaced `/analytics/user-summary/` with `GET /analytics/dashboard/`; role dashboards use `dashboard` payload (events/registrations/users by status, top events, viewer stats).
 - **Home page:** Removed `/analytics/user-summary/` call; hero registration count now comes from each event's `summary` on `/events/upcoming/`.
