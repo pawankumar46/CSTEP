@@ -455,6 +455,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ### 2026-07-03
 
 - **Home page:** ICAS 2026 content on hero and About section (theme, venue, highlights, contact) from [CSTEP ICAS 2026](https://cstep.in/events/india-clean-air-summit-icas-2026/).
+- **Home hero countdown:** `EventCountdown` sits inline with Register / Watch Live; counts down to ICAS start (`19 Aug 2026, 5:30 AM IST`).
 - **Analytics overview:** Event-scoped analytics via `GET /analytics/events/:id/` with event selection from `GET /events/`; shows registrations, attendance, food, assistance, and streaming metrics.
 - **Dashboard analytics:** Replaced `/analytics/user-summary/` with `GET /analytics/dashboard/`; role dashboards use `dashboard` payload (events/registrations/users by status, top events, viewer stats).
 - **Home page:** Removed `/analytics/user-summary/` call; hero registration count now comes from each event's `summary` on `/events/upcoming/`.

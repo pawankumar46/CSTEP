@@ -100,3 +100,47 @@ export function formatEventDurationNoun(count: number): string {
   }
   return `${count} days`;
 }
+
+export function formatEventDateRangeCompact(start: string, end?: string): string {
+  const startDate = parseEventDate(start);
+  const endDate = parseEventDate(end ?? start);
+  if (!startDate || !endDate) return "";
+
+  const format = (date: Date) =>
+    date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+  if (startDate.toDateString() === endDate.toDateString()) {
+    return format(startDate);
+  }
+
+  return `${format(startDate)} – ${format(endDate)}`;
+}
+
+export interface EventCountdownParts {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  totalMs: number;
+  isPast: boolean;
+}
+
+export function getEventCountdown(targetIso: string, now = Date.now()): EventCountdownParts {
+  const target = parseEventDate(targetIso);
+  if (!target) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0, isPast: true };
+  }
+
+  const totalMs = target.getTime() - now;
+  if (totalMs <= 0) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0, isPast: true };
+  }
+
+  const totalSeconds = Math.floor(totalMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return { days, hours, minutes, seconds, totalMs, isPast: false };
+}

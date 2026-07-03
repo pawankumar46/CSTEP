@@ -3,6 +3,7 @@ export const ICAS_CONFERENCE = {
   shortName: "ICAS 2026",
   theme: "Air Without Borders: Scaling Air Quality Action Across Cities, States, and Regions",
   datesLabel: "19 Aug 2026 – 21 Aug 2026",
+  eventStartIso: "2026-08-19T05:30:00+05:30",
   venue: "Four Seasons Hotel Bengaluru",
   sourceUrl: "https://cstep.in/events/india-clean-air-summit-icas-2026/",
   intro:

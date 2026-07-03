@@ -20,6 +20,7 @@ import { formatEventDateRange, getUpcomingEventDays, getUpcomingEventMonthLabel 
 import { useHomeEvent } from "@/hooks/useHomeEvent";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
 import { HeroSectionSkeleton } from "@/components/shared/LoadingSkeleton";
+import { EventCountdown } from "@/components/shared/EventCountdown";
 import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
 import { cn } from "@/lib/utils";
 import type { UpcomingEvent } from "@/types";
@@ -68,6 +69,9 @@ function HeroEventSlide({
     : getHomeRegisterLabel(isAuthenticated, eventIsRegistered);
 
   const dates = formatEventDateRange(event.date, event.endDate);
+  const countdownStart = isIcasEventName(event.name)
+    ? ICAS_CONFERENCE.eventStartIso
+    : event.date;
   const participantsRegistered = event.summary?.totalRegisteredUsers ?? null;
   const venue = getConferenceVenue(event.name, event.location);
   const showTheme = isIcasEventName(event.name);
@@ -122,7 +126,7 @@ function HeroEventSlide({
           )}
         </div>
 
-        <div className="flex flex-wrap gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 pt-2">
           {registerLabel && (
             <Button size="lg" asChild>
               <Link href={registerHref}>
@@ -136,6 +140,7 @@ function HeroEventSlide({
             size="lg"
             variant={registerLabel ? "outline" : "default"}
           />
+          <EventCountdown eventStart={countdownStart} eventStatus={event.status} />
         </div>
 
         {!isAuthenticated && (
