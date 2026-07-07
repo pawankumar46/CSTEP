@@ -157,7 +157,7 @@ function ProfileContent() {
         </Button>
       </form>
 
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
@@ -176,7 +176,7 @@ function ProfileContent() {
             <Link href={ROUTES.feedback}>Submit Feedback</Link>
           </Button>
         </CardContent>
-      </Card>
+      </Card> */}
 
       <Card>
         <CardHeader>
