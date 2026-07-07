@@ -36,7 +36,7 @@ export function EventAdminDashboard() {
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid auto-rows-fr gap-3 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Events" value={analytics.dashboard.events.total} icon={Calendar} />
         <StatCard title="Published" value={publishedEvents} icon={Radio} />
         <StatCard title="Live Now" value={liveEvents} icon={Radio} />

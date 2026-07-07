@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Pause, Play, VolumeX, Share2, Heart, ThumbsUp, HandMetal,
   Send, Users, Home,
 } from "lucide-react";
 import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
+import { StreamingExitFeedbackDialog } from "@/components/streaming/StreamingExitFeedbackDialog";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,6 @@ import {
   STREAM_RIGHT_BANNER_URL,
 } from "@/lib/constants";
 import { getAppUrl } from "@/lib/env";
-import { ROUTES } from "@/lib/routes";
 import { UserInitials } from "@/components/shared/UserInitials";
 
 const REACTIONS = [
@@ -47,6 +46,7 @@ export default function StreamingPage() {
   const [newMessage, setNewMessage] = useState("");
   const [reactions, setReactions] = useState<Record<string, number>>({ "👍": 42, "❤️": 28, "👏": 15 });
   const [linkCopied, setLinkCopied] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | undefined>(LIVE_STREAM_URL || undefined);
   const isDriveEmbed = Boolean(streamUrl && isGoogleDriveStreamUrl(streamUrl));
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,6 +108,10 @@ export default function StreamingPage() {
     }
   };
 
+  const handleExit = () => {
+    setFeedbackOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 h-14 flex items-center justify-between">
@@ -143,13 +147,18 @@ export default function StreamingPage() {
             />
 
             <div className="flex justify-end">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={ROUTES.home} title="Exit to home">
-                  <Home className="h-4 w-4 mr-2" />
-                  Exit
-                </Link>
+              <Button variant="outline" size="sm" onClick={handleExit} title="Exit and share feedback">
+                <Home className="h-4 w-4 mr-2" />
+                Exit
               </Button>
             </div>
+
+            <StreamingExitFeedbackDialog
+              open={feedbackOpen}
+              onOpenChange={setFeedbackOpen}
+              eventId={event.id}
+              eventName={event.name}
+            />
 
             {isModerator && (
               <Card>

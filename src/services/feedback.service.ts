@@ -10,7 +10,7 @@ export const getFeedback = async (): Promise<Feedback[]> => {
 };
 
 export const submitFeedback = async (
-  data: Omit<Feedback, "id" | "createdAt">
+  data: Omit<Feedback, "id" | "createdAt">,
 ): Promise<Feedback> => {
   await delay(600);
   const newFeedback: Feedback = {
@@ -20,6 +20,19 @@ export const submitFeedback = async (
   };
   feedbackList = [newFeedback, ...feedbackList];
   return newFeedback;
+};
+
+export const submitMultiDayFeedback = async (
+  entries: Omit<Feedback, "id" | "createdAt">[],
+): Promise<Feedback[]> => {
+  await delay(800);
+  const created = entries.map((data, index) => ({
+    ...data,
+    id: `fb-${Date.now()}-${index}`,
+    createdAt: new Date().toISOString(),
+  }));
+  feedbackList = [...created, ...feedbackList];
+  return created;
 };
 
 export const getFeedbackStats = async () => {

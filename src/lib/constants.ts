@@ -63,6 +63,7 @@ export type NavItem = {
 
 export const LOBBY_NAV_PATHS = [
   "/dashboard/lobby",
+  "/dashboard/sessions",
   "/dashboard/travel",
   "/dashboard/medical",
   "/dashboard/translation",
@@ -90,6 +91,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["moderator", "event_administrator", "super_administrator"],
     children: [
       { label: "Manage Lobby", href: "/dashboard/lobby" },
+      { label: "Manage Sessions", href: "/dashboard/sessions" },
       { label: "Manage Travel Requests", href: "/dashboard/travel" },
       { label: "Manage Medical Requests", href: "/dashboard/medical" },
       { label: "Manage Translation Requests", href: "/dashboard/translation" },

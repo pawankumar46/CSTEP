@@ -72,6 +72,56 @@ export const mockAnalytics: Omit<AnalyticsData, "summary" | "dashboard" | "statu
   ],
 };
 
+export const mockModeratorChartVariants = {
+  registrationTrendDaily: [
+    { date: "Mon", value: 12 },
+    { date: "Tue", value: 18 },
+    { date: "Wed", value: 15 },
+    { date: "Thu", value: 22 },
+    { date: "Fri", value: 19 },
+    { date: "Sat", value: 8 },
+    { date: "Sun", value: 6 },
+  ],
+  registrationTrendWeekly: [
+    { date: "Week 1", value: 86 },
+    { date: "Week 2", value: 102 },
+    { date: "Week 3", value: 118 },
+    { date: "Week 4", value: 95 },
+    { date: "Week 5", value: 124 },
+    { date: "Week 6", value: 138 },
+  ],
+  participationTrendPhysical: [
+    { date: "Week 1", value: 18 },
+    { date: "Week 2", value: 24 },
+    { date: "Week 3", value: 28 },
+    { date: "Week 4", value: 22 },
+    { date: "Week 5", value: 30 },
+    { date: "Week 6", value: 34 },
+  ],
+  participationTrendVirtual: [
+    { date: "Week 1", value: 10 },
+    { date: "Week 2", value: 11 },
+    { date: "Week 3", value: 14 },
+    { date: "Week 4", value: 16 },
+    { date: "Week 5", value: 15 },
+    { date: "Week 6", value: 18 },
+  ],
+  foodRequirement19Aug: [
+    { name: "Vegetarian", value: 16, color: "#22c55e" },
+    { name: "Jain", value: 9, color: "#84cc16" },
+    { name: "Vegan", value: 8, color: "#10b981" },
+    { name: "Non-Veg (Chicken)", value: 10, color: "#f59e0b" },
+    { name: "Halal", value: 4, color: "#6366f1" },
+  ],
+  foodRequirement20Aug: [
+    { name: "Vegetarian", value: 12, color: "#22c55e" },
+    { name: "Satvik", value: 6, color: "#14b8a6" },
+    { name: "Gluten Free", value: 5, color: "#0ea5e9" },
+    { name: "Non-Veg (Any)", value: 8, color: "#ef4444" },
+    { name: "Diabetic Friendly", value: 4, color: "#8b5cf6" },
+  ],
+} as const;
+
 export const mockAuditLogs: AuditLog[] = [
   { id: "log-1", userId: "user-super-admin", userName: "Dr. Sarah Mitchell", action: "UPDATE", resource: "User Role", details: "Changed role for user-015 to moderator", ipAddress: "192.168.1.100", createdAt: "2025-06-08T09:15:00Z" },
   { id: "log-2", userId: "user-event-admin", userName: "Mr. David Chen", action: "CREATE", resource: "Event", details: "Created event CSTEP Annual Conference 2025", ipAddress: "192.168.1.101", createdAt: "2025-06-08T08:30:00Z" },

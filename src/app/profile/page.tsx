@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageSquare } from "lucide-react";
 import { LandingNavbar } from "@/components/layout/LandingNavbar";
 import { LandingFooter } from "@/components/layout/LandingFooter";
 import { RouteGuard } from "@/components/layout/RouteGuard";
@@ -156,6 +156,27 @@ function ProfileContent() {
           {isSubmitting ? "Submitting..." : "Submit Request"}
         </Button>
       </form>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Session Feedback
+          </CardTitle>
+          <CardDescription>
+            Rate sessions when you leave the live stream — click Exit on the streaming page.
+            You can also submit feedback here anytime.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href={ROUTES.streaming}>Go to Live Stream</Link>
+          </Button>
+          <Button asChild>
+            <Link href={ROUTES.feedback}>Submit Feedback</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

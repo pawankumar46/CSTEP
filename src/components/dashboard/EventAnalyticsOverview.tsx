@@ -2,16 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
-import {
   BarChart3, UserCheck, UserX, UserPlus, Pause, Clock, Eye, Radio,
   Plane, Stethoscope, Languages, Hotel, Users,
 } from "lucide-react";
+import { AnalyticsDistributionTable, AnalyticsMetricTable } from "@/components/dashboard/AnalyticsDistributionTable";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
 import { StatCard } from "@/components/shared/StatCard";
-import { ChartCard } from "@/components/shared/ChartCard";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
@@ -26,30 +22,10 @@ import {
   buildTransportModeDistribution,
   formatWatchDuration,
 } from "@/lib/analytics-mappers";
+import { slugifyFilename } from "@/lib/export-utils";
 import { getAllEvents } from "@/services/event.service";
 import { useAnalyticsStore } from "@/store/useAnalyticsStore";
 import type { Event } from "@/types";
-
-const COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
-
-const AXIS_TICK = { fontSize: 11, fill: "hsl(var(--muted-foreground))" };
-const TOOLTIP_STYLE = {
-  fontSize: 12,
-  borderRadius: 8,
-  border: "1px solid hsl(var(--border))",
-  background: "hsl(var(--card))",
-  color: "hsl(var(--card-foreground))",
-};
-
-function ChartContainer({ height, children }: { height: number; children: React.ReactNode }) {
-  return (
-    <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        {children}
-      </ResponsiveContainer>
-    </div>
-  );
-}
 
 export function EventAnalyticsOverview() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -101,7 +77,7 @@ export function EventAnalyticsOverview() {
     [events, selectedEventId],
   );
 
-  const chartData = useMemo(() => {
+  const tableData = useMemo(() => {
     if (!eventAnalytics) return null;
 
     const { registrations, participationDates, assistanceRequests } = eventAnalytics;
@@ -116,6 +92,29 @@ export function EventAnalyticsOverview() {
       languages: buildLanguageDistribution(assistanceRequests.translation.byLanguage ?? {}),
     };
   }, [eventAnalytics]);
+
+  const streamingMetrics = useMemo(() => {
+    if (!eventAnalytics) return [];
+
+    const { streaming } = eventAnalytics;
+    return [
+      { metric: "Currently Watching", value: streaming.currentlyWatching },
+      { metric: "Unique Viewers", value: streaming.uniqueViewers },
+      { metric: "Broadcast Sessions", value: streaming.broadcastSessions },
+      { metric: "Peak Concurrent Viewers", value: streaming.peakConcurrentViewers },
+      { metric: "Avg Watch Time", value: formatWatchDuration(streaming.avgWatchDurationSeconds) },
+      { metric: "Total Watch Time", value: formatWatchDuration(streaming.totalWatchTimeSeconds) },
+      {
+        metric: "Live Broadcast",
+        value: streaming.primaryBroadcastActive ? "Active" : "Inactive",
+      },
+    ];
+  }, [eventAnalytics]);
+
+  const exportSlugPrefix = useMemo(
+    () => slugifyFilename(eventAnalytics?.event.title ?? "event-analytics"),
+    [eventAnalytics?.event.title],
+  );
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
@@ -150,7 +149,7 @@ export function EventAnalyticsOverview() {
         <p className="text-sm text-destructive">{eventAnalyticsError}</p>
       )}
 
-      {eventAnalytics && chartData && !eventAnalyticsLoading && (
+      {eventAnalytics && tableData && !eventAnalyticsLoading && (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold">{eventAnalytics.event.title}</h2>
@@ -166,7 +165,7 @@ export function EventAnalyticsOverview() {
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Registrations
             </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               <StatCard title="Total" value={eventAnalytics.registrations.total} icon={UserPlus} />
               <StatCard
                 title="Accepted"
@@ -200,7 +199,7 @@ export function EventAnalyticsOverview() {
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Streaming
             </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard
                 title="Currently Watching"
                 value={eventAnalytics.streaming.currentlyWatching}
@@ -222,13 +221,6 @@ export function EventAnalyticsOverview() {
                 icon={BarChart3}
               />
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Avg watch time: {formatWatchDuration(eventAnalytics.streaming.avgWatchDurationSeconds)}
-              {" · "}
-              Total watch time: {formatWatchDuration(eventAnalytics.streaming.totalWatchTimeSeconds)}
-              {" · "}
-              Live broadcast: {eventAnalytics.streaming.primaryBroadcastActive ? "Active" : "Inactive"}
-            </p>
           </div>
 
           <div>
@@ -236,121 +228,52 @@ export function EventAnalyticsOverview() {
               Registration Insights
             </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <ChartCard title="Registration Status" compact>
-                <ChartContainer height={168}>
-                  {chartData.status.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                      No registration data
-                    </div>
-                  ) : (
-                    <PieChart>
-                      <Pie
-                        data={chartData.status}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="46%"
-                        innerRadius={38}
-                        outerRadius={58}
-                        paddingAngle={2}
-                        strokeWidth={0}
-                      >
-                        {chartData.status.map((entry, i) => (
-                          <Cell key={i} fill={entry.color || COLORS[i % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={TOOLTIP_STYLE} />
-                      <Legend
-                        verticalAlign="bottom"
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
-                      />
-                    </PieChart>
-                  )}
-                </ChartContainer>
-              </ChartCard>
-
-              <ChartCard title="Attendance Mode" compact>
-                <ChartContainer height={168}>
-                  <BarChart data={chartData.attendanceMode} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/60" />
-                    <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={28} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ChartContainer>
-              </ChartCard>
-
-              <ChartCard title="Participation Time" compact>
-                <ChartContainer height={168}>
-                  <BarChart data={chartData.participationTime} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/60" />
-                    <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={28} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="value" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ChartContainer>
-              </ChartCard>
+              <AnalyticsDistributionTable
+                title="Registration Status"
+                data={tableData.status}
+                exportSlug={`${exportSlugPrefix}-registration-status`}
+                categoryHeader="Status"
+                emptyMessage="No registration data."
+              />
+              <AnalyticsDistributionTable
+                title="Attendance Mode"
+                data={tableData.attendanceMode}
+                exportSlug={`${exportSlugPrefix}-attendance-mode`}
+                categoryHeader="Mode"
+                emptyMessage="No attendance mode data."
+              />
+              <AnalyticsDistributionTable
+                title="Participation Time"
+                data={tableData.participationTime}
+                exportSlug={`${exportSlugPrefix}-participation-time`}
+                categoryHeader="Time slot"
+                emptyMessage="No participation time data."
+              />
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <ChartCard title="Food Preferences" compact>
-              <ChartContainer height={180}>
-                {chartData.food.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    No food preference data
-                  </div>
-                ) : (
-                  <PieChart>
-                    <Pie
-                      data={chartData.food}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="44%"
-                      innerRadius={32}
-                      outerRadius={50}
-                      paddingAngle={1}
-                      strokeWidth={0}
-                    >
-                      {chartData.food.map((entry, i) => (
-                        <Cell key={i} fill={entry.color || COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Legend
-                      verticalAlign="bottom"
-                      iconType="circle"
-                      iconSize={7}
-                      wrapperStyle={{ fontSize: 10, paddingTop: 2 }}
-                    />
-                  </PieChart>
-                )}
-              </ChartContainer>
-            </ChartCard>
-
-            <ChartCard title="Participation Dates" compact>
-              <ChartContainer height={180}>
-                <BarChart data={chartData.participationDates} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/60" />
-                  <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 9 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
-                  <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={24} />
-                </BarChart>
-              </ChartContainer>
-            </ChartCard>
+            <AnalyticsDistributionTable
+              title="Food Preferences"
+              data={tableData.food}
+              exportSlug={`${exportSlugPrefix}-food-preferences`}
+              categoryHeader="Food preference"
+              emptyMessage="No food preference data."
+            />
+            <AnalyticsDistributionTable
+              title="Participation Dates"
+              data={tableData.participationDates}
+              exportSlug={`${exportSlugPrefix}-participation-dates`}
+              categoryHeader="Date"
+              emptyMessage="No participation date data."
+            />
           </div>
 
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Assistance Requests
             </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard
                 title="Travel"
                 value={eventAnalytics.assistanceRequests.travel.total}
@@ -374,42 +297,29 @@ export function EventAnalyticsOverview() {
             </div>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <ChartCard title="Travel by Transport Mode" compact>
-                <ChartContainer height={152}>
-                  <BarChart data={chartData.transport} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/60" />
-                    <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={28} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="value" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={24} />
-                  </BarChart>
-                </ChartContainer>
-              </ChartCard>
-
-              <ChartCard title="Translation by Language" compact>
-                <ChartContainer height={152}>
-                  <BarChart
-                    data={chartData.languages}
-                    layout="vertical"
-                    margin={{ top: 4, right: 8, left: 4, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted/60" />
-                    <XAxis type="number" tick={AXIS_TICK} axisLine={false} tickLine={false} />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      width={56}
-                      tick={{ ...AXIS_TICK, fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} maxBarSize={14} />
-                  </BarChart>
-                </ChartContainer>
-              </ChartCard>
+              <AnalyticsDistributionTable
+                title="Travel by Transport Mode"
+                data={tableData.transport}
+                exportSlug={`${exportSlugPrefix}-travel-transport`}
+                categoryHeader="Transport mode"
+                emptyMessage="No travel transport data."
+              />
+              <AnalyticsDistributionTable
+                title="Translation by Language"
+                data={tableData.languages}
+                exportSlug={`${exportSlugPrefix}-translation-language`}
+                categoryHeader="Language"
+                emptyMessage="No translation language data."
+              />
             </div>
           </div>
+
+          <AnalyticsMetricTable
+            title="Streaming Details"
+            rows={streamingMetrics}
+            exportSlug={`${exportSlugPrefix}-streaming-details`}
+            emptyMessage="No streaming data."
+          />
         </>
       )}
     </div>

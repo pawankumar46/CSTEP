@@ -45,8 +45,8 @@ export function getEventStreamPhase(event: EventTiming): EventStreamPhase {
 function upcomingTitle(event: EventTiming): string {
   const dates = formatEventDateRange(event.date, event.endDate);
   return dates
-    ? `Live stream opens on ${dates}`
-    : "Live stream opens when the event begins";
+    ? `Live feed starts from 19th August (${dates})`
+    : "Live feed starts from 19th August";
 }
 
 export function getWatchLiveAccess({

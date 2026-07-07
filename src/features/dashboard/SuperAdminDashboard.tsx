@@ -39,7 +39,7 @@ export function SuperAdminDashboard() {
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid auto-rows-fr gap-3 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Users" value={analytics.dashboard.users.total} icon={Users} />
         <StatCard title="Active Users" value={users.filter((u) => u.status === "active").length} icon={Activity} />
         <StatCard title="Roles Defined" value={4} icon={Shield} />

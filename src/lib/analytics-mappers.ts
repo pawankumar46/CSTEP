@@ -6,6 +6,7 @@ import type {
   EventAnalyticsAssistance,
 } from "@/types";
 import { FOOD_PREFERENCES, TRANSLATION_LANGUAGES } from "@/lib/registration-options";
+import type { AnalyticsDistributionRow } from "@/lib/event-analytics-export";
 
 const REGISTRATION_STATUS_CHART: { key: string; name: string; color: string }[] = [
   { key: "ACCEPTED", name: "Accepted", color: "#22c55e" },
@@ -302,4 +303,16 @@ export function formatWatchDuration(seconds: number): string {
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+export function buildDistributionTableRows(
+  data: DistributionDataPoint[],
+): AnalyticsDistributionRow[] {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  return data.map((item) => ({
+    category: item.name,
+    count: item.value,
+    sharePercent: total > 0 ? Math.round((item.value / total) * 1000) / 10 : 0,
+  }));
 }

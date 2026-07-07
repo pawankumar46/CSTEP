@@ -17,23 +17,32 @@ interface StatCardProps {
 export function StatCard({ title, value, description, icon: Icon, trend, className }: StatCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      className="h-full"
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.25 }}
     >
-      <Card className={cn("overflow-hidden", className)}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-          <div className="rounded-lg bg-primary/10 p-2">
-            <Icon className="h-4 w-4 text-primary" />
+      <Card className={cn("flex h-full flex-col overflow-hidden rounded-lg shadow-sm", className)}>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 p-3 pb-1">
+          <CardTitle
+            title={title}
+            className="min-h-[2rem] flex-1 pr-1.5 text-xs font-medium leading-tight text-muted-foreground line-clamp-2"
+          >
+            {title}
+          </CardTitle>
+          <div className="shrink-0 rounded-md bg-primary/10 p-1.5">
+            <Icon className="h-3.5 w-3.5 text-primary" />
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{value}</div>
-          {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+        <CardContent className="mt-auto px-3 pb-3 pt-0">
+          <div className="text-xl font-bold tabular-nums leading-none">{value}</div>
+          {description && (
+            <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{description}</p>
+          )}
           {trend && (
-            <p className={cn("text-xs mt-1", trend.value >= 0 ? "text-emerald-600" : "text-red-600")}>
-              {trend.value >= 0 ? "+" : ""}{trend.value}% {trend.label}
+            <p className={cn("mt-0.5 text-[11px]", trend.value >= 0 ? "text-emerald-600" : "text-red-600")}>
+              {trend.value >= 0 ? "+" : ""}
+              {trend.value}% {trend.label}
             </p>
           )}
         </CardContent>

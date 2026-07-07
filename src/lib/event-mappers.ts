@@ -1,6 +1,7 @@
 import type {
   CreateEventPayload,
   Event,
+  EventScheduleType,
   EventRegistrationSummary,
   EventStatus,
   UpcomingEvent,
@@ -18,6 +19,7 @@ export function toCreateEventPayload(data: CreateEventPayload) {
     scheduled_end: toIsoDateTime(data.scheduledEnd),
     video_muted_by_default: data.videoMutedByDefault,
     pause_continue_enabled: data.pauseContinueEnabled,
+    schedule_type: data.scheduleType,
   };
 }
 
@@ -42,6 +44,7 @@ export function toUpdateEventPayload(data: UpdateEventPayload) {
   if (data.scheduledEnd) payload.scheduled_end = toIsoDateTime(data.scheduledEnd);
   if (data.videoMutedByDefault !== undefined) payload.video_muted_by_default = data.videoMutedByDefault;
   if (data.pauseContinueEnabled !== undefined) payload.pause_continue_enabled = data.pauseContinueEnabled;
+  if (data.scheduleType !== undefined) payload.schedule_type = data.scheduleType;
 
   return payload;
 }
@@ -89,6 +92,11 @@ export function mapApiUpcomingEvent(raw: Record<string, unknown>): UpcomingEvent
 
 export function mapApiEventToEvent(raw: Record<string, unknown>): Event {
   const now = new Date().toISOString();
+  const scheduleTypeRaw = String(raw.schedule_type ?? raw.scheduleType ?? "").toUpperCase();
+  const scheduleType =
+    scheduleTypeRaw === "WHOLE_DAY" || scheduleTypeRaw === "MULTI_SESSION"
+      ? (scheduleTypeRaw as EventScheduleType)
+      : undefined;
 
   return {
     id: String(raw.id ?? raw.pk ?? ""),
@@ -105,5 +113,6 @@ export function mapApiEventToEvent(raw: Record<string, unknown>): Event {
     createdBy: String(raw.created_by ?? raw.createdBy ?? ""),
     createdAt: String(raw.created_at ?? raw.createdAt ?? now),
     updatedAt: String(raw.updated_at ?? raw.updatedAt ?? now),
+    scheduleType,
   };
 }

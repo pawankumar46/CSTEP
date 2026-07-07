@@ -374,7 +374,7 @@ export function AttendanceModeAnalytics() {
             <p className="text-sm text-destructive">{fetchError}</p>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard title="Total Registrations" value={totalCount} icon={UserPlus} />
             <StatCard title="Accepted" value={statusCounts.accepted ?? 0} icon={UserCheck} />
             <StatCard title="Pending" value={statusCounts.pending ?? 0} icon={Clock} />

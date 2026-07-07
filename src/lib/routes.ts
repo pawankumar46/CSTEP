@@ -6,6 +6,7 @@ export const ROUTES = {
   eventRegister: "/event-register",
   streaming: "/streaming",
   profile: "/profile",
+  feedback: "/feedback",
 } as const;
 
 type AuthQueryParams = {

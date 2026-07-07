@@ -29,7 +29,7 @@ export function BaseUserDashboard() {
         <p className="text-muted-foreground">Here&apos;s what&apos;s happening with your events</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid auto-rows-fr gap-4 md:grid-cols-3">
         <StatCard title="Upcoming Events" value={upcomingEvents.length} icon={Calendar} />
         <StatCard title="Recordings Available" value={recordings.length} icon={Video} />
         <StatCard title="Your Feedback" value="Submit" icon={MessageSquare} description="Share your experience" />
@@ -64,7 +64,7 @@ export function BaseUserDashboard() {
           <CardContent className="grid gap-3">
             <Button asChild className="justify-start"><Link href="/streaming"><Video className="h-4 w-4 mr-2" /> Join Live Stream</Link></Button>
             <Button variant="outline" asChild className="justify-start"><Link href="/dashboard/recordings"><Video className="h-4 w-4 mr-2" /> Watch Recordings</Link></Button>
-            <Button variant="outline" asChild className="justify-start"><Link href="/dashboard/feedback"><MessageSquare className="h-4 w-4 mr-2" /> Submit Feedback</Link></Button>
+            <Button variant="outline" asChild className="justify-start"><Link href="/feedback"><MessageSquare className="h-4 w-4 mr-2" /> Submit Feedback</Link></Button>
             <Button variant="outline" asChild className="justify-start"><Link href="/event-register"><Calendar className="h-4 w-4 mr-2" /> Register for Event</Link></Button>
           </CardContent>
         </Card>

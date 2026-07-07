@@ -12,11 +12,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useEventStore } from "@/store/useEventStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { toLocalDateTimeInput } from "@/lib/event-mappers";
 import { Calendar } from "lucide-react";
-import type { Event, EventListType } from "@/types";
+import type { Event, EventListType, EventScheduleType } from "@/types";
 
 const EVENT_TYPE_LABELS: Record<EventListType, string> = {
   upcoming: "Upcoming",
@@ -46,6 +53,7 @@ const defaultForm = {
   scheduledEnd: "",
   videoMutedByDefault: true,
   pauseContinueEnabled: true,
+  scheduleType: "WHOLE_DAY" as EventScheduleType,
 };
 
 type EventFormState = typeof defaultForm;
@@ -69,6 +77,27 @@ function EventFormFields({
           placeholder="CSTEP Demo Event"
         />
       </div>
+      <div className="space-y-2">
+        <Label>Event Type</Label>
+        <Select
+          value={form.scheduleType}
+          onValueChange={(value) =>
+            setForm({
+              ...form,
+              scheduleType: value as EventScheduleType,
+            })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select event type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="WHOLE_DAY">Whole Day</SelectItem>
+            <SelectItem value="MULTI_SESSION">Multi Session</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-2">
         <Label>Description</Label>
         <Textarea
@@ -142,7 +171,10 @@ export default function EventsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState(defaultForm);
 
-  const canManage = user?.role === "event_administrator" || user?.role === "super_administrator";
+  const canManage =
+    user?.role === "moderator" ||
+    user?.role === "event_administrator" ||
+    user?.role === "super_administrator";
 
   useEffect(() => {
     fetchEvents(eventListType);
@@ -161,6 +193,7 @@ export default function EventsPage() {
     scheduledEnd: form.scheduledEnd,
     videoMutedByDefault: form.videoMutedByDefault,
     pauseContinueEnabled: form.pauseContinueEnabled,
+    scheduleType: form.scheduleType,
   });
 
   const handleCreate = async () => {
@@ -187,6 +220,7 @@ export default function EventsPage() {
       scheduledEnd: toLocalDateTimeInput(event.endDate ?? event.date),
       videoMutedByDefault: true,
       pauseContinueEnabled: true,
+      scheduleType: event.scheduleType ?? "WHOLE_DAY",
     });
     setEditOpen(true);
   };

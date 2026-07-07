@@ -24,6 +24,7 @@ export interface User {
 export type EventStatus = "draft" | "published" | "live" | "completed" | "cancelled";
 
 export type EventListType = "upcoming" | "live" | "past";
+export type EventScheduleType = "WHOLE_DAY" | "MULTI_SESSION";
 
 export interface Event {
   id: string;
@@ -40,6 +41,7 @@ export interface Event {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  scheduleType?: EventScheduleType;
 }
 
 export interface EventRegistrationSummary {
@@ -63,6 +65,7 @@ export interface CreateEventPayload {
   scheduledEnd: string;
   videoMutedByDefault: boolean;
   pauseContinueEnabled: boolean;
+  scheduleType: EventScheduleType;
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;
@@ -258,9 +261,10 @@ export interface Feedback {
   userName: string;
   eventId: string;
   eventName: string;
+  sessionDate: string;
+  sessionTitle: string;
   rating: number;
-  feedback: string;
-  suggestions: string;
+  comments: string;
   createdAt: string;
 }
 
@@ -413,6 +417,17 @@ export interface ScheduleItem {
   title: string;
   speaker: string;
   description: string;
+}
+
+export interface EventSession {
+  id: string;
+  eventId: string;
+  title: string;
+  speaker: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  venue?: string;
 }
 
 export interface FAQ {

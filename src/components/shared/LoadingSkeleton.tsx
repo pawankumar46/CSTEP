@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export function StatCardSkeleton() {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <Skeleton className="h-4 w-24" />
+    <Card className="flex h-full flex-col rounded-lg shadow-sm">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 p-3 pb-1">
+        <Skeleton className="h-8 w-20" />
+        <Skeleton className="h-6 w-6 shrink-0 rounded-md" />
       </CardHeader>
-      <CardContent>
-        <Skeleton className="h-8 w-16 mb-2" />
-        <Skeleton className="h-3 w-32" />
+      <CardContent className="mt-auto px-3 pb-3 pt-0">
+        <Skeleton className="h-6 w-12" />
       </CardContent>
     </Card>
   );
@@ -77,7 +77,7 @@ export function BottomCTASkeleton() {
 export function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid auto-rows-fr gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <StatCardSkeleton key={i} />
         ))}

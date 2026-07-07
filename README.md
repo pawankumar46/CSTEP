@@ -225,9 +225,11 @@ Page / Component
 | `/login`, `/signup`, `/otp` | Authentication |
 | `/event-register` | Multi-step event registration |
 | `/profile` | Delegate profile & assistance requests |
+| `/feedback` | Multi-day session feedback (all authenticated users) |
 | `/streaming` | Live stream (guarded by registration + event phase) |
 | `/dashboard` | Role-based dashboard home |
 | `/dashboard/lobby` | Manage registrations |
+| `/dashboard/sessions` | Event day session scheduler (add / edit / delete / drag) |
 | `/dashboard/travel` | Manage travel assistance |
 | `/dashboard/medical` | Manage medical assistance |
 | `/dashboard/translation` | Manage translation assistance |
@@ -254,7 +256,7 @@ Route guards: `RouteGuard`, `StreamAccessGuard`, `EventRegisterGuard` in `src/co
 import { apiClient } from "@/lib/api-client";
 
 // GET with auth header (Bearer JWT) attached automatically
-const { data } = await apiClient.get("/events/upcoming/");
+const { data } = await apiClient.get("/events/event/upcoming/");
 
 // POST
 await apiClient.post("/registrations/registration/", payload);
@@ -298,13 +300,13 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/events/upcoming/` | Paginated upcoming events (`results[]` with `is_registered` + `summary`) |
-| `GET` | `/events/?type=upcoming\|live\|past` | Filtered event list |
-| `GET` | `/events/` | All events |
-| `GET` | `/events/:id/` | Single event |
-| `POST` | `/events/` | Create event |
-| `PATCH` | `/events/:id/` | Update event |
-| `DELETE` | `/events/:id/` | Delete event |
+| `GET` | `/events/event/upcoming/` | Paginated upcoming events (`results[]` with `is_registered` + `summary`) |
+| `GET` | `/events/event/?type=upcoming\|live\|past` | Filtered event list |
+| `GET` | `/events/event/` | All events |
+| `GET` | `/events/event/:id/` | Single event |
+| `POST` | `/events/event/` | Create event |
+| `PATCH` | `/events/event/:id/` | Update event |
+| `DELETE` | `/events/event/:id/` | Delete event |
 
 #### Registrations — `registration.service.ts`, `lobby.service.ts`
 
@@ -452,13 +454,37 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-04
+
+- **Dashboard stat cards:** Compact metric cards — reduced padding, `text-xs` titles, `text-xl` values; equal-height grids with `auto-rows-fr`.
+- **Moderator dashboard:** Food Requirement shown as a date-filtered table with PDF/Excel export (single day or all dates); registration and participation charts retain period/mode filters.
+- **Analytics overview:** Distribution insights shown as tables with PDF/Excel export per section (registration, attendance, food, participation dates, travel, translation, streaming details).
+- **Session feedback:** Multi-day feedback on `/streaming` — Exit opens a dialog for all users: 4 sessions per day on **19, 20, and 21 Aug**, daily Overall per day, and **ICAS / Overall Event**; submit or skip navigates home. Moderator view at `/dashboard/feedback` shows summary with respondent names/ratings, filterable comment table (with **Clear filters**), and export.
+- **Lobby — Manage Sessions:** Event-first day scheduler at `/dashboard/sessions` — up to 3 day tabs, 24-hour timeline (12 AM–11 PM) with networking gaps in empty slots (add / edit / delete / drag); in-memory, no API.
+- **Lobby — Manage Sessions days source:** After selecting an event, day tabs now load from `GET /events/event-days/?event=<id>` (uses backend `results[].date/day_number/label`) so scheduler dates match backend event-day records.
+- **Lobby — Add Session API:** Add Session now includes **Session Type** (`SESSION`, `BREAKFAST_BREAK`, `TEA_BREAK`, `LUNCH_BREAK`, `DINNER_BREAK`, `NETWORKING_BREAK`, `CUSTOM_BREAK`) and posts to `POST /events/schedule-items/` with backend payload keys (`day`, `item_type`, `title`, `description`, `start_time`, `end_time`) using the selected event-day id.
+- **Lobby — Add Session reliability:** Add-to-timeline now validates selected `day` id before posting and shows a clear error if day id cannot be resolved, avoiding silent API skips.
+- **Lobby — Post-add refresh:** After `POST /events/schedule-items/`, scheduler now calls `GET /events/schedule-items/?day=<selectedDayId>` and refreshes that day from backend response.
+- **Lobby — Day tab default:** On reload/event selection, scheduler now re-initializes with the first backend day tab selected (e.g. 19 Aug).
+- **Lobby — Reload day fetch:** On reload and when switching day tabs, scheduler now calls `GET /events/schedule-items/?day=<selectedDayId>` automatically to hydrate timeline from backend.
+- **Lobby — Timeline interactions:** Removed drag-to-move on timeline blocks; sessions are now edited via click (Edit modal) and deleted via block action.
+- **Lobby — Timeline spacing:** Increased timeline width scale (more pixels per hour) for clearer hour slots and easier visual planning.
+- **Lobby — Timeline spacing:** Timeline scale is now `160px/hour` for wider slot visibility.
+- **Events permissions:** Moderators can create, edit, and delete events in `/dashboard/events` (same as event admins/super admins).
+- **Lobby — Delete session API:** Deleting a session now calls `DELETE /events/schedule-items/{schedule_item_id}/` and re-fetches `GET /events/schedule-items/?day=<selectedDayId>` to keep timeline in sync.
+- **Lobby — Edit session API:** Editing a session now calls `PATCH /events/schedule-items/{schedule_item_id}/` (`item_type`, `title`, `description`, `start_time`, `end_time`) and refreshes selected day data via `GET /events/schedule-items/?day=<selectedDayId>`.
+- **Lobby — Delete loading state:** While delete API runs, delete actions are disabled and show a spinner (`Deleting...` in modal / spinner on block delete icon).
+- **Watch Live tooltip:** Disabled Watch Live now shows clearer hover guidance for upcoming events — “Live feed starts from 19th August (…)”.
+- **Watch Live hover fix:** Tooltip now appears reliably for disabled Watch Live by wrapping the disabled button in a hoverable container.
+- **Events form:** Create/Edit Event now includes **Event Type** (`Whole Day` / `Multi Session`) and sends it to backend as `schedule_type` (`WHOLE_DAY` / `MULTI_SESSION`).
+
 ### 2026-07-03
 
 - **Home page:** ICAS 2026 content on hero and About section (theme, venue, highlights, contact) from [CSTEP ICAS 2026](https://cstep.in/events/india-clean-air-summit-icas-2026/).
 - **Home hero countdown:** `EventCountdown` sits inline with Register / Watch Live; counts down to ICAS start (`19 Aug 2026, 5:30 AM IST`).
-- **Analytics overview:** Event-scoped analytics via `GET /analytics/events/:id/` with event selection from `GET /events/`; shows registrations, attendance, food, assistance, and streaming metrics.
+- **Analytics overview:** Event-scoped analytics at `/dashboard/analytics` — distribution charts replaced with exportable tables (registration status, attendance mode, participation time/dates, food, travel, translation); summary stat cards retained.
 - **Dashboard analytics:** Replaced `/analytics/user-summary/` with `GET /analytics/dashboard/`; role dashboards use `dashboard` payload (events/registrations/users by status, top events, viewer stats).
-- **Home page:** Removed `/analytics/user-summary/` call; hero registration count now comes from each event's `summary` on `/events/upcoming/`.
+- **Home page:** Removed `/analytics/user-summary/` call; hero registration count now comes from each event's `summary` on `/events/event/upcoming/`.
 - **Events API:** `mapApiUpcomingEvent` maps paginated `results[]` with `is_registered` and nested `summary` (`total_registered_users`, `participants_*`).
 - **Registration API:** `participation_dates` POST payload is now an array of ISO date strings (`["2025-03-01", "2025-03-02"]`) instead of `{ date }` objects.
 - **Analytics — Attendance Mode:** Loads `GET /registrations/registration/` with `registration__event` and `attendance_mode` (`VIRTUAL` / `PHYSICAL`); shows summary stats, status/food charts, and paginated registration table.

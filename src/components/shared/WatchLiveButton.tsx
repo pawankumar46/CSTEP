@@ -52,14 +52,15 @@ export function WatchLiveButton({
   }
 
   return (
-    <Button
-      size={size}
-      variant={variant}
-      className={className}
-      disabled
-      title={disabledTitle}
-    >
-      {label}
-    </Button>
+    <span title={disabledTitle} className={cn("inline-flex", className)}>
+      <Button
+        size={size}
+        variant={variant}
+        className="pointer-events-none"
+        disabled
+      >
+        {label}
+      </Button>
+    </span>
   );
 }

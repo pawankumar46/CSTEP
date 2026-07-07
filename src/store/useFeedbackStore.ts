@@ -17,6 +17,7 @@ interface FeedbackState {
   fetchFeedback: () => Promise<void>;
   fetchStats: () => Promise<void>;
   submitFeedback: (data: Omit<Feedback, "id" | "createdAt">) => Promise<void>;
+  submitMultiDayFeedback: (entries: Omit<Feedback, "id" | "createdAt">[]) => Promise<void>;
 }
 
 export const useFeedbackStore = create<FeedbackState>((set, get) => ({
@@ -54,6 +55,23 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
       const newFeedback = await feedbackService.submitFeedback(data);
       set({
         feedback: [newFeedback, ...get().feedback],
+        isSubmitting: false,
+      });
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to submit feedback",
+        isSubmitting: false,
+      });
+      throw err;
+    }
+  },
+
+  submitMultiDayFeedback: async (entries) => {
+    set({ isSubmitting: true, error: null });
+    try {
+      const created = await feedbackService.submitMultiDayFeedback(entries);
+      set({
+        feedback: [...created, ...get().feedback],
         isSubmitting: false,
       });
     } catch (err) {
