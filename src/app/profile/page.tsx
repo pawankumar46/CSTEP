@@ -157,27 +157,6 @@ function ProfileContent() {
         </Button>
       </form>
 
-      {/* <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Session Feedback
-          </CardTitle>
-          <CardDescription>
-            Rate sessions when you leave the live stream — click Exit on the streaming page.
-            You can also submit feedback here anytime.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link href={ROUTES.streaming}>Go to Live Stream</Link>
-          </Button>
-          <Button asChild>
-            <Link href={ROUTES.feedback}>Submit Feedback</Link>
-          </Button>
-        </CardContent>
-      </Card> */}
-
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
