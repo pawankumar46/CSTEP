@@ -10,6 +10,7 @@ import {
   BarChart3, MapPin, Monitor, Users, UserCheck, UserX, UserPlus, Pause, Clock,
 } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
+import { ExportMenu } from "@/components/shared/ExportMenu";
 import { ChartCard } from "@/components/shared/ChartCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatCard } from "@/components/shared/StatCard";
@@ -25,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { buildRegistrationStatusDistribution } from "@/lib/analytics-mappers";
+import { slugifyFilename } from "@/lib/export-utils";
+import { ATTENDANCE_MODE_EXPORT_COLUMNS } from "@/lib/registration-export";
 import { getRegistrationOptionLabel } from "@/lib/registration-options";
 import { getAllEvents } from "@/services/event.service";
 import { getEventRegistrationsPage, getEventRegistrationsByAttendanceMode } from "@/services/registration.service";
@@ -261,6 +264,13 @@ export function AttendanceModeAnalytics() {
   const modeLabel = attendanceMode === "virtual" ? "Virtual" : "Physical";
   const ModeIcon = attendanceMode === "virtual" ? Monitor : MapPin;
 
+  const exportFilename = slugifyFilename(
+    `${modeLabel.toLowerCase()}-registrations-${selectedEvent?.name ?? "event"}`,
+  );
+  const exportTitle = selectedEvent
+    ? `${modeLabel} Registrations — ${selectedEvent.name}`
+    : `${modeLabel} Registrations`;
+
   return (
     <div className="space-y-4">
       <Card>
@@ -439,12 +449,23 @@ export function AttendanceModeAnalytics() {
 
           <Card className="shadow-sm">
             <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm font-medium">
-                {modeLabel} Registrations
-              </CardTitle>
-              <CardDescription>
-                {totalCount} registration{totalCount === 1 ? "" : "s"} for this event and mode.
-              </CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-sm font-medium">
+                    {modeLabel} Registrations
+                  </CardTitle>
+                  <CardDescription>
+                    {totalCount} registration{totalCount === 1 ? "" : "s"} for this event and mode.
+                  </CardDescription>
+                </div>
+                <ExportMenu
+                  filename={exportFilename}
+                  title={exportTitle}
+                  columns={ATTENDANCE_MODE_EXPORT_COLUMNS}
+                  data={summaryRegistrations}
+                  disabled={summaryLoading}
+                />
+              </div>
             </CardHeader>
             <CardContent className="px-4 pb-4 pt-0">
               {loading && registrations.length === 0 && !fetchError ? (

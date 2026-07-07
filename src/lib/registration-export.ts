@@ -23,6 +23,22 @@ export const LOBBY_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
   { header: "Status", value: (row) => formatStatus(row.status) },
 ];
 
+export const ATTENDANCE_MODE_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
+  { header: "User Name", value: (row) => row.userName },
+  { header: "Phone", value: (row) => row.phone },
+  { header: "Email", value: (row) => row.email },
+  {
+    header: "Participation Dates",
+    value: (row) => row.participationDateLabel ?? row.participationDate,
+  },
+  { header: "Participation Time", value: (row) => formatParticipationTime(row.participationTime) },
+  {
+    header: "Food Preference",
+    value: (row) => getRegistrationOptionLabel(row.foodPreference),
+  },
+  { header: "Status", value: (row) => formatStatus(row.status) },
+];
+
 export const TRAVEL_EXPORT_COLUMNS: ExportColumn<TravelAssistanceRow>[] = [
   { header: "User Name", value: (row) => row.userName },
   { header: "Email", value: (row) => row.email },

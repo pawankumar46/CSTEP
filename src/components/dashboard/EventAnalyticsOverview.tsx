@@ -6,6 +6,7 @@ import {
   Plane, Stethoscope, Languages, Hotel, Users,
 } from "lucide-react";
 import { AnalyticsDistributionTable, AnalyticsMetricTable } from "@/components/dashboard/AnalyticsDistributionTable";
+import { DashboardTrendCharts } from "@/components/dashboard/DashboardTrendCharts";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
 import { StatCard } from "@/components/shared/StatCard";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -137,10 +138,19 @@ export function EventAnalyticsOverview() {
             <EmptyState
               icon={BarChart3}
               title="Select an event"
-              description="Choose an event above to view registration, assistance, and streaming analytics."
+              description="Choose an event above to view trends, registration, assistance, and streaming analytics."
             />
           </CardContent>
         </Card>
+      )}
+
+      {selectedEventId && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            Trends
+          </h3>
+          <DashboardTrendCharts />
+        </div>
       )}
 
       {selectedEventId && eventAnalyticsLoading && <DashboardSkeleton />}

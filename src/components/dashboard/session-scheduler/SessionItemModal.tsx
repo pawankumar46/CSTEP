@@ -86,7 +86,7 @@ export function SessionItemModal({
         initialItem?.sessionType ??
         (itemType === "session" ? "SESSION" : "CUSTOM_BREAK"),
       label: initialItem?.label ?? "",
-      startTime: minutesToTimeInput(initialItem?.start ?? 9 * 60),
+      startTime: minutesToTimeInput(initialItem?.start ?? SCHEDULER_DAY_START_MINUTES),
       duration: initialItem?.duration ?? 60,
     }),
     [initialItem, itemType],
@@ -183,6 +183,8 @@ export function SessionItemModal({
               id="session-start"
               type="time"
               className="tabular-nums"
+              min={minutesToTimeInput(SCHEDULER_DAY_START_MINUTES)}
+              max={minutesToTimeInput(SCHEDULER_DAY_END_MINUTES - 5)}
               {...register("startTime")}
             />
             {errors.startTime && (

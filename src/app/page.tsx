@@ -155,7 +155,7 @@ function AboutSection() {
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto">
+        <div id="contact" className="max-w-2xl mx-auto scroll-mt-24">
           <Card className="shadow-sm">
             <CardContent className="pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="space-y-1">

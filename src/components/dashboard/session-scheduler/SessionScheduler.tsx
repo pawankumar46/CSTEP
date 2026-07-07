@@ -398,8 +398,7 @@ export function SessionScheduler({
 
         {sortedItems.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No sessions scheduled for {selectedDay?.shortLabel ?? "this day"} — empty slots are
-            open for networking.
+            No sessions scheduled for {selectedDay?.shortLabel ?? "this day"}.
           </p>
         )}
 

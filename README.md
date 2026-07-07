@@ -454,6 +454,15 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-07
+
+- **Home — Contact scroll:** Navbar **Contact** (`#contact`) now scrolls to the “Got any queries?” contact card in the About section (with sticky-header offset); footer no longer uses the `contact` id.
+- **Moderator dashboard — Participation Trend:** X-axis labels changed from Week 1–6 to 15-minute time slots starting at **9 AM** (9 AM, 9:15, 9:30, …).
+- **Moderator dashboard layout:** Removed Food Requirement table and trend charts from the main dashboard; dashboard now shows **Upcoming**, **Current** (live), and **Past** event sections.
+- **Analytics overview:** Registration Trend and Participation Trend charts moved to `/dashboard/analytics`; trends appear **after selecting an event** (with period/mode filters).
+- **Lobby — Manage Sessions timeline:** Timeline window is now **9 AM–6 PM** (was 24-hour); removed empty-slot **Open for networking** blocks from the timeline.
+- **Attendance mode analytics:** Physical/Virtual registrations table at `/dashboard/analytics/attendance-mode` now supports **Excel/PDF export** (all matching registrations, not just the current page).
+
 ### 2026-07-04
 
 - **Dashboard stat cards:** Compact metric cards — reduced padding, `text-xs` titles, `text-xl` values; equal-height grids with `auto-rows-fr`.

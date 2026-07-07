@@ -21,8 +21,8 @@ export type ScheduleByDate = Record<string, TimelineItem[]>;
 
 export type ScheduleByEvent = Record<string, ScheduleByDate>;
 
-export const SCHEDULER_DAY_START_MINUTES = 0;
-export const SCHEDULER_DAY_END_MINUTES = 24 * 60;
+export const SCHEDULER_DAY_START_MINUTES = 9 * 60;
+export const SCHEDULER_DAY_END_MINUTES = 18 * 60;
 export const SCHEDULER_PX_PER_HOUR = 160;
 export const SCHEDULER_PX_PER_MINUTE = SCHEDULER_PX_PER_HOUR / 60;
 export const SCHEDULER_SNAP_MINUTES = 5;
@@ -142,7 +142,7 @@ export function generateTimelineItemId(): string {
 
 export function getHourMarkers(): number[] {
   const markers: number[] = [];
-  for (let m = SCHEDULER_DAY_START_MINUTES; m < SCHEDULER_DAY_END_MINUTES; m += 60) {
+  for (let m = SCHEDULER_DAY_START_MINUTES; m <= SCHEDULER_DAY_END_MINUTES; m += 60) {
     markers.push(m);
   }
   return markers;
@@ -219,42 +219,4 @@ export function getEventScheduleDays(
       shortLabel,
     };
   });
-}
-
-export const NETWORKING_GAP_LABEL = "Open for networking";
-
-export const MIN_NETWORKING_GAP_MINUTES = 5;
-
-export interface TimelineGap {
-  id: string;
-  start: number;
-  duration: number;
-}
-
-export function getNetworkingGaps(
-  items: TimelineItem[],
-  minGapMinutes = MIN_NETWORKING_GAP_MINUTES,
-): TimelineGap[] {
-  const sorted = [...items].sort((a, b) => a.start - b.start);
-  const gaps: TimelineGap[] = [];
-  let cursor = SCHEDULER_DAY_START_MINUTES;
-
-  for (const item of sorted) {
-    if (item.start > cursor) {
-      const duration = item.start - cursor;
-      if (duration >= minGapMinutes) {
-        gaps.push({ id: `networking-${cursor}`, start: cursor, duration });
-      }
-    }
-    cursor = Math.max(cursor, itemEnd(item));
-  }
-
-  if (SCHEDULER_DAY_END_MINUTES > cursor) {
-    const duration = SCHEDULER_DAY_END_MINUTES - cursor;
-    if (duration >= minGapMinutes) {
-      gaps.push({ id: `networking-${cursor}`, start: cursor, duration });
-    }
-  }
-
-  return gaps;
 }

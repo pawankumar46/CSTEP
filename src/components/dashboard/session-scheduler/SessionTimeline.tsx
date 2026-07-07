@@ -5,14 +5,13 @@ import {
   currentMinutesSinceMidnight,
   formatMinutesLabel,
   getHourMarkers,
-  getNetworkingGaps,
   minutesToLeftPx,
   SCHEDULER_DAY_END_MINUTES,
+  SCHEDULER_DAY_START_MINUTES,
   SCHEDULER_TIMELINE_WIDTH_PX,
   todayDateString,
   type TimelineItem,
 } from "@/lib/session-scheduler";
-import { NetworkingGapBlock } from "@/components/dashboard/session-scheduler/NetworkingGapBlock";
 import { SessionBlock } from "@/components/dashboard/session-scheduler/SessionBlock";
 
 interface SessionTimelineProps {
@@ -32,7 +31,10 @@ export function SessionTimeline({
 }: SessionTimelineProps) {
   const [nowMinutes, setNowMinutes] = useState(currentMinutesSinceMidnight());
   const isToday = selectedDate === todayDateString();
-  const showNowLine = isToday && nowMinutes < SCHEDULER_DAY_END_MINUTES;
+  const showNowLine =
+    isToday &&
+    nowMinutes >= SCHEDULER_DAY_START_MINUTES &&
+    nowMinutes <= SCHEDULER_DAY_END_MINUTES;
 
   useEffect(() => {
     if (!isToday) return;
@@ -44,12 +46,11 @@ export function SessionTimeline({
   }, [isToday]);
 
   const hourMarkers = getHourMarkers();
-  const networkingGaps = getNetworkingGaps(items);
 
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground sm:hidden">
-        Scroll sideways to see the full day →
+        Scroll sideways to see 9 AM–6 PM →
       </p>
       <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
         <div
@@ -86,10 +87,6 @@ export function SessionTimeline({
                 aria-hidden
               />
             )}
-
-            {networkingGaps.map((gap) => (
-              <NetworkingGapBlock key={gap.id} gap={gap} />
-            ))}
 
             {items.map((item) => (
               <SessionBlock
