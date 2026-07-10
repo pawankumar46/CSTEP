@@ -457,7 +457,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-10
 
-- **Signup verification:** Post-signup OTP is **email only** (phone verification removed); after successful verification users redirect to **home** (or preserved `redirect` query when present).
+- **Auth token expiry:** API responses with `token_not_valid` / expired access token (`401`) clear the local session and redirect to `/login` automatically.
 - **Home hero image visibility:** Hero image now uses `object-contain` with no dimming overlays so the CSTEP logo and skyline vectors remain fully visible in light and dark mode.
 - **Home hero image card:** Hero image card uses a **2:3 portrait aspect** (matching `Image1.jpg`) at full content height so the image fills the card as one piece with `object-cover` while keeping the CSTEP logo and skyline fully visible; card aligns to the text column on desktop.
 - **Home hero typography:** Event title splits before `CONFERENCE` with `leading-none` so multi-line headings have no extra gap; hero text uses tighter spacing to align with the image card.

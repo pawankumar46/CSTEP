@@ -1,5 +1,9 @@
 import axios from "axios";
 import { getAccessToken } from "@/lib/auth-session";
+import {
+  forceSessionExpiredRedirect,
+  shouldForceLoginOnAuthError,
+} from "@/lib/auth-session-expired";
 import { getApiBaseUrl } from "@/lib/env";
 
 export const apiClient = axios.create({
@@ -22,5 +26,13 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error),
+  async (error) => {
+    const requestUrl = error.config?.url;
+
+    if (shouldForceLoginOnAuthError(error, requestUrl)) {
+      await forceSessionExpiredRedirect();
+    }
+
+    return Promise.reject(error);
+  },
 );
