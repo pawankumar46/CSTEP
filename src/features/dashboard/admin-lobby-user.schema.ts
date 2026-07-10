@@ -3,12 +3,6 @@ import {
   EMPTY_SIGNUP_ADDRESS,
   signupAddressSchema,
 } from "@/features/auth/signup.schema";
-import {
-  FOOD_PREFERENCE_VALUES,
-  type FoodPreferenceValue,
-} from "@/lib/registration-options";
-
-const foodEnum = z.enum(FOOD_PREFERENCE_VALUES as [FoodPreferenceValue, ...FoodPreferenceValue[]]);
 
 const lobbyUserSignupFields = {
   salutation: z.string().min(1, "Salutation is required"),
@@ -24,10 +18,10 @@ const lobbyUserSignupFields = {
 
 const lobbyUserRegistrationFields = {
   eventId: z.string().min(1, "Please select an event"),
-  participationDates: z.array(z.string()).min(1, "Select at least one participation date"),
-  participationTime: z.enum(["half_day", "full_day"]).optional(),
-  attendanceMode: z.enum(["physical", "virtual"]).optional(),
-  foodPreference: foodEnum.optional(),
+  participationDate: z.string().optional(),
+  selectedDayIds: z.array(z.string()),
+  selectedSessionIds: z.array(z.string()),
+  attendanceMode: z.enum(["physical", "virtual"]),
 } as const;
 
 function refineLobbyPasswordMatch(
@@ -74,10 +68,10 @@ export const EMPTY_LOBBY_USER_SIGNUP: LobbyUserSignupFormValues = {
 
 export const EMPTY_LOBBY_USER_REGISTRATION: LobbyUserRegistrationFormValues = {
   eventId: "",
-  participationDates: [],
-  participationTime: "full_day",
+  participationDate: "",
+  selectedDayIds: [],
+  selectedSessionIds: [],
   attendanceMode: "physical",
-  foodPreference: "veg",
 };
 
 export const EMPTY_ADD_LOBBY_USER: AddLobbyUserFormValues = {

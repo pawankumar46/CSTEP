@@ -9,6 +9,7 @@ import {
   toLobbyRegistrationApiPayload,
   toRegistrationApiPayload,
   toRegistrationPreferencesPayload,
+  type RegistrationScheduleType,
 } from "@/lib/registration-mappers";
 import { toAccommodationRequestPayload, toMedicalRequestPayload, toTranslationRequestPayload, toTravelRequestPayload } from "@/lib/event-support-mappers";
 import type { EventSupportFormValues } from "@/features/profile/event-support.schema";
@@ -24,10 +25,8 @@ import { mockRegistrations } from "@/mock/registrations";
 import type {
   Event,
   AttendanceMode,
-  FoodPreference,
   MedicalSupportType,
   PaginatedResponse,
-  ParticipationTime,
   Registration,
   RegistrationFormData,
   RegistrationStatus,
@@ -68,7 +67,7 @@ export const getEventRegistrationsPage = async ({
 }): Promise<EventRegistrationsPageResult> => {
   try {
     const params: Record<string, string | number> = {
-      registration__event: eventId,
+      event: eventId,
       page,
       page_size: pageSize,
     };
@@ -228,14 +227,19 @@ export const updateRegistrationPreferences = async (
   }
 };
 
+export interface SubmitRegistrationOptions {
+  userId?: string;
+  scheduleType?: RegistrationScheduleType;
+}
+
 export const submitRegistration = async (
   data: RegistrationFormData,
-  event?: Pick<Event, "date" | "endDate"> | null,
+  options?: SubmitRegistrationOptions,
 ): Promise<Registration> => {
   try {
     const { data: response } = await apiClient.post<Record<string, unknown>>(
       "/registrations/registration/",
-      toRegistrationApiPayload(data, event)
+      toRegistrationApiPayload(data, options),
     );
     return mapApiRegistrationToRegistration(response);
   } catch (error) {
@@ -250,17 +254,16 @@ export const submitLobbyRegistration = async (
   userId: string,
   data: {
     eventId: string;
-    participationDates: string[];
-    participationTime?: ParticipationTime;
+    selectedDayIds?: string[];
+    selectedSessionIds?: string[];
     attendanceMode?: AttendanceMode;
-    foodPreference?: FoodPreference;
   },
-  event?: Pick<Event, "date" | "endDate"> | null,
+  options?: SubmitRegistrationOptions,
 ): Promise<Registration> => {
   try {
     const { data: response } = await apiClient.post<Record<string, unknown>>(
       "/registrations/registration/",
-      toLobbyRegistrationApiPayload(userId, data, event),
+      toLobbyRegistrationApiPayload(userId, data, options),
     );
     return mapApiRegistrationToRegistration(response, data.eventId);
   } catch (error) {
@@ -275,14 +278,19 @@ export const submitAdminRegistration = async (
   userId: string,
   data: Pick<
     RegistrationFormData,
-    "eventId" | "participationDate" | "participationTime" | "attendanceMode" | "foodPreference"
+    | "eventId"
+    | "participationDate"
+    | "participationTime"
+    | "selectedDayIds"
+    | "selectedSessionIds"
+    | "attendanceMode"
   >,
-  event?: Pick<Event, "date" | "endDate"> | null,
+  options?: SubmitRegistrationOptions,
 ): Promise<Registration> => {
   try {
     const { data: response } = await apiClient.post<Record<string, unknown>>(
       "/registrations/registration/",
-      toAdminRegistrationApiPayload(userId, data, event),
+      toAdminRegistrationApiPayload(userId, data, options),
     );
     return mapApiRegistrationToRegistration(response, data.eventId);
   } catch (error) {

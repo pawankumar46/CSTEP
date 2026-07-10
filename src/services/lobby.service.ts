@@ -1,6 +1,5 @@
 import { apiClient } from "@/lib/api-client";
 import { extractApiErrorMessage, normalizeAuthIdentifier } from "@/lib/auth-mappers";
-import { getEventDayDates } from "@/lib/participation-dates";
 import { signUpLobbyUser } from "@/services/auth.service";
 import { submitLobbyRegistration } from "@/services/registration.service";
 import { findUserByEmail } from "@/services/user.service";
@@ -69,22 +68,19 @@ export const createLobbyUser = async (
 export const registerLobbyUserForEvent = async (
   userId: string,
   values: LobbyUserRegistrationFormValues,
-  event?: Pick<Event, "date" | "endDate"> | null,
+  scheduleType?: "WHOLE_DAY" | "MULTI_SESSION",
 ): Promise<Registration> => {
-  const { eventId, participationDates, participationTime, attendanceMode, foodPreference } = values;
+  const { eventId, selectedDayIds, selectedSessionIds, attendanceMode } = values;
 
   return submitLobbyRegistration(
     userId,
     {
       eventId,
-      participationDates: participationDates.length > 0
-        ? participationDates
-        : getEventDayDates(event),
-      participationTime,
+      selectedDayIds,
+      selectedSessionIds,
       attendanceMode,
-      foodPreference,
     },
-    event,
+    { scheduleType: scheduleType ?? "WHOLE_DAY" },
   );
 };
 
@@ -215,12 +211,14 @@ export const updateTranslationAssistance = async (
 export const updateRegistration = async (
   registrationId: string,
   registration: RegistrationEditFormValues,
-  event?: Pick<Event, "date" | "endDate"> | null,
+  scheduleType?: "WHOLE_DAY" | "MULTI_SESSION",
 ): Promise<void> => {
   try {
     await apiClient.put(
       `/registrations/registration/${registrationId}/`,
-      toRegistrationUpdatePayload(registration, event),
+      toRegistrationUpdatePayload(registration, {
+        scheduleType: scheduleType ?? "WHOLE_DAY",
+      }),
     );
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
@@ -375,6 +373,61 @@ export interface LobbyRegistrationsPageResult {
   hasMore: boolean;
 }
 
+export const getLobbyRegistrationDetail = async (
+  registrationId: string,
+): Promise<Registration> => {
+  try {
+    const { data } = await apiClient.get<Record<string, unknown>>(
+      `/registrations/registration/${registrationId}/`,
+    );
+    return mapApiRegistrationToRegistration(data);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const approveSessionRegistration = async (
+  registrationId: string,
+  sessionRegistrationId: string,
+): Promise<void> => {
+  try {
+    await apiClient.post(
+      `/registrations/registration/${registrationId}/sessions/${sessionRegistrationId}/approve/`,
+    );
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const rejectSessionRegistration = async (
+  registrationId: string,
+  sessionRegistrationId: string,
+): Promise<void> => {
+  try {
+    await apiClient.post(
+      `/registrations/registration/${registrationId}/sessions/${sessionRegistrationId}/reject/`,
+    );
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export type SessionBulkStatus = "APPROVED" | "REJECTED";
+
+export const bulkUpdateSessionRegistrationStatus = async (
+  ids: string[],
+  status: SessionBulkStatus,
+): Promise<void> => {
+  try {
+    await apiClient.patch("/registrations/sessions/bulk-status/", {
+      ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
+      status,
+    });
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 export const getLobbyRegistrationsPage = async (
   eventId: string,
   page = 1,
@@ -382,7 +435,7 @@ export const getLobbyRegistrationsPage = async (
 ): Promise<LobbyRegistrationsPageResult> => {
   const { data } = await apiClient.get<unknown>("/registrations/registration/", {
     params: {
-      registration__event: eventId,
+      event: eventId,
       page,
       page_size: pageSize,
     },
@@ -392,11 +445,17 @@ export const getLobbyRegistrationsPage = async (
   const registrations = list.map((raw) => mapApiRegistrationToRegistration(raw, eventId));
 
   if (data && typeof data === "object" && !Array.isArray(data)) {
-    const record = data as { count?: number; next?: string | null };
+    const record = data as {
+      count?: number;
+      next?: string | null;
+      total_pages?: number;
+      current_page?: number;
+    };
     const total = Number(record.count ?? registrations.length);
     const hasMore = Boolean(record.next);
+    const currentPage = Number(record.current_page ?? page);
 
-    return { registrations, page, pageSize, total, hasMore };
+    return { registrations, page: currentPage, pageSize, total, hasMore };
   }
 
   return {

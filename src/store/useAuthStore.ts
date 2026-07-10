@@ -5,7 +5,11 @@ import {
   clearSessionTokens,
   setSessionTokens,
 } from "@/lib/auth-session";
-import { refreshStoredAccessToken } from "@/lib/auth-token";
+import {
+  clearAccessTokenRefreshSchedule,
+  getLastAccessTokenRefreshAt,
+  markAccessTokenRefreshed,
+} from "@/lib/auth-token";
 import type { LoginCredentials, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
 interface AuthState {
@@ -76,6 +80,7 @@ export const useAuthStore = create<AuthState>()(
           const { user, token, refreshToken } = await authService.login(credentials);
           syncTokenToStorage(token, refreshToken || null);
           syncRefreshToStorage(refreshToken || null);
+          markAccessTokenRefreshed();
           set({
             user,
             token,
@@ -133,6 +138,7 @@ export const useAuthStore = create<AuthState>()(
 
           syncTokenToStorage(null);
           syncRefreshToStorage(null);
+          clearAccessTokenRefreshSchedule();
           const { useRegistrationStore } = await import("@/store/useRegistrationStore");
           useRegistrationStore.getState().clearRegistrationSession();
           set({
@@ -158,6 +164,9 @@ export const useAuthStore = create<AuthState>()(
         syncTokenToStorage(token);
 
         if (token && user) {
+          if (getLastAccessTokenRefreshAt() === 0) {
+            markAccessTokenRefreshed();
+          }
           set({ isAuthenticated: true, isLoading: false });
           return;
         }
@@ -169,14 +178,7 @@ export const useAuthStore = create<AuthState>()(
 
         set({ isLoading: true });
         try {
-          let resolvedUser = await authService.getCurrentUser();
-
-          if (!resolvedUser) {
-            const newToken = await refreshStoredAccessToken();
-            if (newToken) {
-              resolvedUser = await authService.getCurrentUser();
-            }
-          }
+          const resolvedUser = await authService.getCurrentUser();
 
           if (resolvedUser) {
             set({ user: resolvedUser, isAuthenticated: true, isLoading: false });

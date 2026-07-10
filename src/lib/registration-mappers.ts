@@ -12,6 +12,7 @@ import type {
   RegistrationStatus,
   AssistanceActionStatus,
   AssistanceRequestStatus,
+  SessionRegistration,
   TranslationAssistanceItem,
   TranslationAssistanceRow,
   MedicalAssistanceItem,
@@ -98,7 +99,7 @@ function mapApiStatus(value: unknown): RegistrationStatus {
 function mapApiRequestStatus(value: unknown): AssistanceRequestStatus {
   if (value == null || value === "") return "pending";
   const normalized = String(value).toUpperCase();
-  if (normalized === "ACCEPTED") return "accepted";
+  if (normalized === "ACCEPTED" || normalized === "APPROVED") return "accepted";
   if (normalized === "REJECTED") return "rejected";
   if (normalized === "HELD" || normalized === "ON_HELD") return "on_hold";
   return "pending";
@@ -290,36 +291,69 @@ export function toRegistrationPreferencesPayload(
   };
 }
 
+export type RegistrationScheduleType = "WHOLE_DAY" | "MULTI_SESSION";
+
 export function toRegistrationApiPayload(
   data: RegistrationFormData,
-  event?: Pick<Event, "date" | "endDate"> | null,
+  options?: {
+    userId?: string;
+    scheduleType?: RegistrationScheduleType;
+  },
 ) {
-  return {
+  const payload: Record<string, unknown> = {
     event: Number(data.eventId),
-    participation_time: mapAppParticipationTimeToApi(data.participationTime),
     attendance_mode: mapAppAttendanceModeToApi(data.attendanceMode),
-    food_preference: mapAppFoodPreferenceToApi(data.foodPreference),
-    participation_dates: resolveParticipationDatesForApi(data.participationDate, event),
   };
+
+  if (options?.userId) {
+    payload.user = Number(options.userId);
+  }
+
+  const scheduleType = options?.scheduleType ?? "WHOLE_DAY";
+
+  if (scheduleType === "MULTI_SESSION") {
+    payload.session_ids = (data.selectedSessionIds ?? [])
+      .map((id) => Number(id))
+      .filter((id) => !Number.isNaN(id));
+  } else {
+    payload.day_ids = (data.selectedDayIds ?? [])
+      .map((id) => Number(id))
+      .filter((id) => !Number.isNaN(id));
+  }
+
+  return payload;
 }
 
 export function toRegistrationUpdatePayload(
   data: Pick<
     RegistrationFormData,
-    "eventId" | "participationDate" | "participationTime" | "attendanceMode" | "foodPreference"
-  >,
-  event?: Pick<Event, "date" | "endDate"> | null,
+    | "eventId"
+    | "participationDate"
+    | "selectedDayIds"
+    | "selectedSessionIds"
+    | "attendanceMode"
+  > & {
+    participationTime?: ParticipationTime;
+  },
+  options?: {
+    userId?: string;
+    scheduleType?: RegistrationScheduleType;
+  },
 ) {
   return toRegistrationApiPayload(
     {
       ...data,
+      participationTime: data.participationTime ?? "full_day",
       salutation: "",
       firstName: "",
       lastName: "",
       phone: "",
       email: "",
     },
-    event,
+    {
+      userId: options?.userId,
+      scheduleType: options?.scheduleType ?? "WHOLE_DAY",
+    },
   );
 }
 
@@ -342,41 +376,55 @@ export function toLobbyRegistrationApiPayload(
   userId: string,
   data: {
     eventId: string;
-    participationDates: string[];
-    participationTime?: ParticipationTime;
+    selectedDayIds?: string[];
+    selectedSessionIds?: string[];
     attendanceMode?: AttendanceMode;
-    foodPreference?: FoodPreference;
   },
-  event?: Pick<Event, "date" | "endDate"> | null,
+  options?: {
+    scheduleType?: RegistrationScheduleType;
+  },
 ) {
-  return {
+  const scheduleType = options?.scheduleType ?? "WHOLE_DAY";
+  const payload: Record<string, unknown> = {
     user: Number(userId),
     event: Number(data.eventId),
-    participation_dates: resolveParticipationDateStringsForApi(data.participationDates, event),
-    participation_time: data.participationTime
-      ? mapAppParticipationTimeToApi(data.participationTime)
-      : "",
     attendance_mode: data.attendanceMode
       ? mapAppAttendanceModeToApi(data.attendanceMode)
       : "",
-    food_preference: data.foodPreference
-      ? mapAppFoodPreferenceToApi(data.foodPreference)
-      : "",
   };
+
+  if (scheduleType === "MULTI_SESSION") {
+    payload.session_ids = (data.selectedSessionIds ?? [])
+      .map((id) => Number(id))
+      .filter((id) => !Number.isNaN(id));
+  } else {
+    payload.day_ids = (data.selectedDayIds ?? [])
+      .map((id) => Number(id))
+      .filter((id) => !Number.isNaN(id));
+  }
+
+  return payload;
 }
 
 export function toAdminRegistrationApiPayload(
   userId: string,
   data: Pick<
     RegistrationFormData,
-    "eventId" | "participationDate" | "participationTime" | "attendanceMode" | "foodPreference"
+    | "eventId"
+    | "participationDate"
+    | "participationTime"
+    | "selectedDayIds"
+    | "selectedSessionIds"
+    | "attendanceMode"
   >,
-  event?: Pick<Event, "date" | "endDate"> | null,
+  options?: {
+    scheduleType?: RegistrationScheduleType;
+  },
 ) {
-  return {
-    ...toRegistrationUpdatePayload(data, event),
-    user: Number(userId),
-  };
+  return toRegistrationUpdatePayload(data, {
+    userId,
+    scheduleType: options?.scheduleType,
+  });
 }
 
 export function extractRegistrationList(data: unknown): Record<string, unknown>[] {
@@ -603,6 +651,60 @@ export function flattenMedicalAssistanceRows(
   });
 }
 
+function mapApiSessionRegistrations(raw: Record<string, unknown>): SessionRegistration[] {
+  const list = raw.session_registrations;
+  if (!Array.isArray(list)) return [];
+
+  return list.map((item) => {
+    const entry = item as Record<string, unknown>;
+    return {
+      id: String(entry.id ?? ""),
+      registrationId: String(entry.registration ?? ""),
+      scheduleItemId: String(entry.schedule_item ?? ""),
+      sessionTitle: String(entry.session_title ?? ""),
+      date: String(entry.date ?? ""),
+      startTime: String(entry.start_time ?? ""),
+      endTime: String(entry.end_time ?? ""),
+      track: String(entry.track ?? ""),
+      status: mapApiRequestStatus(entry.status) ?? "pending",
+      registeredAt: String(entry.registered_at ?? ""),
+    };
+  });
+}
+
+function mapApiSelectedDayIds(raw: Record<string, unknown>): string[] {
+  const candidates = [
+    raw.day_ids,
+    raw.selected_day_ids,
+    raw.registered_day_ids,
+  ];
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    return candidate
+      .map((item) => {
+        if (item && typeof item === "object" && "id" in item) {
+          return String((item as { id: unknown }).id);
+        }
+        return String(item ?? "");
+      })
+      .filter(Boolean);
+  }
+
+  const dayRegistrations = raw.day_registrations;
+  if (Array.isArray(dayRegistrations)) {
+    return dayRegistrations
+      .map((item) => {
+        if (!item || typeof item !== "object") return "";
+        const entry = item as Record<string, unknown>;
+        return String(entry.day ?? entry.event_day ?? entry.day_id ?? entry.id ?? "");
+      })
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 export function mapApiRegistrationToRegistration(
   raw: Record<string, unknown>,
   eventId?: string
@@ -612,6 +714,8 @@ export function mapApiRegistrationToRegistration(
   const travelAssistance = mapApiTravelAssistanceItems(raw);
   const translationAssistance = mapApiTranslationAssistanceItem(raw);
   const medicalAssistance = mapApiMedicalAssistanceItem(raw);
+  const sessionRegistrations = mapApiSessionRegistrations(raw);
+  const selectedDayIds = mapApiSelectedDayIds(raw);
   const firstTravel = travelAssistance[0];
   const travelKey = firstTravel?.transportMode ?? "";
   const legacyTravelArrangement = details.travel_arrangement ?? raw.travel_arrangement;
@@ -630,6 +734,14 @@ export function mapApiRegistrationToRegistration(
       ? apiParticipationDates.map((date) => formatParticipationDateDisplay(date)).join(", ")
       : formatParticipationDateDisplay(raw.participation_date);
 
+  const registeredSessionsRaw = raw.registered_sessions_count ?? raw.registeredSessionsCount;
+  const registeredSessionsCount =
+    registeredSessionsRaw == null || registeredSessionsRaw === ""
+      ? sessionRegistrations.length > 0
+        ? sessionRegistrations.length
+        : undefined
+      : Number(registeredSessionsRaw);
+
   return {
     id: String(raw.id ?? raw.pk ?? ""),
     userId: String(raw.user ?? raw.user_id ?? raw.userId ?? ""),
@@ -640,6 +752,11 @@ export function mapApiRegistrationToRegistration(
     participationDate,
     participationDateLabel,
     participationTime,
+    registeredSessionsCount: Number.isFinite(registeredSessionsCount)
+      ? registeredSessionsCount
+      : undefined,
+    selectedDayIds,
+    sessionRegistrations,
     attendanceMode: mapApiAttendanceMode(raw.attendance_mode),
     foodPreference: mapApiFoodPreference(raw.food_preference ?? details.food_preference),
     travelAssistance,

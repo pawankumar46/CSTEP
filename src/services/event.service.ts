@@ -2,12 +2,20 @@ import { apiClient } from "@/lib/api-client";
 import { extractApiErrorMessage } from "@/lib/auth-mappers";
 import {
   extractEventList,
+  mapApiEventDropdownOption,
   mapApiEventToEvent,
   mapApiUpcomingEvent,
   toCreateEventPayload,
   toUpdateEventPayload,
 } from "@/lib/event-mappers";
-import type { CreateEventPayload, Event, EventListType, UpcomingEvent, UpdateEventPayload } from "@/types";
+import type {
+  CreateEventPayload,
+  Event,
+  EventDropdownOption,
+  EventListType,
+  UpcomingEvent,
+  UpdateEventPayload,
+} from "@/types";
 
 export interface EventDay {
   id: string;
@@ -41,12 +49,23 @@ export interface ScheduleItemRecord {
   description: string;
   startTime: string;
   endTime: string;
+  speakerName: string;
 }
 
 export const getUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
   try {
     const { data } = await apiClient.get<unknown>("/events/event/upcoming/");
     return extractEventList(data).map(mapApiUpcomingEvent);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+/** Events for registration dropdown (Step 1). */
+export const getEventDropdown = async (): Promise<EventDropdownOption[]> => {
+  try {
+    const { data } = await apiClient.get<unknown>("/events/event/dropdown/");
+    return extractEventList(data).map(mapApiEventDropdownOption);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
@@ -146,23 +165,39 @@ export const createScheduleItem = async (
   }
 };
 
-export const getScheduleItems = async (dayId: number): Promise<ScheduleItemRecord[]> => {
+export const getScheduleItems = async (dayId: string | number): Promise<ScheduleItemRecord[]> => {
   try {
     const { data } = await apiClient.get<unknown>("/events/schedule-items/", {
       params: { day: dayId },
     });
-    return extractEventList(data).map((item) => ({
-      id: String(item.id ?? ""),
-      itemType: String(item.item_type ?? "SESSION"),
-      title: String(item.title ?? ""),
-      description: String(item.description ?? ""),
-      startTime: String(item.start_time ?? "00:00:00"),
-      endTime: String(item.end_time ?? "00:00:00"),
-    }));
+    return mapScheduleItemList(data);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
 };
+
+export const getScheduleItemsDropdown = async (dayId: string | number): Promise<ScheduleItemRecord[]> => {
+  try {
+    const { data } = await apiClient.get<unknown>("/events/schedule-items/dropdown/", {
+      params: { day: dayId },
+    });
+    return mapScheduleItemList(data);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+function mapScheduleItemList(data: unknown): ScheduleItemRecord[] {
+  return extractEventList(data).map((item) => ({
+    id: String(item.id ?? ""),
+    itemType: String(item.item_type ?? item.itemType ?? "SESSION"),
+    title: String(item.title ?? ""),
+    description: String(item.description ?? ""),
+    startTime: String(item.start_time ?? item.startTime ?? "00:00:00"),
+    endTime: String(item.end_time ?? item.endTime ?? "00:00:00"),
+    speakerName: String(item.speaker_name ?? item.speakerName ?? ""),
+  }));
+}
 
 export const deleteScheduleItem = async (scheduleItemId: string): Promise<void> => {
   try {

@@ -58,6 +58,7 @@ interface LobbyState {
   accommodationAssistanceLoading: boolean;
   accommodationPagination: AssistancePaginationState;
   error: string | null;
+  clearError: () => void;
   setSelectedEventId: (eventId: string | null) => void;
   fetchRegistrations: (eventId: string) => Promise<void>;
   fetchTravelAssistance: (eventId: string, page?: number) => Promise<void>;
@@ -80,12 +81,12 @@ interface LobbyState {
   updateTravelAssistance: (id: string, values: TravelEditFormValues) => Promise<void>;
   updateMedicalAssistance: (id: string, values: MedicalEditFormValues) => Promise<void>;
   updateTranslationAssistance: (id: string, values: TranslationEditFormValues) => Promise<void>;
-  updateRegistration: (id: string, values: RegistrationEditFormValues, event?: Pick<Event, "date" | "endDate"> | null) => Promise<void>;
+  updateRegistration: (id: string, values: RegistrationEditFormValues, scheduleType?: "WHOLE_DAY" | "MULTI_SESSION") => Promise<void>;
   signUpLobbyUser: (values: LobbyUserSignupFormValues) => Promise<string>;
   registerLobbyUser: (
     userId: string,
     values: LobbyUserRegistrationFormValues,
-    event?: Pick<Event, "date" | "endDate"> | null,
+    scheduleType?: "WHOLE_DAY" | "MULTI_SESSION",
   ) => Promise<void>;
 }
 
@@ -106,6 +107,8 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
   accommodationAssistanceLoading: false,
   accommodationPagination: EMPTY_ASSISTANCE_PAGINATION,
   error: null,
+
+  clearError: () => set({ error: null }),
 
   setSelectedEventId: (eventId) => {
     set({
@@ -446,12 +449,12 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     }
   },
 
-  updateRegistration: async (id, values, event) => {
+  updateRegistration: async (id, values, scheduleType) => {
     const eventId = get().selectedEventId;
     if (!eventId) throw new Error("No event selected");
 
     try {
-      await lobbyService.updateRegistration(id, values, event);
+      await lobbyService.updateRegistration(id, values, scheduleType);
       await get().fetchRegistrations(eventId);
       set({ error: null });
     } catch (err) {
@@ -471,12 +474,12 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     }
   },
 
-  registerLobbyUser: async (userId, values, event) => {
+  registerLobbyUser: async (userId, values, scheduleType) => {
     const eventId = values.eventId || get().selectedEventId;
     if (!eventId) throw new Error("No event selected");
 
     try {
-      await lobbyService.registerLobbyUserForEvent(userId, values, event);
+      await lobbyService.registerLobbyUserForEvent(userId, values, scheduleType);
       await get().fetchRegistrations(eventId);
       set({ selectedEventId: eventId, error: null });
     } catch (err) {

@@ -313,7 +313,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/registrations/` | User's registrations |
-| `POST` | `/registrations/registration/` | Create registration (user / lobby / admin); `participation_dates` is `string[]` e.g. `["2025-03-01", "2025-03-02"]` |
+| `POST` | `/registrations/registration/` | Create registration (user / lobby / admin); `participation_dates` is `string[]`; optional `schedule_items` is `number[]` for multi-session events |
 | `PUT` | `/registrations/registration/:id/` | Update registration |
 | `PATCH` | `/registrations/registration/bulk-status/` | Bulk status: `{ ids, status }` |
 | `PATCH` | `/registrations/:id/` | Update registration preferences |
@@ -462,6 +462,32 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 - **Analytics overview:** Registration Trend and Participation Trend charts moved to `/dashboard/analytics`; trends appear **after selecting an event** (with period/mode filters).
 - **Lobby — Manage Sessions timeline:** Timeline window is now **9 AM–6 PM** (was 24-hour); removed empty-slot **Open for networking** blocks from the timeline.
 - **Attendance mode analytics:** Physical/Virtual registrations table at `/dashboard/analytics/attendance-mode` now supports **Excel/PDF export** (all matching registrations, not just the current page).
+- **Live streaming view modes:** `/streaming` player controls offer **Default**, **Theater**, and **Full screen** — theater widens the player, increases height (16:9 scale), and moves live chat below the video (YouTube-style).
+- **Live streaming theater sizing:** Tuned theater view dimensions to be slightly smaller for better balance on laptop screens while staying larger than default view.
+- **Live streaming theater layout:** Theater mode now uses a balanced grid — wide player on top; event info, current speaker, agenda, and moderator controls on the left; live chat fills the right column with matched height and no wasted space.
+- **Hydration warning hardening:** Added `suppressHydrationWarning` to shared form controls (`Input`, `Textarea`, `Button`, `Checkbox`) to avoid noisy extension-injected attribute mismatches (for example `fdprocessedid`) during hydration.
+- **Event registration — Step 1:** Event dropdown now loads from `GET /events/event/dropdown/` (`id`, `title`, `scheduled_start`, `scheduled_end`, `schedule_type`) instead of the upcoming events list.
+- **Event registration — Step 3:** Participation dates now load from `GET /events/event-days/?event=<id>`; removed **Time of Participation** from the form. For `MULTI_SESSION`, selecting a day fetches `GET /events/schedule-items/dropdown/?day=<dayId>` and shows selectable session cards (multi-select: title, start/end, speaker) before attendance mode; selected ids are sent as `session_ids` on registration submit. For `WHOLE_DAY`, users proceed with only day + attendance mode.
+- **Registration session dropdown:** Event registration, Manage Lobby Add Users, and Edit registration now load session options from `GET /events/schedule-items/dropdown/?day=<id>` (Manage Sessions timeline still uses `GET /events/schedule-items/?day=<id>`).
+- **Event registration — session cards:** Replaced nested `<button>` + `Checkbox` with a single `role="button"` card and decorative check indicator to fix invalid DOM nesting / hydration warnings.
+- **Event registration — API payload:** Registration submit now sends `user`, `event`, `attendance_mode`, and `food_preference`. **MULTI_SESSION** events send `session_ids` (selected schedule items). **WHOLE_DAY** events send `day_ids` (multi-select event days). WHOLE_DAY step 3 UI now supports selecting multiple days.
+- **Manage Lobby — registration list:** `GET /registrations/registration/` now filters with `event=<id>` (was `registration__event`). Table/export map the new response fields: `registered_sessions_count`, `attendance_mode`, `food_preference` (replacing participation date/time columns).
+- **Manage Lobby — session details:** Moderators/event admins can click a non-zero Sessions count to open a modal that loads `GET /registrations/registration/{id}/` and lists `session_registrations` (title, date, time, track, status).
+- **Manage Lobby — session approve/reject:** Sessions in the modal show **Approve** / **Reject** so status can be changed again after a decision (Approve hidden when already accepted; Reject hidden when already rejected). Posts to `/registrations/registration/{registration_id}/sessions/{session_reg_id}/approve/` and `.../reject/`, then refreshes the list.
+- **Manage Lobby — session bulk status:** Select multiple sessions in the modal and bulk **Approve** / **Reject** via `PATCH /registrations/sessions/bulk-status/` with `{ ids, status: "APPROVED" | "REJECTED" }`.
+- **Manage Lobby — Add Users:** Step 2 registration now matches public event registration — **WHOLE_DAY** multi-selects `day_ids`; **MULTI_SESSION** picks a day then multi-selects sessions as `session_ids`. Removed participation time / legacy `participation_dates` from this flow.
+- **Manage Lobby — Edit registration:** Edit dialog now uses the same **WHOLE_DAY** (`day_ids`) / **MULTI_SESSION** (`session_ids`) flow; loads current selections from registration detail and removes participation time / legacy date radios.
+- **Manage Lobby — Edit error popup:** Failed registration updates (e.g. 400 “already registered”) show the API error in a popup with an **OK** button instead of an uncaught promise.
+- **Manage Lobby — transient errors:** Page-level red error banner auto-dismisses after 5 seconds.
+- **Address fields:** All address inputs are required (with trim validation) except **Address line 2 (optional)** — applies to signup and Manage Lobby Add Users.
+- **Event registration — API loop fix:** Stopped retrying lobby `GET /registrations/registration/` on **403** (permission denied) via token refresh, which was causing repeated `registration` + `refresh` calls on `/event-register`. Lobby data is now refetched after token refresh only for **staff** on the matching **dashboard** route (registrations only on `/dashboard/lobby`). Session fetch on Step 3 no longer clears selections on every effect run when the day is unchanged.
+- **Event registration — session cards:** Removed the left fade overlay on the session carousel and added inner padding so the first card’s border is no longer clipped.
+- **Auth token refresh:** `POST /auth/token/refresh/` now runs only on the **25-minute interval** in `AuthProvider`. Removed tab-focus refresh, 401 interceptor refresh, and hydrate-time refresh; a shared throttle skips duplicate refresh calls within the interval.
+- **Event registration — food preference removed:** Dropped the Food step from `/event-register` (now 4 steps: Event → Personal Info → Participation → Review). Public registration submit no longer sends `food_preference` in the API payload.
+- **Manage Lobby / admin registration — food preference removed:** Add Users and Edit registration no longer collect or send `food_preference`; lobby table and export no longer include a Food column.
+- **Manage Sessions — start time picker:** Add/Edit session modal now uses **12-hour AM/PM** selects (hour, minute, period) instead of the browser 24-hour time input.
+- **Manage Sessions — time dropdown clipping:** Hour/minute/period dropdowns in the Add/Edit session modal now open upward to avoid being cut off near the modal bottom.
+- **Manage Sessions — valid hour options:** Start-time hour options now match the timeline window by period (**AM:** 9,10,11; **PM:** 12,1,2,3,4,5), so users can always pick valid times like 9 AM without hidden scroll.
 
 ### 2026-07-04
 

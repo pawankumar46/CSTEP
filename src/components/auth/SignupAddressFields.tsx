@@ -15,6 +15,10 @@ interface SignupAddressFieldsProps<T extends AddressFormShape> {
   idPrefix?: string;
 }
 
+function RequiredMark() {
+  return <span className="text-destructive" aria-hidden>*</span>;
+}
+
 export function SignupAddressFields<T extends AddressFormShape>({
   register,
   errors,
@@ -28,7 +32,9 @@ export function SignupAddressFields<T extends AddressFormShape>({
       <p className="text-sm font-medium">Address</p>
 
       <div className="space-y-2">
-        <Label htmlFor={`${prefix}address-line-1`}>Address line 1</Label>
+        <Label htmlFor={`${prefix}address-line-1`}>
+          Address line 1 <RequiredMark />
+        </Label>
         <Input
           id={`${prefix}address-line-1`}
           placeholder="Street address"
@@ -50,14 +56,18 @@ export function SignupAddressFields<T extends AddressFormShape>({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor={`${prefix}city`}>City</Label>
+          <Label htmlFor={`${prefix}city`}>
+            City <RequiredMark />
+          </Label>
           <Input id={`${prefix}city`} {...register("address.city" as never)} />
           {addressErrors?.city && (
             <p className="text-xs text-destructive">{addressErrors.city.message}</p>
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor={`${prefix}district`}>District</Label>
+          <Label htmlFor={`${prefix}district`}>
+            District <RequiredMark />
+          </Label>
           <Input id={`${prefix}district`} {...register("address.district" as never)} />
           {addressErrors?.district && (
             <p className="text-xs text-destructive">{addressErrors.district.message}</p>
@@ -67,14 +77,18 @@ export function SignupAddressFields<T extends AddressFormShape>({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor={`${prefix}state`}>State</Label>
+          <Label htmlFor={`${prefix}state`}>
+            State <RequiredMark />
+          </Label>
           <Input id={`${prefix}state`} {...register("address.state" as never)} />
           {addressErrors?.state && (
             <p className="text-xs text-destructive">{addressErrors.state.message}</p>
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor={`${prefix}country`}>Country</Label>
+          <Label htmlFor={`${prefix}country`}>
+            Country <RequiredMark />
+          </Label>
           <Input id={`${prefix}country`} {...register("address.country" as never)} />
           {addressErrors?.country && (
             <p className="text-xs text-destructive">{addressErrors.country.message}</p>
@@ -83,7 +97,9 @@ export function SignupAddressFields<T extends AddressFormShape>({
       </div>
 
       <div className="space-y-2 max-w-xs">
-        <Label htmlFor={`${prefix}postal-code`}>Postal code</Label>
+        <Label htmlFor={`${prefix}postal-code`}>
+          Postal code <RequiredMark />
+        </Label>
         <Input id={`${prefix}postal-code`} {...register("address.postalCode" as never)} />
         {addressErrors?.postalCode && (
           <p className="text-xs text-destructive">{addressErrors.postalCode.message}</p>

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AUTH_SESSION_REFRESHED_EVENT } from "@/lib/auth-session";
+import { isStaffRole } from "@/lib/auth-utils";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
   ACCESS_TOKEN_REFRESH_INTERVAL_MS,
@@ -40,17 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const intervalId = window.setInterval(refreshSession, ACCESS_TOKEN_REFRESH_INTERVAL_MS);
 
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        refreshSession();
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisible);
-
     return () => {
       window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [isAuthenticated, refreshToken]);
 
@@ -64,7 +56,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { selectedEventId } = useLobbyStore.getState();
         if (!selectedEventId) return;
 
+        const authUser = useAuthStore.getState().user;
+        if (!authUser || !isStaffRole(authUser.role)) return;
+
         const path = window.location.pathname;
+        if (!path.startsWith("/dashboard")) return;
+
         if (path.includes("/dashboard/travel")) {
           void useLobbyStore.getState().fetchTravelAssistance(selectedEventId);
           return;
@@ -81,8 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           void useLobbyStore.getState().fetchAccommodationAssistance(selectedEventId);
           return;
         }
-
-        void useLobbyStore.getState().fetchRegistrations(selectedEventId);
+        if (path.includes("/dashboard/lobby")) {
+          void useLobbyStore.getState().fetchRegistrations(selectedEventId);
+        }
       });
     };
 

@@ -1,6 +1,7 @@
 import type {
   CreateEventPayload,
   Event,
+  EventDropdownOption,
   EventScheduleType,
   EventRegistrationSummary,
   EventStatus,
@@ -87,6 +88,22 @@ export function mapApiUpcomingEvent(raw: Record<string, unknown>): UpcomingEvent
     isRegistered: Boolean(raw.is_registered ?? raw.isRegistered),
     registeredCount: summary?.totalRegisteredUsers ?? base.registeredCount,
     summary,
+  };
+}
+
+export function mapApiEventDropdownOption(raw: Record<string, unknown>): EventDropdownOption {
+  const scheduleTypeRaw = String(raw.schedule_type ?? raw.scheduleType ?? "").toUpperCase();
+  const scheduleType =
+    scheduleTypeRaw === "WHOLE_DAY" || scheduleTypeRaw === "MULTI_SESSION"
+      ? (scheduleTypeRaw as EventScheduleType)
+      : undefined;
+
+  return {
+    id: String(raw.id ?? raw.pk ?? ""),
+    name: String(raw.title ?? raw.name ?? "Untitled Event"),
+    date: String(raw.scheduled_start ?? raw.date ?? ""),
+    endDate: raw.scheduled_end ? String(raw.scheduled_end) : undefined,
+    scheduleType,
   };
 }
 

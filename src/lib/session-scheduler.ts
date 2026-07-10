@@ -55,6 +55,42 @@ export function timeInputToMinutes(value: string): number {
   return h * 60 + m;
 }
 
+export type TwelveHourPeriod = "AM" | "PM";
+
+export interface TwelveHourParts {
+  hour12: number;
+  minute: number;
+  period: TwelveHourPeriod;
+}
+
+export function timeInputTo12HourParts(value: string): TwelveHourParts {
+  const totalMinutes = timeInputToMinutes(value);
+  const h24 = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return {
+    hour12: h24 % 12 || 12,
+    minute,
+    period: h24 >= 12 ? "PM" : "AM",
+  };
+}
+
+export function twelveHourPartsToTimeInput({
+  hour12,
+  minute,
+  period,
+}: TwelveHourParts): string {
+  let h24 = hour12 % 12;
+  if (period === "PM") h24 += 12;
+  return minutesToTimeInput(h24 * 60 + minute);
+}
+
+export const SCHEDULER_HOUR_12_OPTIONS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
+
+export const SCHEDULER_MINUTE_OPTIONS = Array.from(
+  { length: 60 / SCHEDULER_SNAP_MINUTES },
+  (_, index) => index * SCHEDULER_SNAP_MINUTES,
+);
+
 export function snapMinutes(minutes: number): number {
   return Math.round(minutes / SCHEDULER_SNAP_MINUTES) * SCHEDULER_SNAP_MINUTES;
 }

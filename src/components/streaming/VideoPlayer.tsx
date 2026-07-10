@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Play, Pause, Volume2, VolumeX, Maximize, Loader2, RefreshCw } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Loader2, RefreshCw, LayoutPanelLeft, RectangleHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
 import { LIVE_STREAM_FILE_ID } from "@/lib/constants";
+import { THEATER_PLAYER_CLASS, type StreamViewMode } from "@/lib/stream-view";
 
 const BUFFERING_TIMEOUT_MS = 20000;
 const IFRAME_LOAD_TIMEOUT_MS = 20000;
@@ -23,6 +24,8 @@ export interface VideoPlayerProps {
   onPause?: () => void;
   onResume?: () => void;
   onMute?: () => void;
+  viewMode?: StreamViewMode;
+  onViewModeChange?: (mode: StreamViewMode) => void;
   fill?: boolean;
   className?: string;
 }
@@ -37,6 +40,8 @@ export function VideoPlayer({
   onPause,
   onResume,
   onMute,
+  viewMode = "default",
+  onViewModeChange,
   fill = false,
   className,
 }: VideoPlayerProps) {
@@ -49,6 +54,16 @@ export function VideoPlayer({
   const [needsUserPlay, setNeedsUserPlay] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     if (!streamUrl) {
@@ -229,6 +244,15 @@ export function VideoPlayer({
     }
   };
 
+  const handleViewModeChange = (mode: StreamViewMode) => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    }
+    onViewModeChange?.(mode);
+  };
+
+  const showViewControls = Boolean(onViewModeChange);
+
   const handleUserPlay = async () => {
     onResume?.();
     const played = await tryPlayVideo();
@@ -269,8 +293,8 @@ export function VideoPlayer({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full bg-black overflow-hidden group",
-        fill ? "h-full min-h-0" : "aspect-video rounded-xl",
+        "relative w-full bg-black overflow-hidden group transition-all duration-300 ease-in-out",
+        fill ? "h-full min-h-0" : viewMode === "theater" ? THEATER_PLAYER_CLASS : "aspect-video rounded-xl",
         className,
       )}
     >
@@ -405,7 +429,7 @@ export function VideoPlayer({
         </div>
       )}
 
-      {!usesIframe && (
+      {(showViewControls || !usesIframe) && (
         <div
           className={cn(
             "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",
@@ -414,7 +438,7 @@ export function VideoPlayer({
         >
           <div className="flex items-center justify-between gap-4">
             <p className="text-white text-sm font-medium truncate">{title}</p>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
               {usesVideo && !playbackError && (
                 <>
                   {isPaused || needsUserPlay ? (
@@ -423,26 +447,74 @@ export function VideoPlayer({
                       variant="ghost"
                       className="h-8 w-8 text-white hover:bg-white/20"
                       onClick={needsUserPlay ? handleUserPlay : onResume}
+                      title={isPaused ? "Resume" : "Play"}
                     >
                       <Play className="h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onPause}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-white hover:bg-white/20"
+                      onClick={onPause}
+                      title="Pause"
+                    >
                       <Pause className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" onClick={onMute}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-white hover:bg-white/20"
+                    onClick={onMute}
+                    title={isMuted ? "Unmute" : "Mute"}
+                  >
                     {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+                </>
+              )}
+              {showViewControls && (
+                <>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "h-8 w-8 text-white hover:bg-white/20",
+                      viewMode === "default" && "bg-white/20",
+                    )}
+                    onClick={() => handleViewModeChange("default")}
+                    title="Default view"
+                    aria-pressed={viewMode === "default"}
+                  >
+                    <LayoutPanelLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "h-8 w-8 text-white hover:bg-white/20",
+                      viewMode === "theater" && "bg-white/20",
+                    )}
+                    onClick={() => handleViewModeChange("theater")}
+                    title="Theater view"
+                    aria-pressed={viewMode === "theater"}
+                  >
+                    <RectangleHorizontal className="h-4 w-4" />
                   </Button>
                 </>
               )}
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-white hover:bg-white/20"
+                className={cn(
+                  "h-8 w-8 text-white hover:bg-white/20",
+                  isFullscreen && "bg-white/20",
+                )}
                 onClick={toggleFullscreen}
+                title={isFullscreen ? "Exit full screen" : "Full screen"}
+                aria-pressed={isFullscreen}
               >
-                <Maximize className="h-4 w-4" />
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
               </Button>
             </div>
           </div>

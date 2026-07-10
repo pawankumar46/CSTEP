@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { THEATER_PLAYER_CLASS, type StreamViewMode } from "@/lib/stream-view";
 import { VideoPlayer, type VideoPlayerProps } from "@/components/streaming/VideoPlayer";
 
 interface StreamPlayerFrameProps extends VideoPlayerProps {
@@ -19,19 +20,31 @@ export function StreamPlayerFrame({
   rightBannerUrl,
   leftBannerAlt = "Event sponsor banner",
   rightBannerAlt = "Event sponsor banner",
+  viewMode = "default",
   className,
   ...playerProps
 }: StreamPlayerFrameProps) {
-  const showBanners = Boolean(leftBannerUrl || rightBannerUrl);
+  const isTheater = viewMode === "theater";
+  const showBanners = Boolean(leftBannerUrl || rightBannerUrl) && !isTheater;
 
   if (!showBanners) {
-    return <VideoPlayer {...playerProps} className={className} />;
+    return (
+      <VideoPlayer
+        {...playerProps}
+        viewMode={viewMode}
+        className={cn(
+          "w-full rounded-xl transition-all duration-300 ease-in-out",
+          isTheater ? THEATER_PLAYER_CLASS : "aspect-video",
+          className,
+        )}
+      />
+    );
   }
 
   return (
     <div
       className={cn(
-        "grid w-full items-stretch overflow-hidden rounded-xl",
+        "grid w-full items-stretch overflow-hidden rounded-xl transition-all duration-300 ease-in-out",
         "md:grid-cols-[6rem_1fr_6rem] lg:grid-cols-[8rem_1fr_8rem] xl:grid-cols-[9rem_1fr_9rem]",
         className,
       )}
@@ -47,8 +60,8 @@ export function StreamPlayerFrame({
         <div className="hidden md:block" />
       )}
 
-      <div className="relative min-w-0 aspect-video min-h-0 bg-black md:aspect-auto md:h-full">
-        <VideoPlayer {...playerProps} fill className="absolute inset-0 rounded-none" />
+      <div className="relative min-w-0 aspect-video min-h-0 bg-black">
+        <VideoPlayer {...playerProps} viewMode={viewMode} fill className="absolute inset-0 rounded-none" />
       </div>
 
       {rightBannerUrl ? (

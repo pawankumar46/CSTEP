@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
@@ -37,25 +37,44 @@ import {
   type TimelineItem,
   type TimelineItemType,
 } from "@/lib/session-scheduler";
+import { SchedulerTimePicker } from "@/components/dashboard/session-scheduler/SchedulerTimePicker";
 
-const formSchema = z.object({
-  sessionType: z.enum([
-    "SESSION",
-    "BREAKFAST_BREAK",
-    "TEA_BREAK",
-    "LUNCH_BREAK",
-    "DINNER_BREAK",
-    "NETWORKING_BREAK",
-    "CUSTOM_BREAK",
-  ]),
-  label: z.string().trim().min(1, "Label is required"),
-  startTime: z.string().min(1, "Start time is required"),
-  duration: z
-    .number({ error: "Duration is required" })
-    .int()
-    .min(5, "Minimum duration is 5 minutes")
-    .max(SCHEDULER_DAY_END_MINUTES - SCHEDULER_DAY_START_MINUTES, "Duration is too long"),
-});
+const formSchema = z
+  .object({
+    sessionType: z.enum([
+      "SESSION",
+      "BREAKFAST_BREAK",
+      "TEA_BREAK",
+      "LUNCH_BREAK",
+      "DINNER_BREAK",
+      "NETWORKING_BREAK",
+      "CUSTOM_BREAK",
+    ]),
+    label: z.string().trim().min(1, "Label is required"),
+    startTime: z.string().min(1, "Start time is required"),
+    duration: z
+      .number({ error: "Duration is required" })
+      .int()
+      .min(5, "Minimum duration is 5 minutes")
+      .max(SCHEDULER_DAY_END_MINUTES - SCHEDULER_DAY_START_MINUTES, "Duration is too long"),
+  })
+  .superRefine((data, ctx) => {
+    const start = timeInputToMinutes(data.startTime);
+    if (start < SCHEDULER_DAY_START_MINUTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Start time cannot be before 9:00 AM",
+        path: ["startTime"],
+      });
+    }
+    if (start > SCHEDULER_DAY_END_MINUTES - 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Start time cannot be after 5:55 PM",
+        path: ["startTime"],
+      });
+    }
+  });
 
 export type SessionItemFormValues = z.infer<typeof formSchema>;
 
@@ -98,6 +117,7 @@ export function SessionItemModal({
     watch,
     setValue,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<SessionItemFormValues>({
     resolver: zodResolver(formSchema),
@@ -177,20 +197,19 @@ export function SessionItemModal({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="session-start">Start time</Label>
-            <Input
-              id="session-start"
-              type="time"
-              className="tabular-nums"
-              min={minutesToTimeInput(SCHEDULER_DAY_START_MINUTES)}
-              max={minutesToTimeInput(SCHEDULER_DAY_END_MINUTES - 5)}
-              {...register("startTime")}
-            />
-            {errors.startTime && (
-              <p className="text-sm text-destructive">{errors.startTime.message}</p>
+          <Controller
+            name="startTime"
+            control={control}
+            render={({ field }) => (
+              <SchedulerTimePicker
+                id="session-start"
+                label="Start time"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.startTime?.message}
+              />
             )}
-          </div>
+          />
 
           <div className="space-y-2">
             <Label htmlFor="session-duration">Duration (minutes)</Label>

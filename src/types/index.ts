@@ -58,6 +58,15 @@ export interface UpcomingEvent extends Event {
   summary?: EventRegistrationSummary;
 }
 
+/** Lightweight event option from GET /events/event/dropdown/ */
+export interface EventDropdownOption {
+  id: string;
+  name: string;
+  date: string;
+  endDate?: string;
+  scheduleType?: EventScheduleType;
+}
+
 export interface CreateEventPayload {
   title: string;
   description: string;
@@ -192,6 +201,19 @@ export interface AccommodationAssistanceRow extends AccommodationAssistanceItem 
   phone: string;
 }
 
+export interface SessionRegistration {
+  id: string;
+  registrationId: string;
+  scheduleItemId: string;
+  sessionTitle: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  track: string;
+  status: AssistanceRequestStatus;
+  registeredAt: string;
+}
+
 export interface Registration {
   id: string;
   userId: string;
@@ -202,6 +224,9 @@ export interface Registration {
   participationDate: ParticipationDate;
   participationDateLabel?: string;
   participationTime: ParticipationTime;
+  registeredSessionsCount?: number;
+  selectedDayIds?: string[];
+  sessionRegistrations?: SessionRegistration[];
   attendanceMode: AttendanceMode;
   foodPreference: FoodPreference;
   travelAssistance?: TravelAssistanceItem[];
@@ -460,10 +485,11 @@ export interface RegistrationFormData {
   lastName: string;
   phone: string;
   email: string;
-  participationDate: ParticipationDate;
+  participationDate?: ParticipationDate;
   participationTime: ParticipationTime;
+  selectedDayIds?: string[];
+  selectedSessionIds?: string[];
   attendanceMode: AttendanceMode;
-  foodPreference: FoodPreference;
 }
 
 export type ApiUserRole = "BASE_USER" | "MODERATOR" | "EVENT_ADMIN" | "SUPER_ADMIN";

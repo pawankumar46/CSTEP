@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { AlreadyRegisteredError } from "@/services/registration.service";
 import * as registrationService from "@/services/registration.service";
-import type { Event, PaginatedResponse, Registration, RegistrationFormData, RegistrationStatus } from "@/types";
+import type { PaginatedResponse, Registration, RegistrationFormData, RegistrationStatus } from "@/types";
+import type { SubmitRegistrationOptions } from "@/services/registration.service";
 
 interface RegistrationState {
   registrations: Registration[];
@@ -16,7 +17,7 @@ interface RegistrationState {
   updateStatus: (id: string, status: RegistrationStatus) => Promise<void>;
   submitRegistration: (
     data: RegistrationFormData,
-    event?: Pick<Event, "date" | "endDate"> | null,
+    options?: SubmitRegistrationOptions,
   ) => Promise<Registration>;
   checkUserRegistration: (email: string) => Promise<boolean>;
   clearRegistrationSession: () => void;
@@ -76,10 +77,10 @@ export const useRegistrationStore = create<RegistrationState>()(
     }
   },
 
-  submitRegistration: async (data, event) => {
+  submitRegistration: async (data, options) => {
     set({ isLoading: true, error: null });
     try {
-      const registration = await registrationService.submitRegistration(data, event);
+      const registration = await registrationService.submitRegistration(data, options);
       set({
         registrations: [registration, ...get().registrations],
         isEventRegistered: true,

@@ -48,6 +48,58 @@ function getUniqueCalendarDays(start: Date, end: Date): Date[] {
   return days;
 }
 
+function formatIsoDateLabel(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  return formatDayLabel(parsed);
+}
+
+export interface EventDayDateSource {
+  date: string;
+  label?: string;
+}
+
+export function buildParticipationDateOptionsFromEventDays(
+  days: EventDayDateSource[],
+  includeAllDays = true,
+): ParticipationDateOption[] {
+  const sorted = [...days]
+    .filter((day) => Boolean(day.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const dayOptions = sorted.map((day) => ({
+    value: day.date,
+    label: day.label?.trim() ? day.label.trim() : formatIsoDateLabel(day.date),
+  }));
+
+  if (includeAllDays && dayOptions.length > 1) {
+    const allDaysLabel = dayOptions.map((option) => option.label).join(" & ");
+    const multiDayHeading = dayOptions.length === 2 ? "Both Days" : "All Days";
+
+    dayOptions.push({
+      value: "both_days",
+      label: `${multiDayHeading} (${allDaysLabel})`,
+    });
+  }
+
+  return dayOptions;
+}
+
+export function getParticipationEventRangeFromDays(
+  days: EventDayDateSource[],
+): Pick<Event, "date" | "endDate"> | null {
+  const sorted = [...days]
+    .filter((day) => Boolean(day.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (sorted.length === 0) return null;
+
+  return {
+    date: sorted[0].date,
+    endDate: sorted[sorted.length - 1].date,
+  };
+}
+
 export function getParticipationDateOptions(
   event?: Pick<Event, "date" | "endDate"> | null,
 ): ParticipationDateOption[] {

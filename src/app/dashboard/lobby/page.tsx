@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { EventSelectCard } from "@/components/dashboard/EventSelectCard";
 import { AddLobbyUsersDialog } from "@/components/dashboard/AddLobbyUsersDialog";
 import { EditRegistrationDialog } from "@/components/dashboard/EditRegistrationDialog";
+import { SessionRegistrationsDialog } from "@/components/dashboard/SessionRegistrationsDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,8 +23,9 @@ import { slugifyFilename } from "@/lib/export-utils";
 import {
   LOBBY_EXPORT_COLUMNS,
 } from "@/lib/registration-export";
+import { getRegistrationOptionLabel } from "@/lib/registration-options";
 import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
-import type { Event, Registration, RegistrationStatus, UserRole } from "@/types";
+import type { Registration, RegistrationStatus, UserRole } from "@/types";
 
 const statusVariant: Record<RegistrationStatus, "default" | "secondary" | "success" | "warning" | "destructive"> = {
   pending: "warning",
@@ -51,6 +53,7 @@ function LobbyContent() {
     registrations,
     registrationsLoading,
     error,
+    clearError,
     setSelectedEventId,
     fetchRegistrations,
     bulkUpdateStatus,
@@ -62,6 +65,8 @@ function LobbyContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editRegistrationOpen, setEditRegistrationOpen] = useState(false);
   const [editingRegistration, setEditingRegistration] = useState<Registration | null>(null);
+  const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
+  const [sessionsRegistration, setSessionsRegistration] = useState<Registration | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState<RegistrationStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -69,6 +74,16 @@ function LobbyContent() {
   selectedIdsRef.current = selectedIds;
 
   const canManage = user ? LOBBY_ACTION_ROLES.includes(user.role) : false;
+
+  useEffect(() => {
+    if (!error) return;
+
+    const timer = window.setTimeout(() => {
+      clearError();
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [error, clearError]);
 
   useEffect(() => {
     fetchEvents("upcoming");
@@ -129,15 +144,20 @@ function LobbyContent() {
   const handleEditRegistration = async (
     id: string,
     values: RegistrationEditFormValues,
-    event?: Pick<Event, "date" | "endDate"> | null,
+    scheduleType?: "WHOLE_DAY" | "MULTI_SESSION",
   ) => {
-    await updateRegistration(id, values, event);
+    await updateRegistration(id, values, scheduleType);
   };
 
   const openEditDialog = (registration: Registration) => {
     setEditingRegistration(registration);
     setEditRegistrationOpen(true);
   };
+
+  const openSessionsDialog = useCallback((registration: Registration) => {
+    setSessionsRegistration(registration);
+    setSessionsDialogOpen(true);
+  }, []);
 
   const resolveActionIds = useCallback((rowId: string) => {
     const currentSelected = selectedIdsRef.current;
@@ -185,14 +205,31 @@ function LobbyContent() {
       { accessorKey: "phone", header: "Phone Number" },
       { accessorKey: "email", header: "Email" },
       {
-        accessorKey: "participationDate",
-        header: "Participation Date",
-        cell: ({ row }) => row.original.participationDateLabel ?? row.original.participationDate,
+        accessorKey: "registeredSessionsCount",
+        header: "Sessions",
+        cell: ({ row }) => {
+          const count = row.original.registeredSessionsCount ?? 0;
+          if (!canManage || count === 0) {
+            return <span className="tabular-nums">{count}</span>;
+          }
+          return (
+            <button
+              type="button"
+              className="tabular-nums font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              onClick={() => openSessionsDialog(row.original)}
+              aria-label={`View ${count} sessions for ${row.original.userName}`}
+            >
+              {count}
+            </button>
+          );
+        },
       },
       {
-        accessorKey: "participationTime",
-        header: "Participation Time",
-        cell: ({ row }) => (row.original.participationTime === "full_day" ? "Full Day" : "Half Day"),
+        accessorKey: "attendanceMode",
+        header: "Attendance",
+        cell: ({ row }) => (
+          <span className="capitalize">{row.original.attendanceMode}</span>
+        ),
       },
       {
         accessorKey: "status",
@@ -274,7 +311,7 @@ function LobbyContent() {
         },
       },
     ];
-  }, [actionLoadingId, allVisibleIds, allVisibleSelected, applyStatusAction, bulkLoading, canManage, pendingBulkAction, resolveActionIds, selectedIds, selectedSet]);
+  }, [actionLoadingId, allVisibleIds, allVisibleSelected, applyStatusAction, bulkLoading, canManage, openSessionsDialog, pendingBulkAction, resolveActionIds, selectedIds, selectedSet]);
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
@@ -311,6 +348,13 @@ function LobbyContent() {
         eventsLoading={eventsLoading}
         defaultEventId={selectedEventId}
         onSubmit={handleEditRegistration}
+      />
+
+      <SessionRegistrationsDialog
+        open={sessionsDialogOpen}
+        onOpenChange={setSessionsDialogOpen}
+        registration={sessionsRegistration}
+        canManage={canManage}
       />
 
       {!selectedEventId ? (
