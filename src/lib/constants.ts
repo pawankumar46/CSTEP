@@ -6,6 +6,7 @@ import { ICAS_CONFERENCE } from "@/lib/icas-conference";
 export const APP_NAME = "CSTEP";
 export const APP_SHORT_NAME = "CS";
 export const BRAND_LOGO_SRC = "/CstepLogo.png";
+export const FAVICON_SRC = "/logo.png";
 export const BRAND_LOGO_DARK_SRC =
   readPublicEnv("NEXT_PUBLIC_BRAND_LOGO_DARK_SRC") ?? "/CSTEP_Primary-Logo%20copy.png";
 export const APP_DESCRIPTION =

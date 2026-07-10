@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ThemeScript } from "@/components/providers/ThemeScript";
-import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
+import { APP_NAME, APP_DESCRIPTION, FAVICON_SRC } from "@/lib/constants";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,6 +14,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s | ${APP_NAME}` },
   description: APP_DESCRIPTION,
+  icons: {
+    icon: FAVICON_SRC,
+    shortcut: FAVICON_SRC,
+    apple: FAVICON_SRC,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

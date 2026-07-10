@@ -456,7 +456,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-10
 
-- **Home hero image:** Landing page hero now uses `public/imge2.jpg` (`/imge2.jpg`) — square aspect with `object-contain` and taller sizing (`28rem` max on desktop) so the CSTEP logo and Indian skyline stay fully visible.
+- **Favicon:** Site favicon uses `public/logo.png` (`/logo.png`) — square CSTEP icon mark; navbar brand logo remains `CstepLogo.png`.
 - **Home hero image visibility:** Hero image now uses `object-contain` with no dimming overlays so the CSTEP logo and skyline vectors remain fully visible in light and dark mode.
 - **Home hero image card:** Hero image card uses a **2:3 portrait aspect** (matching `Image1.jpg`) at full content height so the image fills the card as one piece with `object-cover` while keeping the CSTEP logo and skyline fully visible; card aligns to the text column on desktop.
 - **Home hero typography:** Event title splits before `CONFERENCE` with `leading-none` so multi-line headings have no extra gap; hero text uses tighter spacing to align with the image card.
