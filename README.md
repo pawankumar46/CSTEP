@@ -454,6 +454,17 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-10
+
+- **Home hero image:** Landing page hero now uses `public/imge2.jpg` (`/imge2.jpg`) — square aspect with `object-contain` and taller sizing (`28rem` max on desktop) so the CSTEP logo and Indian skyline stay fully visible.
+- **Home hero image visibility:** Hero image now uses `object-contain` with no dimming overlays so the CSTEP logo and skyline vectors remain fully visible in light and dark mode.
+- **Home hero image card:** Hero image card uses a **2:3 portrait aspect** (matching `Image1.jpg`) at full content height so the image fills the card as one piece with `object-cover` while keeping the CSTEP logo and skyline fully visible; card aligns to the text column on desktop.
+- **Home hero typography:** Event title splits before `CONFERENCE` with `leading-none` so multi-line headings have no extra gap; hero text uses tighter spacing to align with the image card.
+- **Home hero layout:** Image and event copy centered together as one block (`max-w-6xl mx-auto`); poster beside text with balanced max-width on the copy column.
+- **Assistance services disabled:** Travel, medical, translation, and accommodation support commented out in profile, dashboard nav, analytics overview, and post-registration flow (redirects home instead of profile support).
+- **Analytics overview:** Removed Food Preferences distribution table from event analytics overview.
+- **Attendance mode analytics:** Removed Food Preferences chart/column; added **Sessions** count from `registered_sessions_count` — clicking opens a read-only session details dialog (no approve/reject actions).
+
 ### 2026-07-07
 
 - **Home — Contact scroll:** Navbar **Contact** (`#contact`) now scrolls to the “Got any queries?” contact card in the About section (with sticky-header offset); footer no longer uses the `contact` id.

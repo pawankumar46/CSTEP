@@ -64,10 +64,10 @@ export type NavItem = {
 export const LOBBY_NAV_PATHS = [
   "/dashboard/lobby",
   "/dashboard/sessions",
-  "/dashboard/travel",
-  "/dashboard/medical",
-  "/dashboard/translation",
-  "/dashboard/accommodation",
+  // "/dashboard/travel",
+  // "/dashboard/medical",
+  // "/dashboard/translation",
+  // "/dashboard/accommodation",
 ] as const;
 
 export const ANALYTICS_NAV_PATHS = [
@@ -92,10 +92,10 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Manage Lobby", href: "/dashboard/lobby" },
       { label: "Manage Sessions", href: "/dashboard/sessions" },
-      { label: "Manage Travel Requests", href: "/dashboard/travel" },
-      { label: "Manage Medical Requests", href: "/dashboard/medical" },
-      { label: "Manage Translation Requests", href: "/dashboard/translation" },
-      { label: "Manage Accommodation Requests", href: "/dashboard/accommodation" },
+      // { label: "Manage Travel Requests", href: "/dashboard/travel" },
+      // { label: "Manage Medical Requests", href: "/dashboard/medical" },
+      // { label: "Manage Translation Requests", href: "/dashboard/translation" },
+      // { label: "Manage Accommodation Requests", href: "/dashboard/accommodation" },
     ],
   },
   {

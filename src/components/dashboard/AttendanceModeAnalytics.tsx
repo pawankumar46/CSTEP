@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell,
+  Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import {
   BarChart3, MapPin, Monitor, Users, UserCheck, UserX, UserPlus, Pause, Clock,
@@ -15,6 +15,7 @@ import { ChartCard } from "@/components/shared/ChartCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatCard } from "@/components/shared/StatCard";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
+import { SessionRegistrationsDialog } from "@/components/dashboard/SessionRegistrationsDialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,6 @@ import {
 import { buildRegistrationStatusDistribution } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
 import { ATTENDANCE_MODE_EXPORT_COLUMNS } from "@/lib/registration-export";
-import { getRegistrationOptionLabel } from "@/lib/registration-options";
 import { getAllEvents } from "@/services/event.service";
 import { getEventRegistrationsPage, getEventRegistrationsByAttendanceMode } from "@/services/registration.service";
 import type { AttendanceMode, Event, Registration, RegistrationStatus } from "@/types";
@@ -50,7 +50,6 @@ const STATUS_VARIANT: Record<RegistrationStatus, "default" | "secondary" | "succ
 };
 
 const COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
-const AXIS_TICK = { fontSize: 11, fill: "hsl(var(--muted-foreground))" };
 const TOOLTIP_STYLE = {
   fontSize: 12,
   borderRadius: 8,
@@ -81,53 +80,6 @@ function countByStatus(registrations: Registration[]) {
   );
 }
 
-function buildFoodDistribution(registrations: Registration[]) {
-  const counts = new Map<string, number>();
-
-  for (const row of registrations) {
-    const label = getRegistrationOptionLabel(row.foodPreference);
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  }
-
-  return Array.from(counts.entries())
-    .map(([name, value], index) => ({
-      name,
-      value,
-      color: COLORS[index % COLORS.length],
-    }))
-    .filter((item) => item.value > 0);
-}
-
-const columns: ColumnDef<Registration>[] = [
-  { accessorKey: "userName", header: "User Name" },
-  { accessorKey: "phone", header: "Phone" },
-  { accessorKey: "email", header: "Email" },
-  {
-    accessorKey: "participationDate",
-    header: "Participation Dates",
-    cell: ({ row }) => row.original.participationDateLabel ?? row.original.participationDate,
-  },
-  {
-    accessorKey: "participationTime",
-    header: "Participation Time",
-    cell: ({ row }) => (row.original.participationTime === "full_day" ? "Full Day" : "Half Day"),
-  },
-  {
-    accessorKey: "foodPreference",
-    header: "Food Preference",
-    cell: ({ row }) => getRegistrationOptionLabel(row.original.foodPreference),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant={STATUS_VARIANT[row.original.status]} className="capitalize">
-        {row.original.status.replace("_", " ")}
-      </Badge>
-    ),
-  },
-];
-
 export function AttendanceModeAnalytics() {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -144,6 +96,19 @@ export function AttendanceModeAnalytics() {
   const [loading, setLoading] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
+  const [sessionsRegistration, setSessionsRegistration] = useState<
+    Pick<Registration, "id" | "userName" | "email"> | null
+  >(null);
+
+  const openSessionsDialog = useCallback((registration: Registration) => {
+    setSessionsRegistration({
+      id: registration.id,
+      userName: registration.userName,
+      email: registration.email,
+    });
+    setSessionsDialogOpen(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -259,7 +224,54 @@ export function AttendanceModeAnalytics() {
       }),
     [statusCounts],
   );
-  const foodChartData = useMemo(() => buildFoodDistribution(summaryRegistrations), [summaryRegistrations]);
+
+  const columns = useMemo<ColumnDef<Registration>[]>(
+    () => [
+      { accessorKey: "userName", header: "User Name" },
+      { accessorKey: "phone", header: "Phone" },
+      { accessorKey: "email", header: "Email" },
+      {
+        accessorKey: "registeredSessionsCount",
+        header: "Sessions",
+        cell: ({ row }) => {
+          const count = row.original.registeredSessionsCount ?? 0;
+          if (count === 0) {
+            return <span className="tabular-nums">{count}</span>;
+          }
+          return (
+            <button
+              type="button"
+              className="tabular-nums font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              onClick={() => openSessionsDialog(row.original)}
+              aria-label={`View ${count} sessions for ${row.original.userName}`}
+            >
+              {count}
+            </button>
+          );
+        },
+      },
+      {
+        accessorKey: "participationDate",
+        header: "Participation Dates",
+        cell: ({ row }) => row.original.participationDateLabel ?? row.original.participationDate,
+      },
+      {
+        accessorKey: "participationTime",
+        header: "Participation Time",
+        cell: ({ row }) => (row.original.participationTime === "full_day" ? "Full Day" : "Half Day"),
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge variant={STATUS_VARIANT[row.original.status]} className="capitalize">
+            {row.original.status.replace("_", " ")}
+          </Badge>
+        ),
+      },
+    ],
+    [openSessionsDialog],
+  );
 
   const modeLabel = attendanceMode === "virtual" ? "Virtual" : "Physical";
   const ModeIcon = attendanceMode === "virtual" ? Monitor : MapPin;
@@ -273,6 +285,13 @@ export function AttendanceModeAnalytics() {
 
   return (
     <div className="space-y-4">
+      <SessionRegistrationsDialog
+        open={sessionsDialogOpen}
+        onOpenChange={setSessionsDialogOpen}
+        registration={sessionsRegistration}
+        canManage={false}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Filters</CardTitle>
@@ -392,60 +411,40 @@ export function AttendanceModeAnalytics() {
             <StatCard title="Rejected" value={statusCounts.rejected ?? 0} icon={UserX} />
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
-            <ChartCard title="Registration Status" description="Status breakdown for all matching registrations.">
-              <ChartContainer height={180}>
-                {statusChartData.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    No registrations found
-                  </div>
-                ) : (
-                  <PieChart>
-                    <Pie
-                      data={statusChartData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="46%"
-                      innerRadius={38}
-                      outerRadius={58}
-                      paddingAngle={2}
-                      strokeWidth={0}
-                    >
-                      {statusChartData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color || COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Legend
-                      verticalAlign="bottom"
-                      iconType="circle"
-                      iconSize={8}
-                      wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
-                    />
-                  </PieChart>
-                )}
-              </ChartContainer>
-            </ChartCard>
-
-            <ChartCard title="Food Preferences" description="Food preference breakdown for all matching registrations.">
-              <ChartContainer height={180}>
-                {foodChartData.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    No food preference data
-                  </div>
-                ) : (
-                  <BarChart data={foodChartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/60" />
-                    <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 9 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={28} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="value" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  </BarChart>
-                )}
-              </ChartContainer>
-            </ChartCard>
-          </div>
+          <ChartCard title="Registration Status" description="Status breakdown for all matching registrations.">
+            <ChartContainer height={180}>
+              {statusChartData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  No registrations found
+                </div>
+              ) : (
+                <PieChart>
+                  <Pie
+                    data={statusChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="46%"
+                    innerRadius={38}
+                    outerRadius={58}
+                    paddingAngle={2}
+                    strokeWidth={0}
+                  >
+                    {statusChartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color || COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
+                  />
+                </PieChart>
+              )}
+            </ChartContainer>
+          </ChartCard>
 
           <Card className="shadow-sm">
             <CardHeader className="py-3 px-4">

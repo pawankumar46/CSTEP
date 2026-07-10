@@ -25,11 +25,18 @@ import { getEvents } from "@/services/event.service";
 import type { EventSupportFormValues, ServiceType } from "@/features/profile/event-support.schema";
 import type { Event } from "@/types";
 
-const SERVICE_OPTIONS = [
-  { value: "travel" as const, label: "Travel Assistance", icon: Plane },
-  { value: "medical" as const, label: "Medical Assistance", icon: Stethoscope },
-  { value: "translation" as const, label: "Translation Assistance", icon: Languages },
-  { value: "accommodation" as const, label: "Accommodation Assistance", icon: Hotel },
+type ServiceOption = {
+  value: ServiceType;
+  label: string;
+  icon: typeof Plane;
+};
+
+const SERVICE_OPTIONS: readonly ServiceOption[] = [
+  // Assistance services disabled
+  // { value: "travel", label: "Travel Assistance", icon: Plane },
+  // { value: "medical", label: "Medical Assistance", icon: Stethoscope },
+  // { value: "translation", label: "Translation Assistance", icon: Languages },
+  // { value: "accommodation", label: "Accommodation Assistance", icon: Hotel },
 ];
 
 const TRANSPORT_OPTIONS = [
@@ -197,6 +204,14 @@ export function EventSupportRequestForm({
     eventsError,
     error: errors.eventId?.message,
   };
+
+  if (SERVICE_OPTIONS.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Travel, medical, translation, and accommodation assistance requests are currently unavailable.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-6">

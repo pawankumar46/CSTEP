@@ -62,22 +62,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const path = window.location.pathname;
         if (!path.startsWith("/dashboard")) return;
 
-        if (path.includes("/dashboard/travel")) {
-          void useLobbyStore.getState().fetchTravelAssistance(selectedEventId);
-          return;
-        }
-        if (path.includes("/dashboard/medical")) {
-          void useLobbyStore.getState().fetchMedicalAssistance(selectedEventId);
-          return;
-        }
-        if (path.includes("/dashboard/translation")) {
-          void useLobbyStore.getState().fetchTranslationAssistance(selectedEventId);
-          return;
-        }
-        if (path.includes("/dashboard/accommodation")) {
-          void useLobbyStore.getState().fetchAccommodationAssistance(selectedEventId);
-          return;
-        }
+        // Assistance services disabled
+        // if (path.includes("/dashboard/travel")) {
+        //   void useLobbyStore.getState().fetchTravelAssistance(selectedEventId);
+        //   return;
+        // }
+        // if (path.includes("/dashboard/medical")) {
+        //   void useLobbyStore.getState().fetchMedicalAssistance(selectedEventId);
+        //   return;
+        // }
+        // if (path.includes("/dashboard/translation")) {
+        //   void useLobbyStore.getState().fetchTranslationAssistance(selectedEventId);
+        //   return;
+        // }
+        // if (path.includes("/dashboard/accommodation")) {
+        //   void useLobbyStore.getState().fetchAccommodationAssistance(selectedEventId);
+        //   return;
+        // }
         if (path.includes("/dashboard/lobby")) {
           void useLobbyStore.getState().fetchRegistrations(selectedEventId);
         }

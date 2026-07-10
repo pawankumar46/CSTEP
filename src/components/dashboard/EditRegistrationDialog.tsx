@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronLeft, ChevronRight, ClipboardList, Loader2, Mic } from "lucide-react";
+import { Check, ClipboardList, Loader2, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +25,7 @@ import {
 import { formatEventDateRange } from "@/lib/event-display";
 import { buildParticipationDateOptionsFromEventDays } from "@/lib/participation-dates";
 import { ATTENDANCE_MODES } from "@/lib/registration-options";
+import { SessionScrollRow } from "@/components/shared/SessionScrollRow";
 import { cn } from "@/lib/utils";
 import {
   registrationEditSchema,
@@ -473,61 +474,54 @@ export function EditRegistrationDialog({
               ) : scheduleItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
               ) : (
-                <div className="relative">
-                  <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {scheduleItems.map((item) => {
-                      const isSelected = selectedSessionIds?.includes(item.id) ?? false;
-                      return (
-                        <div
-                          key={item.id}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={isSelected}
-                          onClick={() => toggleSession(item.id)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              toggleSession(item.id);
-                            }
-                          }}
-                          className={cn(
-                            "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            isSelected
-                              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                              : "border-border bg-card hover:border-primary/40",
-                          )}
-                        >
-                          <div className="p-3 space-y-2">
-                            <div className="flex items-start gap-2">
-                              <div
-                                aria-hidden
-                                className={cn(
-                                  "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                  isSelected && "bg-primary text-primary-foreground",
-                                )}
-                              >
-                                {isSelected && <Check className="h-3 w-3" />}
-                              </div>
-                              <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
+                <SessionScrollRow>
+                  {scheduleItems.map((item) => {
+                    const isSelected = selectedSessionIds?.includes(item.id) ?? false;
+                    return (
+                      <div
+                        key={item.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        onClick={() => toggleSession(item.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            toggleSession(item.id);
+                          }
+                        }}
+                        className={cn(
+                          "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                            : "border-border bg-card hover:border-primary/40",
+                        )}
+                      >
+                        <div className="p-3 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <div
+                              aria-hidden
+                              className={cn(
+                                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                isSelected && "bg-primary text-primary-foreground",
+                              )}
+                            >
+                              {isSelected && <Check className="h-3 w-3" />}
                             </div>
-                            <p className="text-xs text-muted-foreground pl-6">
-                              {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
-                            </p>
-                            <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
-                              <Mic className="h-3 w-3" />
-                              {item.speakerName || "Speaker TBA"}
-                            </p>
+                            <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
                           </div>
+                          <p className="text-xs text-muted-foreground pl-6">
+                            {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
+                          </p>
+                          <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
+                            <Mic className="h-3 w-3" />
+                            {item.speakerName || "Speaker TBA"}
+                          </p>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-muted-foreground">
-                    <ChevronLeft className="h-3 w-3" />
-                    Swipe to browse · tap to select multiple
-                    <ChevronRight className="h-3 w-3" />
-                  </div>
-                </div>
+                      </div>
+                    );
+                  })}
+                </SessionScrollRow>
               )}
               {sessionSelectionError && (
                 <p className="text-xs text-destructive">{sessionSelectionError}</p>

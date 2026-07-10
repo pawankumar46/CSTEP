@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3, UserCheck, UserX, UserPlus, Pause, Clock, Eye, Radio,
-  Plane, Stethoscope, Languages, Hotel, Users,
+  // Plane, Stethoscope, Languages, Hotel,
+  Users,
 } from "lucide-react";
 import { AnalyticsDistributionTable, AnalyticsMetricTable } from "@/components/dashboard/AnalyticsDistributionTable";
 import { DashboardTrendCharts } from "@/components/dashboard/DashboardTrendCharts";
@@ -15,12 +16,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   buildAttendanceModeDistribution,
-  buildFoodPreferenceDistribution,
-  buildLanguageDistribution,
   buildParticipationDateTrend,
   buildParticipationTimeDistribution,
   buildRegistrationStatusDistribution,
-  buildTransportModeDistribution,
+  // buildLanguageDistribution,
+  // buildTransportModeDistribution,
   formatWatchDuration,
 } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
@@ -81,16 +81,15 @@ export function EventAnalyticsOverview() {
   const tableData = useMemo(() => {
     if (!eventAnalytics) return null;
 
-    const { registrations, participationDates, assistanceRequests } = eventAnalytics;
+    const { registrations, participationDates } = eventAnalytics;
 
     return {
       status: buildRegistrationStatusDistribution(registrations.byStatus),
       attendanceMode: buildAttendanceModeDistribution(registrations.byAttendanceMode),
-      food: buildFoodPreferenceDistribution(registrations.byFoodPreference),
       participationTime: buildParticipationTimeDistribution(registrations.byParticipationTime),
       participationDates: buildParticipationDateTrend(participationDates),
-      transport: buildTransportModeDistribution(assistanceRequests.travel.byTransportMode ?? {}),
-      languages: buildLanguageDistribution(assistanceRequests.translation.byLanguage ?? {}),
+      // transport: buildTransportModeDistribution(assistanceRequests.travel.byTransportMode ?? {}),
+      // languages: buildLanguageDistribution(assistanceRequests.translation.byLanguage ?? {}),
     };
   }, [eventAnalytics]);
 
@@ -262,23 +261,15 @@ export function EventAnalyticsOverview() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AnalyticsDistributionTable
-              title="Food Preferences"
-              data={tableData.food}
-              exportSlug={`${exportSlugPrefix}-food-preferences`}
-              categoryHeader="Food preference"
-              emptyMessage="No food preference data."
-            />
-            <AnalyticsDistributionTable
-              title="Participation Dates"
-              data={tableData.participationDates}
-              exportSlug={`${exportSlugPrefix}-participation-dates`}
-              categoryHeader="Date"
-              emptyMessage="No participation date data."
-            />
-          </div>
+          <AnalyticsDistributionTable
+            title="Participation Dates"
+            data={tableData.participationDates}
+            exportSlug={`${exportSlugPrefix}-participation-dates`}
+            categoryHeader="Date"
+            emptyMessage="No participation date data."
+          />
 
+          {/* Assistance services disabled
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Assistance Requests
@@ -323,6 +314,7 @@ export function EventAnalyticsOverview() {
               />
             </div>
           </div>
+          */}
 
           <AnalyticsMetricTable
             title="Streaming Details"

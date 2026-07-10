@@ -25,8 +25,7 @@ import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
 import { cn } from "@/lib/utils";
 import type { UpcomingEvent } from "@/types";
 
-const CONFERENCE_IMAGE =
-  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80";
+const HOME_HERO_IMAGE = "/imge2.jpg";
 
 function UpcomingEventHeading({
   eventStart,
@@ -50,6 +49,28 @@ function UpcomingEventHeading({
       ))}{" "}
       {month}
     </p>
+  );
+}
+
+function formatHeroTitleLines(name: string): string[] {
+  const conferenceMatch = name.match(/^(.+?)\s+(CONFERENCE\s+.+)$/i);
+  if (conferenceMatch) {
+    return [conferenceMatch[1].trim(), conferenceMatch[2].trim()];
+  }
+  return [name];
+}
+
+function HeroEventTitle({ name }: { name: string }) {
+  const lines = formatHeroTitleLines(name);
+
+  return (
+    <h1 className="text-4xl font-bold tracking-tight leading-tight lg:text-[2.75rem]">
+      {lines.map((line, index) => (
+        <span key={line} className={cn("block", index > 0 && "mt-2")}>
+          {line}
+        </span>
+      ))}
+    </h1>
   );
 }
 
@@ -77,70 +98,70 @@ function HeroEventSlide({
   const showTheme = isIcasEventName(event.name);
 
   return (
-    <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-      <div className="relative order-2 lg:order-1 h-56 sm:h-72 lg:h-[420px] rounded-2xl overflow-hidden">
-        <img
-          src={event.imageUrl || CONFERENCE_IMAGE}
-          alt={event.name}
-          className="absolute inset-0 h-full w-full object-cover opacity-80 dark:opacity-70"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background/30 lg:to-background/50" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/30 via-transparent to-transparent" />
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:flex-row lg:items-center lg:justify-center lg:gap-8 xl:gap-10">
+      <div className="order-2 flex shrink-0 justify-center lg:order-1">
+        <div className="relative size-64 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-100/60 to-background shadow-sm dark:from-sky-950/25 sm:size-72 lg:size-[min(28rem,calc(100vh-12rem))]">
+          <img
+            src={HOME_HERO_IMAGE}
+            alt={`${event.name} — ${APP_NAME}`}
+            className="absolute inset-0 h-full w-full object-contain object-center"
+          />
+        </div>
       </div>
 
-      <div className="order-1 lg:order-2 space-y-5 lg:pl-4 lg:pt-2">
+      <div className="order-1 flex w-full min-w-0 max-w-xl flex-col justify-center gap-5 lg:order-2 lg:w-auto lg:max-w-lg xl:max-w-xl lg:gap-6">
         <UpcomingEventHeading eventStart={event.date} eventEnd={event.endDate} />
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:space-y-5">
           <Badge variant="secondary" className="w-fit gap-1.5">
             <Sparkles className="h-3 w-3" />
             {APP_NAME}
           </Badge>
           {showTheme && (
-            <p className="text-sm font-medium text-primary leading-snug max-w-xl">
+            <p className="text-sm font-medium leading-relaxed text-primary lg:text-base">
               {ICAS_CONFERENCE.theme}
             </p>
           )}
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
-            {event.name}
-          </h1>
-          <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
+          <HeroEventTitle name={event.name} />
+          <p className="text-base leading-relaxed text-muted-foreground lg:text-lg">
             {event.description}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="h-4 w-4 text-primary" />
-            {dates}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <MapPin className="h-4 w-4 text-primary" />
-            {venue}
-          </span>
-          {participantsRegistered !== null && (
+        <div className="space-y-4 lg:space-y-5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-primary" />
-              {participantsRegistered.toLocaleString()} registered
+              <Calendar className="h-4 w-4 shrink-0 text-primary" />
+              {dates}
             </span>
-          )}
-        </div>
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4 shrink-0 text-primary" />
+              {venue}
+            </span>
+            {participantsRegistered !== null && (
+              <span className="flex items-center gap-1.5">
+                <Users className="h-4 w-4 shrink-0 text-primary" />
+                {participantsRegistered.toLocaleString()} registered
+              </span>
+            )}
+          </div>
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          {registerLabel && (
-            <Button size="lg" asChild>
-              <Link href={registerHref}>
-                {registerLabel}
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          )}
-          <WatchLiveButton
-            event={event}
-            size="lg"
-            variant={registerLabel ? "outline" : "default"}
-          />
-          <EventCountdown eventStart={countdownStart} eventStatus={event.status} />
+          <div className="flex flex-wrap items-center gap-3">
+            {registerLabel && (
+              <Button size="lg" asChild>
+                <Link href={registerHref}>
+                  {registerLabel}
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
+            )}
+            <WatchLiveButton
+              event={event}
+              size="lg"
+              variant={registerLabel ? "outline" : "default"}
+            />
+            <EventCountdown eventStart={countdownStart} eventStatus={event.status} />
+          </div>
         </div>
 
         {!isAuthenticated && (
@@ -155,7 +176,7 @@ function HeroEventSlide({
           </p>
         )}
         {isAuthenticated && eventIsRegistered && (
-          <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
             You&apos;re registered for this event. Join the live stream when it begins.
           </p>
         )}
