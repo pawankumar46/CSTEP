@@ -76,7 +76,6 @@ function SignupForm() {
       });
       const params = new URLSearchParams({
         email: data.email.trim().toLowerCase(),
-        phone: data.phone,
       });
       if (redirectTo) params.set("redirect", redirectTo);
       router.push(`${ROUTES.otp}?${params.toString()}`);

@@ -110,7 +110,7 @@ c-step/
 ├── public/                    # Static assets (logos, banner images)
 ├── src/
 │   ├── app/                   # Next.js App Router pages & API routes
-│   │   ├── (auth)/            # login, signup, otp, forgot-password
+│   │   ├── (auth)/            # login, signup, otp, forgot-password, reset-password
 │   │   ├── api/               # Server-side proxy routes
 │   │   │   ├── broadcast-sessions/
 │   │   │   └── stream/        # Google Drive video proxy
@@ -289,7 +289,8 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/auth/sign_up/` | User registration (`role`, nested `address`, profile fields) |
 | `POST` | `/auth/login/` | Login → access + refresh tokens |
 | `POST` | `/auth/verify-otp/` | OTP verification |
-| `POST` | `/auth/forgot_password/` | Password reset request |
+| `POST` | `/auth/forgot-password/` | Password reset request (`{ "email": "..." }`) |
+| `POST` | `/auth/reset-password/` | Reset password with OTP (`email`, `otp`, `new_password`, `confirm_password`) |
 | `POST` | `/auth/logout/` | Logout (refresh token in body) |
 | `POST` | `/auth/token/refresh/` | Refresh access token |
 | `GET` | `/auth/me/` | Current user profile |
@@ -456,7 +457,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-10
 
-- **Favicon:** Site favicon uses `public/logo.png` (`/logo.png`) — square CSTEP icon mark; navbar brand logo remains `CstepLogo.png`.
+- **Signup verification:** Post-signup OTP is **email only** (phone verification removed); after successful verification users redirect to **home** (or preserved `redirect` query when present).
 - **Home hero image visibility:** Hero image now uses `object-contain` with no dimming overlays so the CSTEP logo and skyline vectors remain fully visible in light and dark mode.
 - **Home hero image card:** Hero image card uses a **2:3 portrait aspect** (matching `Image1.jpg`) at full content height so the image fills the card as one piece with `object-cover` while keeping the CSTEP logo and skyline fully visible; card aligns to the text column on desktop.
 - **Home hero typography:** Event title splits before `CONFERENCE` with `leading-none` so multi-line headings have no extra gap; hero text uses tighter spacing to align with the image card.

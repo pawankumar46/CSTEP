@@ -10,7 +10,7 @@ import {
   getLastAccessTokenRefreshAt,
   markAccessTokenRefreshed,
 } from "@/lib/auth-token";
-import type { LoginCredentials, SignupCredentials, User, VerifyOtpPayload } from "@/types";
+import type { LoginCredentials, ResetPasswordPayload, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
 interface AuthState {
   user: User | null;
@@ -25,6 +25,7 @@ interface AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   verifyOtp: (payload: VerifyOtpPayload) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (payload: ResetPasswordPayload) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
@@ -120,6 +121,20 @@ export const useAuthStore = create<AuthState>()(
         } catch (err) {
           set({
             error: err instanceof Error ? err.message : "Failed to send reset email",
+            isLoading: false,
+          });
+          throw err;
+        }
+      },
+
+      resetPassword: async (payload) => {
+        set({ isLoading: true, error: null });
+        try {
+          await authService.resetPassword(payload);
+          set({ isLoading: false });
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : "Failed to reset password",
             isLoading: false,
           });
           throw err;

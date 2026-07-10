@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
+import { ROUTES, buildResetPasswordUrl } from "@/lib/routes";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -23,6 +24,7 @@ type FormData = z.infer<typeof schema>;
 export default function ForgotPasswordPage() {
   const { forgotPassword, isLoading, error, clearError } = useAuthStore();
   const [sent, setSent] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -32,6 +34,7 @@ export default function ForgotPasswordPage() {
     clearError();
     try {
       await forgotPassword(data.email);
+      setSubmittedEmail(data.email.trim().toLowerCase());
       setSent(true);
     } catch {
       // error in store
@@ -44,8 +47,17 @@ export default function ForgotPasswordPage() {
         <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-center space-y-4 max-w-md">
           <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto" />
           <h2 className="text-2xl font-bold">Check your email</h2>
-          <p className="text-muted-foreground">We&apos;ve sent password reset instructions to your email address.</p>
-          <Button asChild><Link href="/login">Back to login</Link></Button>
+          <p className="text-muted-foreground">
+            We&apos;ve sent a password reset OTP to your email. Use it on the next screen to set a new password.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button asChild>
+              <Link href={buildResetPasswordUrl(submittedEmail)}>Reset Password</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={ROUTES.login}>Back to login</Link>
+            </Button>
+          </div>
         </motion.div>
       </div>
     );
@@ -72,9 +84,9 @@ export default function ForgotPasswordPage() {
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {isLoading ? "Sending..." : "Send Reset Link"}
+                {isLoading ? "Sending..." : "Send OTP to Email"}
               </Button>
-              <Link href="/login" className="text-sm text-primary hover:underline">Back to login</Link>
+              <Link href={ROUTES.login} className="text-sm text-primary hover:underline">Back to login</Link>
             </CardFooter>
           </form>
         </Card>

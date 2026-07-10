@@ -15,9 +15,10 @@ import {
   extractUserIdFromSignupResponse,
   toSignupPayload,
   toLobbySignupPayload,
+  toResetPasswordPayload,
   toVerifyOtpPayload,
 } from "@/lib/auth-mappers";
-import type { AuthResponse, LoginCredentials, SignupCredentials, User, VerifyOtpPayload } from "@/types";
+import type { AuthResponse, LoginCredentials, ResetPasswordPayload, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
 async function fetchCurrentUser(fallbackEmail?: string): Promise<User | null> {
   try {
@@ -117,7 +118,16 @@ export const verifyOtp = async (payload: VerifyOtpPayload): Promise<{ success: b
 
 export const forgotPassword = async (email: string): Promise<{ success: boolean }> => {
   try {
-    await apiClient.post("/auth/forgot_password/", { email: normalizeAuthIdentifier(email) });
+    await apiClient.post("/auth/forgot-password/", { email: normalizeAuthIdentifier(email) });
+    return { success: true };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const resetPassword = async (payload: ResetPasswordPayload): Promise<{ success: boolean }> => {
+  try {
+    await apiClient.post("/auth/reset-password/", toResetPasswordPayload(payload));
     return { success: true };
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));

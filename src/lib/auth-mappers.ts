@@ -22,6 +22,20 @@ export function toVerifyOtpPayload(method: "phone" | "email", otp: string, conta
   return { email: normalizeAuthIdentifier(contact), otp };
 }
 
+export function toResetPasswordPayload(data: {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}) {
+  return {
+    email: normalizeAuthIdentifier(data.email),
+    otp: data.otp.trim(),
+    new_password: data.newPassword,
+    confirm_password: data.confirmPassword,
+  };
+}
+
 function toSignupAddressPayload(address: SignupAddress) {
   return {
     address_line_1: address.addressLine1,

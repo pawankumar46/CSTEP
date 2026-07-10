@@ -3,6 +3,8 @@ export const ROUTES = {
   signup: "/signup",
   login: "/login",
   otp: "/otp",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   eventRegister: "/event-register",
   streaming: "/streaming",
   profile: "/profile",
@@ -83,6 +85,12 @@ export function buildProfileSupportUrl(eventId?: string): string {
   if (!eventId) return ROUTES.profile;
   const search = new URLSearchParams({ event: eventId });
   return `${ROUTES.profile}?${search.toString()}`;
+}
+
+export function buildResetPasswordUrl(email?: string): string {
+  if (!email?.trim()) return ROUTES.resetPassword;
+  const search = new URLSearchParams({ email: email.trim().toLowerCase() });
+  return `${ROUTES.resetPassword}?${search.toString()}`;
 }
 
 export function getHomeRegisterLabel(isAuthenticated: boolean, isEventRegistered: boolean): string | null {

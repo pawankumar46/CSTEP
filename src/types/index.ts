@@ -503,6 +503,13 @@ export interface VerifyOtpPayload {
   email?: string;
 }
 
+export interface ResetPasswordPayload {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export interface SignupAddress {
   addressLine1: string;
   addressLine2?: string;
