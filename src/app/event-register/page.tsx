@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
@@ -15,7 +15,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { registrationSchema, REGISTRATION_STEPS, type RegistrationFormValues } from "@/features/registration/registration.schema";
 import {
   ATTENDANCE_MODES,
@@ -32,7 +31,7 @@ import { useRegistrationStore } from "@/store/useRegistrationStore";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import type { EventDay, ScheduleItemRecord } from "@/services/event.service";
-import type { EventDropdownOption } from "@/types";
+import type { AttendanceMode, EventDropdownOption } from "@/types";
 
 export default function EventRegisterPage() {
   return (
@@ -55,14 +54,14 @@ function EventRegisterForm() {
   const [eventDays, setEventDays] = useState<EventDay[]>([]);
   const [eventDaysLoading, setEventDaysLoading] = useState(false);
   const [eventDaysError, setEventDaysError] = useState<string | null>(null);
-  const [scheduleItems, setScheduleItems] = useState<ScheduleItemRecord[]>([]);
-  const [scheduleItemsLoading, setScheduleItemsLoading] = useState(false);
-  const [scheduleItemsError, setScheduleItemsError] = useState<string | null>(null);
+  const [scheduleItemsByDay, setScheduleItemsByDay] = useState<Record<string, ScheduleItemRecord[]>>({});
+  const [scheduleLoadingByDay, setScheduleLoadingByDay] = useState<Record<string, boolean>>({});
+  const [scheduleErrorByDay, setScheduleErrorByDay] = useState<Record<string, string | null>>({});
   const [sessionSelectionError, setSessionSelectionError] = useState<string | null>(null);
   const [daySelectionError, setDaySelectionError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
-  const loadedScheduleDayIdRef = useRef<string | null>(null);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const fetchedScheduleDayIdsRef = useRef<Set<string>>(new Set());
   const { submitRegistration, isLoading } = useRegistrationStore();
 
   useEffect(() => {
@@ -94,7 +93,10 @@ function EventRegisterForm() {
     defaultValues: {
       eventId: "",
       salutation: "", firstName: "", middleName: "", lastName: "", phone: "", email: "",
-      participationDate: "", participationTime: "full_day", selectedDayIds: [], selectedSessionIds: [], attendanceMode: "physical",
+      participationDate: "", participationTime: "full_day",
+      selectedDayIds: [], selectedSessionIds: [],
+      sessionsByDay: {}, attendanceByDay: {},
+      attendanceMode: "physical",
     },
   });
 
@@ -124,6 +126,8 @@ function EventRegisterForm() {
         participationTime: "full_day",
         selectedDayIds: [],
         selectedSessionIds: [],
+        sessionsByDay: {},
+        attendanceByDay: {},
         attendanceMode: "physical",
       });
     }
@@ -140,38 +144,75 @@ function EventRegisterForm() {
     () => eventDays.filter((day) => values.selectedDayIds?.includes(day.id)),
     [eventDays, values.selectedDayIds],
   );
-  const selectedSessions = useMemo(
-    () => scheduleItems.filter((item) => values.selectedSessionIds?.includes(item.id)),
-    [scheduleItems, values.selectedSessionIds],
+  const getDayLabel = useCallback(
+    (day: EventDay) =>
+      day.label?.trim()
+      || participationDateOptions.find((option) => option.value === day.date)?.label
+      || day.date,
+    [participationDateOptions],
   );
 
   const toggleDay = (dayId: string) => {
     const current = getValues("selectedDayIds") ?? [];
-    const next = current.includes(dayId)
+    const isRemoving = current.includes(dayId);
+    const next = isRemoving
       ? current.filter((id) => id !== dayId)
       : [...current, dayId];
+
     setValue("selectedDayIds", next, { shouldValidate: true });
     setDaySelectionError(null);
+
+    if (isMultiSession) {
+      const sessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+      const attendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
+
+      if (isRemoving) {
+        delete sessionsByDay[dayId];
+        delete attendanceByDay[dayId];
+        setScheduleItemsByDay((prev) => {
+          const copy = { ...prev };
+          delete copy[dayId];
+          return copy;
+        });
+      } else {
+        attendanceByDay[dayId] = attendanceByDay[dayId] ?? "physical";
+        sessionsByDay[dayId] = sessionsByDay[dayId] ?? [];
+      }
+
+      setValue("sessionsByDay", sessionsByDay, { shouldValidate: true });
+      setValue("attendanceByDay", attendanceByDay, { shouldValidate: true });
+    }
   };
 
-  const toggleSession = (sessionId: string) => {
-    const current = getValues("selectedSessionIds") ?? [];
-    const next = current.includes(sessionId)
+  const toggleSessionForDay = (dayId: string, sessionId: string) => {
+    const sessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+    const current = sessionsByDay[dayId] ?? [];
+    sessionsByDay[dayId] = current.includes(sessionId)
       ? current.filter((id) => id !== sessionId)
       : [...current, sessionId];
-    setValue("selectedSessionIds", next, { shouldValidate: true });
+    setValue("sessionsByDay", sessionsByDay, { shouldValidate: true });
     setSessionSelectionError(null);
+  };
+
+  const setDayAttendance = (dayId: string, mode: AttendanceMode) => {
+    const attendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
+    attendanceByDay[dayId] = mode;
+    setValue("attendanceByDay", attendanceByDay, { shouldValidate: true });
   };
 
   useEffect(() => {
     if (!values.eventId) {
       setEventDays([]);
       setEventDaysError(null);
-      setScheduleItems([]);
-      setScheduleItemsError(null);
+      setScheduleItemsByDay({});
+      setScheduleLoadingByDay({});
+      setScheduleErrorByDay({});
+      fetchedScheduleDayIdsRef.current = new Set();
       setValue("participationDate", "");
       setValue("selectedDayIds", []);
       setValue("selectedSessionIds", []);
+      setValue("sessionsByDay", {});
+      setValue("attendanceByDay", {});
       return;
     }
 
@@ -200,47 +241,55 @@ function EventRegisterForm() {
 
   useEffect(() => {
     if (!isMultiSession) {
-      setScheduleItems([]);
-      setScheduleItemsError(null);
+      fetchedScheduleDayIdsRef.current = new Set();
+      setScheduleItemsByDay({});
+      setScheduleLoadingByDay({});
+      setScheduleErrorByDay({});
       return;
     }
 
-    const selectedDay = eventDays.find((day) => day.date === values.participationDate);
-    if (!selectedDay) {
-      loadedScheduleDayIdRef.current = null;
-      setScheduleItems([]);
-      setScheduleItemsError(null);
-      setValue("selectedSessionIds", []);
-      return;
-    }
-
-    if (loadedScheduleDayIdRef.current !== selectedDay.id) {
-      loadedScheduleDayIdRef.current = selectedDay.id;
-      setValue("selectedSessionIds", []);
-    }
-
+    const selectedDayIds = values.selectedDayIds ?? [];
     let cancelled = false;
 
-    (async () => {
-      setScheduleItemsLoading(true);
-      setScheduleItemsError(null);
-      try {
-        const items = await getScheduleItemsDropdown(selectedDay.id);
-        if (!cancelled) setScheduleItems(items);
-      } catch (err) {
-        if (!cancelled) {
-          setScheduleItems([]);
-          setScheduleItemsError(err instanceof Error ? err.message : "Failed to load sessions");
-        }
-      } finally {
-        if (!cancelled) setScheduleItemsLoading(false);
+    for (const id of fetchedScheduleDayIdsRef.current) {
+      if (!selectedDayIds.includes(id)) {
+        fetchedScheduleDayIdsRef.current.delete(id);
       }
-    })();
+    }
+
+    selectedDayIds.forEach((dayId) => {
+      if (fetchedScheduleDayIdsRef.current.has(dayId)) {
+        return;
+      }
+
+      fetchedScheduleDayIdsRef.current.add(dayId);
+      setScheduleLoadingByDay((prev) => ({ ...prev, [dayId]: true }));
+      setScheduleErrorByDay((prev) => ({ ...prev, [dayId]: null }));
+
+      void getScheduleItemsDropdown(dayId)
+        .then((items) => {
+          if (cancelled) return;
+          setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: items }));
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          fetchedScheduleDayIdsRef.current.delete(dayId);
+          setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: [] }));
+          setScheduleErrorByDay((prev) => ({
+            ...prev,
+            [dayId]: err instanceof Error ? err.message : "Failed to load sessions",
+          }));
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setScheduleLoadingByDay((prev) => ({ ...prev, [dayId]: false }));
+        });
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [isMultiSession, eventDays, values.participationDate, setValue]);
+  }, [isMultiSession, values.selectedDayIds]);
 
   const formatSessionTime = (value: string) => {
     const [hh = "0", mm = "0"] = value.split(":");
@@ -252,47 +301,36 @@ function EventRegisterForm() {
     return `${h12}:${String(minute).padStart(2, "0")} ${period}`;
   };
 
-  useEffect(() => {
-    if (!values.eventId || !isMultiSession) {
-      return;
-    }
-
-    if (participationDateOptions.length === 0) {
-      setValue("participationDate", "");
-      return;
-    }
-
-    const currentValue = getValues("participationDate");
-    const isCurrentValid = participationDateOptions.some((option) => option.value === currentValue);
-    if (!isCurrentValid) {
-      setValue("participationDate", participationDateOptions[0].value);
-    }
-  }, [values.eventId, isMultiSession, participationDateOptions, setValue, getValues]);
-
   const validateStep = async () => {
     if (step === 2) {
+      const selectedDayIdList = getValues("selectedDayIds") ?? [];
+
+      if (selectedDayIdList.length === 0) {
+        setDaySelectionError("Please select at least one day");
+        return false;
+      }
+
       if (isMultiSession) {
-        if (!getValues("participationDate")) {
-          await trigger("participationDate");
-          return false;
-        }
-        if (scheduleItems.length > 0) {
-          const selected = getValues("selectedSessionIds") ?? [];
-          if (selected.length === 0) {
-            setSessionSelectionError("Please select at least one session");
+        const sessionsByDay = getValues("sessionsByDay") ?? {};
+        for (const dayId of selectedDayIdList) {
+          const dayItems = scheduleItemsByDay[dayId] ?? [];
+          const selectedForDay = sessionsByDay[dayId] ?? [];
+          if (dayItems.length > 0 && selectedForDay.length === 0) {
+            const day = eventDays.find((entry) => entry.id === dayId);
+            setSessionSelectionError(
+              `Please select at least one session for ${day ? getDayLabel(day) : "the selected day"}`,
+            );
             return false;
           }
-        }
-      } else {
-        const selectedDays = getValues("selectedDayIds") ?? [];
-        if (selectedDays.length === 0) {
-          setDaySelectionError("Please select at least one day");
-          return false;
         }
       }
     }
     setSessionSelectionError(null);
     setDaySelectionError(null);
+
+    if (step === 2 && !isMultiSession) {
+      return trigger(["attendanceMode"]);
+    }
 
     const fields = REGISTRATION_STEPS[step].fields;
     if (fields.length === 0) return true;
@@ -445,8 +483,8 @@ function EventRegisterForm() {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <Label>{isMultiSession ? "Date of Participation" : "Select Days"}</Label>
-                      {!isMultiSession && (values.selectedDayIds?.length ?? 0) > 0 && (
+                      <Label>{isMultiSession ? "Select Days & Sessions" : "Select Days"}</Label>
+                      {(values.selectedDayIds?.length ?? 0) > 0 && (
                         <span className="text-xs text-muted-foreground">
                           {values.selectedDayIds?.length} selected
                         </span>
@@ -460,24 +498,10 @@ function EventRegisterForm() {
                       <p className="text-sm text-destructive">{eventDaysError}</p>
                     ) : eventDays.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No participation dates available for this event.</p>
-                    ) : isMultiSession ? (
-                      <Controller name="participationDate" control={control} render={({ field }) => (
-                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col gap-3">
-                          {participationDateOptions.map((option) => (
-                            <div key={option.value} className="flex items-center gap-2">
-                              <RadioGroupItem value={option.value} id={`date-${option.value}`} />
-                              <Label htmlFor={`date-${option.value}`} className="font-normal cursor-pointer">
-                                {option.label}
-                              </Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      )} />
                     ) : (
                       <div className="flex flex-col gap-3">
                         {eventDays.map((day) => {
                           const isSelected = values.selectedDayIds?.includes(day.id) ?? false;
-                          const label = day.label?.trim() || participationDateOptions.find((option) => option.value === day.date)?.label || day.date;
                           return (
                             <div
                               key={day.id}
@@ -508,7 +532,7 @@ function EventRegisterForm() {
                                 >
                                   {isSelected && <Check className="h-3 w-3" />}
                                 </div>
-                                <p className="font-medium text-sm">{label}</p>
+                                <p className="font-medium text-sm">{getDayLabel(day)}</p>
                               </div>
                             </div>
                           );
@@ -521,94 +545,128 @@ function EventRegisterForm() {
                     )}
                   </div>
 
-                  {isMultiSession && values.participationDate && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <Label>Select Sessions</Label>
-                        {(values.selectedSessionIds?.length ?? 0) > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            {values.selectedSessionIds?.length} selected
-                          </span>
-                        )}
-                      </div>
-                      {scheduleItemsLoading ? (
-                        <p className="text-sm text-muted-foreground">Loading sessions…</p>
-                      ) : scheduleItemsError ? (
-                        <p className="text-sm text-destructive">{scheduleItemsError}</p>
-                      ) : scheduleItems.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
-                      ) : (
-                        <SessionScrollRow>
-                          {scheduleItems.map((item) => {
-                            const isSelected = values.selectedSessionIds?.includes(item.id) ?? false;
-                            return (
-                              <div
-                                key={item.id}
-                                role="button"
-                                tabIndex={0}
-                                aria-pressed={isSelected}
-                                onClick={() => toggleSession(item.id)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    toggleSession(item.id);
-                                  }
-                                }}
-                                className={cn(
-                                  "min-w-[240px] max-w-[260px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                  isSelected
-                                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                                    : "border-border bg-card hover:border-primary/40",
-                                )}
+                  {isMultiSession && selectedDays.length > 0 && (
+                    <div className="space-y-6">
+                      {selectedDays.map((day) => {
+                        const dayId = day.id;
+                        const dayItems = scheduleItemsByDay[dayId] ?? [];
+                        const selectedForDay = values.sessionsByDay?.[dayId] ?? [];
+                        const dayAttendance = values.attendanceByDay?.[dayId] ?? "physical";
+                        const loading = scheduleLoadingByDay[dayId];
+                        const error = scheduleErrorByDay[dayId];
+
+                        return (
+                          <div key={dayId} className="space-y-4 rounded-xl border p-4 bg-card">
+                            <h4 className="font-semibold text-sm">{getDayLabel(day)}</h4>
+
+                            <div className="space-y-2">
+                              <Label>Attendance Mode</Label>
+                              <Select
+                                onValueChange={(value) => setDayAttendance(dayId, value as AttendanceMode)}
+                                value={dayAttendance}
                               >
-                                <div className="p-3 space-y-2">
-                                  <div className="flex items-start gap-2">
-                                    <div
-                                      aria-hidden
-                                      className={cn(
-                                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                        isSelected && "bg-primary text-primary-foreground",
-                                      )}
-                                    >
-                                      {isSelected && <Check className="h-3 w-3" />}
-                                    </div>
-                                    <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground pl-6">
-                                    {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
-                                    <Mic className="h-3 w-3" />
-                                    {item.speakerName || "Speaker TBA"}
-                                  </p>
-                                </div>
+                                <SelectTrigger><SelectValue placeholder="Select attendance mode" /></SelectTrigger>
+                                <SelectContent>
+                                  {ATTENDANCE_MODES.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <Label>Select Sessions</Label>
+                                {selectedForDay.length > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {selectedForDay.length} selected
+                                  </span>
+                                )}
                               </div>
-                            );
-                          })}
-                        </SessionScrollRow>
-                      )}
+                              {loading ? (
+                                <p className="text-sm text-muted-foreground">Loading sessions…</p>
+                              ) : error ? (
+                                <p className="text-sm text-destructive">{error}</p>
+                              ) : dayItems.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
+                              ) : (
+                                <SessionScrollRow>
+                                  {dayItems.map((item) => {
+                                    const isSelected = selectedForDay.includes(item.id);
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-pressed={isSelected}
+                                        onClick={() => toggleSessionForDay(dayId, item.id)}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            toggleSessionForDay(dayId, item.id);
+                                          }
+                                        }}
+                                        className={cn(
+                                          "min-w-[240px] max-w-[260px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                          isSelected
+                                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                            : "border-border bg-card hover:border-primary/40",
+                                        )}
+                                      >
+                                        <div className="p-3 space-y-2">
+                                          <div className="flex items-start gap-2">
+                                            <div
+                                              aria-hidden
+                                              className={cn(
+                                                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                                isSelected && "bg-primary text-primary-foreground",
+                                              )}
+                                            >
+                                              {isSelected && <Check className="h-3 w-3" />}
+                                            </div>
+                                            <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
+                                          </div>
+                                          <p className="text-xs text-muted-foreground pl-6">
+                                            {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
+                                            <Mic className="h-3 w-3" />
+                                            {item.speakerName || "Speaker TBA"}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </SessionScrollRow>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                       {sessionSelectionError && (
                         <p className="text-xs text-destructive">{sessionSelectionError}</p>
                       )}
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label>Attendance Mode</Label>
-                    <Controller name="attendanceMode" control={control} render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger><SelectValue placeholder="Select attendance mode" /></SelectTrigger>
-                        <SelectContent>
-                          {ATTENDANCE_MODES.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )} />
-                    {errors.attendanceMode && (
-                      <p className="text-xs text-destructive">{errors.attendanceMode.message}</p>
-                    )}
-                  </div>
+                  {!isMultiSession && (
+                    <div className="space-y-2">
+                      <Label>Attendance Mode</Label>
+                      <Controller name="attendanceMode" control={control} render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger><SelectValue placeholder="Select attendance mode" /></SelectTrigger>
+                          <SelectContent>
+                            {ATTENDANCE_MODES.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )} />
+                      {errors.attendanceMode && (
+                        <p className="text-xs text-destructive">{errors.attendanceMode.message}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -627,32 +685,49 @@ function EventRegisterForm() {
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">Participation</h4>
-                      <p>{getRegistrationOptionLabel(values.attendanceMode)}</p>
                       {isMultiSession ? (
-                        <>
-                          <p className="text-muted-foreground mt-1">
-                            {participationDateOptions.find((option) => option.value === values.participationDate)?.label ?? "—"}
-                          </p>
-                          {selectedSessions.length > 0 && (
-                            <ul className="mt-2 space-y-1 text-muted-foreground">
-                              {selectedSessions.map((session) => (
-                                <li key={session.id}>
-                                  {session.title} ({formatSessionTime(session.startTime)} - {formatSessionTime(session.endTime)})
+                        selectedDays.length > 0 ? (
+                          <ul className="space-y-4">
+                            {selectedDays.map((day) => {
+                              const dayId = day.id;
+                              const daySessions = (values.sessionsByDay?.[dayId] ?? [])
+                                .map((id) => (scheduleItemsByDay[dayId] ?? []).find((s) => s.id === id))
+                                .filter((session): session is ScheduleItemRecord => Boolean(session));
+                              const dayAttendance = values.attendanceByDay?.[dayId] ?? "physical";
+
+                              return (
+                                <li key={dayId}>
+                                  <p className="font-medium">{getDayLabel(day)}</p>
+                                  <p className="text-muted-foreground">{getRegistrationOptionLabel(dayAttendance)}</p>
+                                  {daySessions.length > 0 && (
+                                    <ul className="mt-1 space-y-1 text-muted-foreground">
+                                      {daySessions.map((session) => (
+                                        <li key={session.id}>
+                                          {session.title} ({formatSessionTime(session.startTime)} - {formatSessionTime(session.endTime)})
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
                                 </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <p className="text-muted-foreground">—</p>
+                        )
+                      ) : (
+                        <>
+                          <p>{getRegistrationOptionLabel(values.attendanceMode)}</p>
+                          {selectedDays.length > 0 ? (
+                            <ul className="mt-2 space-y-1 text-muted-foreground">
+                              {selectedDays.map((day) => (
+                                <li key={day.id}>{getDayLabel(day)}</li>
                               ))}
                             </ul>
+                          ) : (
+                            <p className="text-muted-foreground mt-1">—</p>
                           )}
                         </>
-                      ) : selectedDays.length > 0 ? (
-                        <ul className="mt-2 space-y-1 text-muted-foreground">
-                          {selectedDays.map((day) => (
-                            <li key={day.id}>
-                              {day.label?.trim() || participationDateOptions.find((option) => option.value === day.date)?.label || day.date}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-muted-foreground mt-1">—</p>
                       )}
                     </div>
                   </CardContent>

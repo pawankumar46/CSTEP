@@ -21,6 +21,8 @@ const lobbyUserRegistrationFields = {
   participationDate: z.string().optional(),
   selectedDayIds: z.array(z.string()),
   selectedSessionIds: z.array(z.string()),
+  sessionsByDay: z.record(z.string(), z.array(z.string())),
+  attendanceByDay: z.record(z.string(), z.enum(["physical", "virtual"])),
   attendanceMode: z.enum(["physical", "virtual"]),
 } as const;
 
@@ -71,6 +73,8 @@ export const EMPTY_LOBBY_USER_REGISTRATION: LobbyUserRegistrationFormValues = {
   participationDate: "",
   selectedDayIds: [],
   selectedSessionIds: [],
+  sessionsByDay: {},
+  attendanceByDay: {},
   attendanceMode: "physical",
 };
 

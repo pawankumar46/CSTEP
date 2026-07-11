@@ -5,6 +5,8 @@ export const registrationEditSchema = z.object({
   participationDate: z.string().optional(),
   selectedDayIds: z.array(z.string()),
   selectedSessionIds: z.array(z.string()),
+  sessionsByDay: z.record(z.string(), z.array(z.string())),
+  attendanceByDay: z.record(z.string(), z.enum(["physical", "virtual"])),
   attendanceMode: z.enum(["physical", "virtual"]),
 });
 
@@ -15,5 +17,7 @@ export const EMPTY_REGISTRATION_EDIT: RegistrationEditFormValues = {
   participationDate: "",
   selectedDayIds: [],
   selectedSessionIds: [],
+  sessionsByDay: {},
+  attendanceByDay: {},
   attendanceMode: "physical",
 };

@@ -70,7 +70,14 @@ export const registerLobbyUserForEvent = async (
   values: LobbyUserRegistrationFormValues,
   scheduleType?: "WHOLE_DAY" | "MULTI_SESSION",
 ): Promise<Registration> => {
-  const { eventId, selectedDayIds, selectedSessionIds, attendanceMode } = values;
+  const {
+    eventId,
+    selectedDayIds,
+    selectedSessionIds,
+    sessionsByDay,
+    attendanceByDay,
+    attendanceMode,
+  } = values;
 
   return submitLobbyRegistration(
     userId,
@@ -78,6 +85,8 @@ export const registerLobbyUserForEvent = async (
       eventId,
       selectedDayIds,
       selectedSessionIds,
+      sessionsByDay,
+      attendanceByDay,
       attendanceMode,
     },
     { scheduleType: scheduleType ?? "WHOLE_DAY" },
@@ -419,7 +428,7 @@ export const bulkUpdateSessionRegistrationStatus = async (
   status: SessionBulkStatus,
 ): Promise<void> => {
   try {
-    await apiClient.patch("/registrations/sessions/bulk-status/", {
+    await apiClient.patch("/registrations/registration-session/bulk-status/", {
       ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
       status,
     });

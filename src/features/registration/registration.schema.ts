@@ -12,6 +12,8 @@ export const registrationSchema = z.object({
   participationTime: z.enum(["half_day", "full_day"]),
   selectedDayIds: z.array(z.string()),
   selectedSessionIds: z.array(z.string()),
+  sessionsByDay: z.record(z.string(), z.array(z.string())),
+  attendanceByDay: z.record(z.string(), z.enum(["physical", "virtual"])),
   attendanceMode: z.enum(["physical", "virtual"]),
 });
 
@@ -20,6 +22,6 @@ export type RegistrationFormValues = z.infer<typeof registrationSchema>;
 export const REGISTRATION_STEPS = [
   { title: "Select Event", fields: ["eventId"] as const },
   { title: "Personal Info", fields: ["salutation", "firstName", "middleName", "lastName", "phone", "email"] as const },
-  { title: "Participation", fields: ["participationDate", "attendanceMode"] as const },
+  { title: "Participation", fields: ["attendanceMode"] as const },
   { title: "Review", fields: [] as const },
 ];

@@ -214,6 +214,15 @@ export interface SessionRegistration {
   registeredAt: string;
 }
 
+export interface RegistrationDay {
+  id: string;
+  dayId: string;
+  dayNumber?: number;
+  date: string;
+  attendanceMode: AttendanceMode;
+  sessions: SessionRegistration[];
+}
+
 export interface Registration {
   id: string;
   userId: string;
@@ -224,8 +233,10 @@ export interface Registration {
   participationDate: ParticipationDate;
   participationDateLabel?: string;
   participationTime: ParticipationTime;
+  registeredDaysCount?: number;
   registeredSessionsCount?: number;
   selectedDayIds?: string[];
+  days?: RegistrationDay[];
   sessionRegistrations?: SessionRegistration[];
   attendanceMode: AttendanceMode;
   foodPreference: FoodPreference;
@@ -489,6 +500,8 @@ export interface RegistrationFormData {
   participationTime: ParticipationTime;
   selectedDayIds?: string[];
   selectedSessionIds?: string[];
+  sessionsByDay?: Record<string, string[]>;
+  attendanceByDay?: Record<string, AttendanceMode>;
   attendanceMode: AttendanceMode;
 }
 

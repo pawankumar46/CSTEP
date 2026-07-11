@@ -314,7 +314,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/registrations/` | User's registrations |
-| `POST` | `/registrations/registration/` | Create registration (user / lobby / admin); `participation_dates` is `string[]`; optional `schedule_items` is `number[]` for multi-session events |
+| `POST` | `/registrations/registration/` | Create registration. **WHOLE_DAY:** `{ event, day_ids, attendance_mode }`. **MULTI_SESSION:** `{ event, sessions: [{ day, attendance_mode: PHYSICAL \| VIRTUAL, session_ids }] }` |
 | `PUT` | `/registrations/registration/:id/` | Update registration |
 | `PATCH` | `/registrations/registration/bulk-status/` | Bulk status: `{ ids, status }` |
 | `PATCH` | `/registrations/:id/` | Update registration preferences |
@@ -455,6 +455,17 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-11
+
+- **Event registration — MULTI_SESSION payload:** `POST /registrations/registration/` now sends `{ event, sessions: [{ day, attendance_mode, session_ids }] }` with per-day attendance (`PHYSICAL` / `VIRTUAL`). Step 3 supports **multi-day** selection; each selected day has its own attendance mode and session multi-select.
+- **Manage Lobby — Add Users:** MULTI_SESSION registration matches the new multi-day sessions payload and UI (per-day attendance + sessions).
+- **Manage Lobby — Edit registration:** MULTI_SESSION edit now uses the same multi-day flow (per-day attendance + session multi-select), prefilled from the `days[]` detail response, and sends the `sessions[]` payload on `PUT`.
+- **Manage Lobby — registration list:** `GET /registrations/registration/` response now returns `registered_days_count`; added a **Days** column (and CSV/Excel/PDF export field) alongside **Sessions**.
+- **Manage Lobby — session details:** `GET /registrations/registration/{id}/` now nests sessions under `days[]` (each with `day_number`, `date`, `attendance_mode`, `sessions[]`). The session details dialog groups sessions per day with a per-day attendance badge; approve/reject and bulk status still act on each session registration id.
+- **Manage Lobby — session bulk status endpoint:** Bulk approve/reject now posts to `PATCH /registrations/registration-session/bulk-status/` (was `/registrations/sessions/bulk-status/`).
+- **Auth — 403 handling:** API responses with `403 Forbidden` (on non–auth-page requests) now clear the session and redirect to `/login` (previously only expired-token `401`s did).
+- **Session details fix:** When the same session registration id appears under multiple days, selecting/approving one row no longer toggles the duplicate row in another day (selection keyed per day+session).
+
 ### 2026-07-10
 
 - **Auth token expiry:** API responses with `token_not_valid` / expired access token (`401`) clear the local session and redirect to `/login` automatically.
@@ -486,7 +497,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 - **Manage Lobby — registration list:** `GET /registrations/registration/` now filters with `event=<id>` (was `registration__event`). Table/export map the new response fields: `registered_sessions_count`, `attendance_mode`, `food_preference` (replacing participation date/time columns).
 - **Manage Lobby — session details:** Moderators/event admins can click a non-zero Sessions count to open a modal that loads `GET /registrations/registration/{id}/` and lists `session_registrations` (title, date, time, track, status).
 - **Manage Lobby — session approve/reject:** Sessions in the modal show **Approve** / **Reject** so status can be changed again after a decision (Approve hidden when already accepted; Reject hidden when already rejected). Posts to `/registrations/registration/{registration_id}/sessions/{session_reg_id}/approve/` and `.../reject/`, then refreshes the list.
-- **Manage Lobby — session bulk status:** Select multiple sessions in the modal and bulk **Approve** / **Reject** via `PATCH /registrations/sessions/bulk-status/` with `{ ids, status: "APPROVED" | "REJECTED" }`.
+- **Manage Lobby — session bulk status:** Select multiple sessions in the modal and bulk **Approve** / **Reject** via `PATCH /registrations/registration-session/bulk-status/` with `{ ids, status: "APPROVED" | "REJECTED" }`.
 - **Manage Lobby — Add Users:** Step 2 registration now matches public event registration — **WHOLE_DAY** multi-selects `day_ids`; **MULTI_SESSION** picks a day then multi-selects sessions as `session_ids`. Removed participation time / legacy `participation_dates` from this flow.
 - **Manage Lobby — Edit registration:** Edit dialog now uses the same **WHOLE_DAY** (`day_ids`) / **MULTI_SESSION** (`session_ids`) flow; loads current selections from registration detail and removes participation time / legacy date radios.
 - **Manage Lobby — Edit error popup:** Failed registration updates (e.g. 400 “already registered”) show the API error in a popup with an **OK** button instead of an uncaught promise.

@@ -205,6 +205,13 @@ function LobbyContent() {
       { accessorKey: "phone", header: "Phone Number" },
       { accessorKey: "email", header: "Email" },
       {
+        accessorKey: "registeredDaysCount",
+        header: "Days",
+        cell: ({ row }) => (
+          <span className="tabular-nums">{row.original.registeredDaysCount ?? 0}</span>
+        ),
+      },
+      {
         accessorKey: "registeredSessionsCount",
         header: "Sessions",
         cell: ({ row }) => {

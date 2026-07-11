@@ -56,6 +56,10 @@ export function isExpiredAccessTokenError(error: unknown): boolean {
   });
 }
 
+export function isForbiddenError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 403;
+}
+
 export async function forceSessionExpiredRedirect(): Promise<void> {
   if (typeof window === "undefined" || handlingExpiredSession || isAuthPagePath()) {
     return;
@@ -97,5 +101,6 @@ export async function forceSessionExpiredRedirect(): Promise<void> {
 }
 
 export function shouldForceLoginOnAuthError(error: unknown, requestUrl?: string): boolean {
-  return isExpiredAccessTokenError(error) && !isPublicAuthRequest(requestUrl);
+  if (isPublicAuthRequest(requestUrl)) return false;
+  return isExpiredAccessTokenError(error) || isForbiddenError(error);
 }

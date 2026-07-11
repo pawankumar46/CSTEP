@@ -15,6 +15,7 @@ export const LOBBY_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
   { header: "User Name", value: (row) => row.userName },
   { header: "Phone Number", value: (row) => row.phone },
   { header: "Email", value: (row) => row.email },
+  { header: "Days", value: (row) => row.registeredDaysCount ?? 0 },
   { header: "Sessions", value: (row) => row.registeredSessionsCount ?? 0 },
   {
     header: "Attendance",

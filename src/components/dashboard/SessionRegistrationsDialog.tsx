@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { assistanceStatusVariant, formatAssistanceStatus } from "@/lib/assistance-status";
 import { formatParticipationDateDisplay } from "@/lib/registration-mappers";
+import { getRegistrationOptionLabel } from "@/lib/registration-options";
 import { cn } from "@/lib/utils";
 import {
   approveSessionRegistration,
@@ -22,7 +23,7 @@ import {
   rejectSessionRegistration,
   type SessionBulkStatus,
 } from "@/services/lobby.service";
-import type { Registration, SessionRegistration } from "@/types";
+import type { Registration, RegistrationDay } from "@/types";
 
 interface SessionRegistrationsDialogProps {
   open: boolean;
@@ -47,7 +48,7 @@ export function SessionRegistrationsDialog({
   registration,
   canManage = false,
 }: SessionRegistrationsDialogProps) {
-  const [sessions, setSessions] = useState<SessionRegistration[]>([]);
+  const [days, setDays] = useState<RegistrationDay[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -56,36 +57,71 @@ export function SessionRegistrationsDialog({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const daysWithSessions = useMemo(
+    () => days.filter((day) => day.sessions.length > 0),
+    [days],
+  );
+  const hasSessions = daysWithSessions.length > 0;
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const allSessionIds = useMemo(() => sessions.map((session) => session.id), [sessions]);
+  const rowKeyToSessionId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const day of days) {
+      for (const session of day.sessions) {
+        map.set(`${day.id}-${session.id}`, session.id);
+      }
+    }
+    return map;
+  }, [days]);
+  const allRowKeys = useMemo(() => [...rowKeyToSessionId.keys()], [rowKeyToSessionId]);
   const allSelected =
-    allSessionIds.length > 0 && allSessionIds.every((id) => selectedSet.has(id));
+    allRowKeys.length > 0 && allRowKeys.every((key) => selectedSet.has(key));
   const selectedCount = selectedIds.length;
   const isBusy = actionLoadingId !== null || bulkLoading;
 
-  const loadSessions = useCallback(async (registrationId: string) => {
-    setLoading(true);
-    setError(null);
-    setActionError(null);
-    try {
-      const detail = await getLobbyRegistrationDetail(registrationId);
-      const nextSessions = detail.sessionRegistrations ?? [];
-      setSessions(nextSessions);
-      setSelectedIds((prev) =>
-        prev.filter((id) => nextSessions.some((session) => session.id === id)),
-      );
-    } catch (err) {
-      setSessions([]);
-      setSelectedIds([]);
-      setError(err instanceof Error ? err.message : "Failed to load sessions");
-    } finally {
-      setLoading(false);
-    }
+  const buildDays = useCallback((detail: Registration): RegistrationDay[] => {
+    if (detail.days && detail.days.length > 0) return detail.days;
+    const sessions = detail.sessionRegistrations ?? [];
+    if (sessions.length === 0) return [];
+    return [
+      {
+        id: "all",
+        dayId: "",
+        date: sessions[0]?.date ?? "",
+        attendanceMode: detail.attendanceMode,
+        sessions,
+      },
+    ];
   }, []);
+
+  const loadSessions = useCallback(
+    async (registrationId: string) => {
+      setLoading(true);
+      setError(null);
+      setActionError(null);
+      try {
+        const detail = await getLobbyRegistrationDetail(registrationId);
+        const nextDays = buildDays(detail);
+        const validKeys = new Set(
+          nextDays.flatMap((day) =>
+            day.sessions.map((session) => `${day.id}-${session.id}`),
+          ),
+        );
+        setDays(nextDays);
+        setSelectedIds((prev) => prev.filter((key) => validKeys.has(key)));
+      } catch (err) {
+        setDays([]);
+        setSelectedIds([]);
+        setError(err instanceof Error ? err.message : "Failed to load sessions");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [buildDays],
+  );
 
   useEffect(() => {
     if (!open || !registration) {
-      setSessions([]);
+      setDays([]);
       setError(null);
       setLoading(false);
       setActionLoadingId(null);
@@ -106,11 +142,11 @@ export function SessionRegistrationsDialog({
       try {
         const detail = await getLobbyRegistrationDetail(registration.id);
         if (!cancelled) {
-          setSessions(detail.sessionRegistrations ?? []);
+          setDays(buildDays(detail));
         }
       } catch (err) {
         if (!cancelled) {
-          setSessions([]);
+          setDays([]);
           setError(err instanceof Error ? err.message : "Failed to load sessions");
         }
       } finally {
@@ -121,15 +157,16 @@ export function SessionRegistrationsDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, registration]);
+  }, [open, registration, buildDays]);
 
   const handleSessionAction = async (
+    rowKey: string,
     sessionId: string,
     action: "approve" | "reject",
   ) => {
     if (!registration) return;
 
-    setActionLoadingId(sessionId);
+    setActionLoadingId(rowKey);
     setActionError(null);
     try {
       if (action === "approve") {
@@ -152,11 +189,20 @@ export function SessionRegistrationsDialog({
   const handleBulkAction = async (status: SessionBulkStatus) => {
     if (!registration || selectedIds.length === 0) return;
 
+    const sessionIds = [
+      ...new Set(
+        selectedIds
+          .map((key) => rowKeyToSessionId.get(key))
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (sessionIds.length === 0) return;
+
     setBulkLoading(true);
     setPendingBulkAction(status);
     setActionError(null);
     try {
-      await bulkUpdateSessionRegistrationStatus(selectedIds, status);
+      await bulkUpdateSessionRegistrationStatus(sessionIds, status);
       setSelectedIds([]);
       await loadSessions(registration.id);
     } catch (err) {
@@ -190,7 +236,7 @@ export function SessionRegistrationsDialog({
           </div>
         ) : error ? (
           <p className="py-6 text-sm text-destructive text-center">{error}</p>
-        ) : sessions.length === 0 ? (
+        ) : !hasSessions ? (
           <div className="py-10 text-center space-y-1">
             <p className="text-sm font-medium">No sessions registered</p>
             <p className="text-xs text-muted-foreground">
@@ -212,7 +258,7 @@ export function SessionRegistrationsDialog({
                     checked={allSelected}
                     disabled={isBusy}
                     onCheckedChange={(checked) => {
-                      setSelectedIds(checked ? allSessionIds : []);
+                      setSelectedIds(checked ? allRowKeys : []);
                     }}
                     aria-label="Select all sessions"
                   />
@@ -255,102 +301,118 @@ export function SessionRegistrationsDialog({
               </div>
             )}
 
-            <ul className="space-y-3">
-              {sessions.map((session) => {
-                const isActionLoading = actionLoadingId === session.id;
-                const canApprove = canManage && session.status !== "accepted";
-                const canReject = canManage && session.status !== "rejected";
-                const isSelected = selectedSet.has(session.id);
+            <div className="space-y-4">
+              {daysWithSessions.map((day) => (
+                <div key={day.id} className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {day.dayNumber ? `Day ${day.dayNumber}` : "Day"}
+                      {day.date ? ` · ${formatParticipationDateDisplay(day.date)}` : ""}
+                    </p>
+                    <Badge variant="outline" className="shrink-0">
+                      {getRegistrationOptionLabel(day.attendanceMode)}
+                    </Badge>
+                  </div>
+                  <ul className="space-y-3">
+                    {day.sessions.map((session) => {
+                      const rowKey = `${day.id}-${session.id}`;
+                      const isActionLoading = actionLoadingId === rowKey;
+                      const canApprove = canManage && session.status !== "accepted";
+                      const canReject = canManage && session.status !== "rejected";
+                      const isSelected = selectedSet.has(rowKey);
 
-                return (
-                  <li
-                    key={session.id}
-                    className="rounded-xl border border-border bg-card p-3 space-y-2"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2 min-w-0">
-                        {canManage && (
-                          <Checkbox
-                            className="mt-0.5"
-                            checked={isSelected}
-                            disabled={isBusy}
-                            onCheckedChange={(checked) => {
-                              setSelectedIds((prev) =>
-                                checked
-                                  ? [...prev, session.id]
-                                  : prev.filter((id) => id !== session.id),
-                              );
-                            }}
-                            aria-label={`Select ${session.sessionTitle}`}
-                          />
-                        )}
-                        <p className="font-medium text-sm leading-snug">{session.sessionTitle}</p>
-                      </div>
-                      <Badge
-                        variant={assistanceStatusVariant[session.status]}
-                        className="capitalize shrink-0"
-                      >
-                        {formatAssistanceStatus(session.status)}
-                      </Badge>
-                    </div>
-                    <div className={cn(
-                      "flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground",
-                      canManage && "pl-6",
-                    )}>
-                      <span className="inline-flex items-center gap-1">
-                        <CalendarDays className="h-3 w-3" />
-                        {formatParticipationDateDisplay(session.date)}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatSessionTime(session.startTime)} – {formatSessionTime(session.endTime)}
-                      </span>
-                      {session.track && (
-                        <span className="capitalize">Track: {session.track}</span>
-                      )}
-                    </div>
-                    {canManage && (canApprove || canReject) && (
-                      <div className="flex items-center gap-2 pt-1 pl-6">
-                        {canApprove && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-emerald-600"
-                            disabled={isBusy}
-                            onClick={() => void handleSessionAction(session.id, "approve")}
-                          >
-                            {isActionLoading ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Check className="h-3 w-3" />
+                      return (
+                        <li
+                          key={rowKey}
+                          className="rounded-xl border border-border bg-card p-3 space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2 min-w-0">
+                              {canManage && (
+                                <Checkbox
+                                  className="mt-0.5"
+                                  checked={isSelected}
+                                  disabled={isBusy}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedIds((prev) =>
+                                      checked
+                                        ? [...prev, rowKey]
+                                        : prev.filter((key) => key !== rowKey),
+                                    );
+                                  }}
+                                  aria-label={`Select ${session.sessionTitle}`}
+                                />
+                              )}
+                              <p className="font-medium text-sm leading-snug">{session.sessionTitle}</p>
+                            </div>
+                            <Badge
+                              variant={assistanceStatusVariant[session.status]}
+                              className="capitalize shrink-0"
+                            >
+                              {formatAssistanceStatus(session.status)}
+                            </Badge>
+                          </div>
+                          <div className={cn(
+                            "flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground",
+                            canManage && "pl-6",
+                          )}>
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarDays className="h-3 w-3" />
+                              {formatParticipationDateDisplay(session.date)}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatSessionTime(session.startTime)} – {formatSessionTime(session.endTime)}
+                            </span>
+                            {session.track && (
+                              <span className="capitalize">Track: {session.track}</span>
                             )}
-                            Approve
-                          </Button>
-                        )}
-                        {canReject && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-destructive"
-                            disabled={isBusy}
-                            onClick={() => void handleSessionAction(session.id, "reject")}
-                          >
-                            {isActionLoading ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <X className="h-3 w-3" />
-                            )}
-                            Reject
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+                          </div>
+                          {canManage && (canApprove || canReject) && (
+                            <div className="flex items-center gap-2 pt-1 pl-6">
+                              {canApprove && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-emerald-600"
+                                  disabled={isBusy}
+                                  onClick={() => void handleSessionAction(rowKey, session.id, "approve")}
+                                >
+                                  {isActionLoading ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Check className="h-3 w-3" />
+                                  )}
+                                  Approve
+                                </Button>
+                              )}
+                              {canReject && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-destructive"
+                                  disabled={isBusy}
+                                  onClick={() => void handleSessionAction(rowKey, session.id, "reject")}
+                                >
+                                  {isActionLoading ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <X className="h-3 w-3" />
+                                  )}
+                                  Reject
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </DialogContent>

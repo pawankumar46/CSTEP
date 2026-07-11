@@ -256,6 +256,8 @@ export const submitLobbyRegistration = async (
     eventId: string;
     selectedDayIds?: string[];
     selectedSessionIds?: string[];
+    sessionsByDay?: Record<string, string[]>;
+    attendanceByDay?: Record<string, AttendanceMode>;
     attendanceMode?: AttendanceMode;
   },
   options?: SubmitRegistrationOptions,
