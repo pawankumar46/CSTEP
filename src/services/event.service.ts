@@ -73,7 +73,12 @@ export const getEventDropdown = async (): Promise<EventDropdownOption[]> => {
 
 export const getEvents = async (type: EventListType = "upcoming"): Promise<Event[]> => {
   try {
-    const { data } = await apiClient.get<unknown>("/events/event/", { params: { type } });
+    // The dedicated upcoming endpoint returns the assistance flags (allowed_*),
+    // which the list endpoint omits — needed for prefilling the edit form.
+    const { data } =
+      type === "upcoming"
+        ? await apiClient.get<unknown>("/events/event/upcoming/")
+        : await apiClient.get<unknown>("/events/event/", { params: { type } });
     return extractEventList(data).map(mapApiEventToEvent);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));

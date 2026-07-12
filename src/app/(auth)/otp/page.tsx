@@ -12,7 +12,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { OTPInput } from "@/components/shared/OTPInput";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
+import { resendOtp } from "@/services/auth.service";
 import { ROUTES, buildAuthUrl, sanitizeRedirect } from "@/lib/routes";
+
+const RESEND_COOLDOWN_SECONDS = 30;
 
 function OTPForm() {
   const router = useRouter();
@@ -25,6 +28,9 @@ function OTPForm() {
   const [otp, setOtp] = useState("");
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
     if (prefilledEmail) {
@@ -32,9 +38,40 @@ function OTPForm() {
     }
   }, [prefilledEmail]);
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
+  const handleResend = async () => {
+    if (resending || cooldown > 0) return;
+    clearError();
+    setFormError(null);
+    setResendMessage(null);
+
+    if (!email.trim()) {
+      setFormError("Email is required");
+      return;
+    }
+
+    setResending(true);
+    try {
+      await resendOtp(email.trim().toLowerCase());
+      setOtp("");
+      setResendMessage("A new OTP has been sent to your email.");
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to resend OTP");
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleVerify = async () => {
     clearError();
     setFormError(null);
+    setResendMessage(null);
 
     if (!email.trim()) {
       setFormError("Email is required");
@@ -86,6 +123,12 @@ function OTPForm() {
             </div>
           )}
 
+          {resendMessage && (
+            <div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-600 dark:text-emerald-400 text-center">
+              {resendMessage}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
             <Input
@@ -108,6 +151,23 @@ function OTPForm() {
             {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {isLoading ? "Verifying..." : "Verify Email"}
           </Button>
+
+          <p className="text-sm text-muted-foreground">
+            Didn&apos;t get the code?{" "}
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resending || cooldown > 0}
+              className="font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
+            >
+              {resending
+                ? "Resending..."
+                : cooldown > 0
+                  ? `Resend OTP in ${cooldown}s`
+                  : "Resend OTP"}
+            </button>
+          </p>
+
           <Link href={buildAuthUrl(ROUTES.login, { redirect: searchParams.get("redirect") })} className="text-sm text-primary hover:underline">
             Back to sign in
           </Link>

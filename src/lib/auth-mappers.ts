@@ -105,6 +105,20 @@ export function toLoginPayload(identifier: string, password: string) {
   };
 }
 
+export function toUpdateProfilePayload(data: {
+  salutation?: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+}) {
+  return {
+    salutation: data.salutation ?? "",
+    first_name: data.firstName.trim(),
+    middle_name: data.middleName?.trim() ?? "",
+    last_name: data.lastName.trim(),
+  };
+}
+
 export function mapApiUser(raw: Record<string, unknown>, fallbackEmail?: string): User {
   const roleKey = String(raw.role ?? "BASE_USER");
   const now = new Date().toISOString();

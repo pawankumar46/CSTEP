@@ -42,6 +42,10 @@ export interface Event {
   createdAt: string;
   updatedAt: string;
   scheduleType?: EventScheduleType;
+  travelAssistance?: boolean;
+  medicalAssistance?: boolean;
+  translationAssistance?: boolean;
+  accommodationAssistance?: boolean;
 }
 
 export interface EventRegistrationSummary {
@@ -65,6 +69,10 @@ export interface EventDropdownOption {
   date: string;
   endDate?: string;
   scheduleType?: EventScheduleType;
+  travelAssistance?: boolean;
+  medicalAssistance?: boolean;
+  translationAssistance?: boolean;
+  accommodationAssistance?: boolean;
 }
 
 export interface CreateEventPayload {
@@ -75,6 +83,10 @@ export interface CreateEventPayload {
   videoMutedByDefault: boolean;
   pauseContinueEnabled: boolean;
   scheduleType: EventScheduleType;
+  travelAssistance: boolean;
+  medicalAssistance: boolean;
+  translationAssistance: boolean;
+  accommodationAssistance: boolean;
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;

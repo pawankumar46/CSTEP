@@ -28,7 +28,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { AlreadyRegisteredError } from "@/services/registration.service";
 import { getEventDays, getEventDropdown, getScheduleItemsDropdown } from "@/services/event.service";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, buildProfileSupportUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import type { EventDay, ScheduleItemRecord } from "@/services/event.service";
 import type { AttendanceMode, EventDropdownOption } from "@/types";
@@ -351,10 +351,18 @@ function EventRegisterForm() {
         userId: user?.id,
         scheduleType: selectedEvent?.scheduleType ?? "WHOLE_DAY",
       });
-      // Assistance services disabled — redirect home after registration
-      // sessionStorage.setItem(PROFILE_SUPPORT_EVENT_KEY, eventId);
-      // router.replace(buildProfileSupportUrl(eventId));
-      router.replace(ROUTES.home);
+
+      const enabledServices: string[] = [];
+      if (selectedEvent?.travelAssistance) enabledServices.push("travel");
+      if (selectedEvent?.medicalAssistance) enabledServices.push("medical");
+      if (selectedEvent?.translationAssistance) enabledServices.push("translation");
+      if (selectedEvent?.accommodationAssistance) enabledServices.push("accommodation");
+
+      if (enabledServices.length > 0) {
+        router.replace(buildProfileSupportUrl(eventId, enabledServices));
+      } else {
+        router.replace(ROUTES.home);
+      }
     } catch (err) {
       if (err instanceof AlreadyRegisteredError) {
         setAlreadyRegistered(true);

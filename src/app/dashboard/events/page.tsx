@@ -54,7 +54,18 @@ const defaultForm = {
   videoMutedByDefault: true,
   pauseContinueEnabled: true,
   scheduleType: "WHOLE_DAY" as EventScheduleType,
+  travelAssistance: false,
+  medicalAssistance: false,
+  translationAssistance: false,
+  accommodationAssistance: false,
 };
+
+const ASSISTANCE_OPTIONS = [
+  { key: "travelAssistance", label: "Travel assistance" },
+  { key: "medicalAssistance", label: "Medical assistance" },
+  { key: "translationAssistance", label: "Translation assistance" },
+  { key: "accommodationAssistance", label: "Accommodation assistance" },
+] as const;
 
 type EventFormState = typeof defaultForm;
 
@@ -146,6 +157,29 @@ function EventFormFields({
           </Label>
         </div>
       </div>
+
+      <div className="space-y-3 rounded-lg border p-3">
+        <div>
+          <p className="text-sm font-medium">Assistance offered for this event</p>
+          <p className="text-xs text-muted-foreground">
+            Enable the assistance types this event provides. Disabled types are hidden in the lobby.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {ASSISTANCE_OPTIONS.map((option) => (
+            <div key={option.key} className="flex items-center gap-2">
+              <Checkbox
+                id={`${idPrefix}-${option.key}`}
+                checked={form[option.key]}
+                onCheckedChange={(checked) => setForm({ ...form, [option.key]: !!checked })}
+              />
+              <Label htmlFor={`${idPrefix}-${option.key}`} className="font-normal cursor-pointer">
+                {option.label}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -184,6 +218,11 @@ export default function EventsPage() {
     setEventListType(type);
   };
 
+  const openCreate = () => {
+    setForm(defaultForm);
+    setCreateOpen(true);
+  };
+
   const isFormValid = form.title.trim() && form.scheduledStart && form.scheduledEnd;
 
   const buildPayload = () => ({
@@ -194,6 +233,10 @@ export default function EventsPage() {
     videoMutedByDefault: form.videoMutedByDefault,
     pauseContinueEnabled: form.pauseContinueEnabled,
     scheduleType: form.scheduleType,
+    travelAssistance: form.travelAssistance,
+    medicalAssistance: form.medicalAssistance,
+    translationAssistance: form.translationAssistance,
+    accommodationAssistance: form.accommodationAssistance,
   });
 
   const handleCreate = async () => {
@@ -221,6 +264,10 @@ export default function EventsPage() {
       videoMutedByDefault: true,
       pauseContinueEnabled: true,
       scheduleType: event.scheduleType ?? "WHOLE_DAY",
+      travelAssistance: event.travelAssistance ?? false,
+      medicalAssistance: event.medicalAssistance ?? false,
+      translationAssistance: event.translationAssistance ?? false,
+      accommodationAssistance: event.accommodationAssistance ?? false,
     });
     setEditOpen(true);
   };
@@ -273,7 +320,7 @@ export default function EventsPage() {
             <p className="text-muted-foreground">Browse and manage events</p>
           </div>
           {canManage && (
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus className="h-4 w-4 mr-2" /> Create Event
             </Button>
           )}
@@ -300,7 +347,7 @@ export default function EventsPage() {
           <p className="text-muted-foreground">Browse and manage events</p>
         </div>
         {canManage && (
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" /> Create Event
           </Button>
         )}
@@ -336,7 +383,7 @@ export default function EventsPage() {
           description={EMPTY_STATE_COPY[eventListType].description}
           action={
             canManage && eventListType === "upcoming"
-              ? { label: "Create Event", onClick: () => setCreateOpen(true) }
+              ? { label: "Create Event", onClick: openCreate }
               : undefined
           }
         />

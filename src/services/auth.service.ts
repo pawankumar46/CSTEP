@@ -16,6 +16,7 @@ import {
   toSignupPayload,
   toLobbySignupPayload,
   toResetPasswordPayload,
+  toUpdateProfilePayload,
   toVerifyOtpPayload,
 } from "@/lib/auth-mappers";
 import type { AuthResponse, LoginCredentials, ResetPasswordPayload, SignupCredentials, User, VerifyOtpPayload } from "@/types";
@@ -116,6 +117,15 @@ export const verifyOtp = async (payload: VerifyOtpPayload): Promise<{ success: b
   }
 };
 
+export const resendOtp = async (email: string): Promise<{ success: boolean }> => {
+  try {
+    await apiClient.post("/auth/resend-otp/", { email: normalizeAuthIdentifier(email) });
+    return { success: true };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 export const forgotPassword = async (email: string): Promise<{ success: boolean }> => {
   try {
     await apiClient.post("/auth/forgot-password/", { email: normalizeAuthIdentifier(email) });
@@ -129,6 +139,23 @@ export const resetPassword = async (payload: ResetPasswordPayload): Promise<{ su
   try {
     await apiClient.post("/auth/reset-password/", toResetPasswordPayload(payload));
     return { success: true };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const updateProfile = async (payload: {
+  salutation?: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+}): Promise<User> => {
+  try {
+    const { data } = await apiClient.patch<Record<string, unknown>>(
+      "/auth/me/",
+      toUpdateProfilePayload(payload),
+    );
+    return mapApiUser(data);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

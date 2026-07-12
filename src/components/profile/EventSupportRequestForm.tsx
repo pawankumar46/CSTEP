@@ -31,12 +31,11 @@ type ServiceOption = {
   icon: typeof Plane;
 };
 
-const SERVICE_OPTIONS: readonly ServiceOption[] = [
-  // Assistance services disabled
-  // { value: "travel", label: "Travel Assistance", icon: Plane },
-  // { value: "medical", label: "Medical Assistance", icon: Stethoscope },
-  // { value: "translation", label: "Translation Assistance", icon: Languages },
-  // { value: "accommodation", label: "Accommodation Assistance", icon: Hotel },
+const ALL_SERVICE_OPTIONS: readonly ServiceOption[] = [
+  { value: "travel", label: "Travel Assistance", icon: Plane },
+  { value: "medical", label: "Medical Assistance", icon: Stethoscope },
+  { value: "translation", label: "Translation Assistance", icon: Languages },
+  { value: "accommodation", label: "Accommodation Assistance", icon: Hotel },
 ];
 
 const TRANSPORT_OPTIONS = [
@@ -51,6 +50,10 @@ interface EventSupportRequestFormProps {
   errors: FieldErrors<EventSupportFormValues>;
   setValue: UseFormSetValue<EventSupportFormValues>;
   presetEventId?: string | null;
+  /** Restrict the selectable services (e.g. only those the event offers). */
+  allowedServices?: ServiceType[];
+  /** Hide the event picker when the event is already fixed. */
+  lockEvent?: boolean;
 }
 
 function clearServiceFields(
@@ -160,10 +163,17 @@ export function EventSupportRequestForm({
   errors,
   setValue,
   presetEventId,
+  allowedServices,
+  lockEvent = false,
 }: EventSupportRequestFormProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
+
+  const serviceOptions =
+    allowedServices && allowedServices.length > 0
+      ? ALL_SERVICE_OPTIONS.filter((option) => allowedServices.includes(option.value))
+      : ALL_SERVICE_OPTIONS;
 
   useEffect(() => {
     if (presetEventId) {
@@ -205,50 +215,52 @@ export function EventSupportRequestForm({
     error: errors.eventId?.message,
   };
 
-  if (SERVICE_OPTIONS.length === 0) {
+  if (serviceOptions.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Travel, medical, translation, and accommodation assistance requests are currently unavailable.
+        No assistance types are available for this event.
       </p>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <Label className="text-base">Select service</Label>
-        <Controller
-          name="serviceType"
-          control={control}
-          render={({ field }) => (
-            <RadioGroup
-              onValueChange={(service) => {
-                const next = service as ServiceType;
-                field.onChange(next);
-                clearServiceFields(next, setValue, presetEventId ?? undefined);
-              }}
-              value={field.value}
-              className="flex flex-wrap gap-6"
-            >
-              {SERVICE_OPTIONS.map((option) => (
-                <div key={option.value} className="flex items-center gap-2">
-                  <RadioGroupItem value={option.value} id={`service-${option.value}`} />
-                  <Label htmlFor={`service-${option.value}`} className="flex items-center gap-2 font-normal">
-                    <option.icon className="h-4 w-4 text-muted-foreground" />
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          )}
-        />
-      </div>
+      {serviceOptions.length > 1 && (
+        <div className="space-y-3">
+          <Label className="text-base">Select service</Label>
+          <Controller
+            name="serviceType"
+            control={control}
+            render={({ field }) => (
+              <RadioGroup
+                onValueChange={(service) => {
+                  const next = service as ServiceType;
+                  field.onChange(next);
+                  clearServiceFields(next, setValue, presetEventId ?? undefined);
+                }}
+                value={field.value}
+                className="flex flex-wrap gap-6"
+              >
+                {serviceOptions.map((option) => (
+                  <div key={option.value} className="flex items-center gap-2">
+                    <RadioGroupItem value={option.value} id={`service-${option.value}`} />
+                    <Label htmlFor={`service-${option.value}`} className="flex items-center gap-2 font-normal">
+                      <option.icon className="h-4 w-4 text-muted-foreground" />
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            )}
+          />
+        </div>
+      )}
 
       {values.serviceType === "travel" && (
         <div className="space-y-5 rounded-xl border bg-muted/30 p-5">
           <h3 className="text-lg font-semibold text-primary">Travel Assistance</h3>
 
-          <EventSelect {...eventSelectProps} />
+          {!lockEvent && <EventSelect {...eventSelectProps} />}
 
           <div className="space-y-2">
             <Label>Mode of transport</Label>
@@ -407,7 +419,7 @@ export function EventSupportRequestForm({
         <div className="space-y-5 rounded-xl border bg-muted/30 p-5">
           <h3 className="text-lg font-semibold text-destructive">Medical Assistance</h3>
 
-          <EventSelect {...eventSelectProps} />
+          {!lockEvent && <EventSelect {...eventSelectProps} />}
 
           <div className="space-y-2">
             <Label htmlFor="medicalRequirement">Medical requirement</Label>
@@ -456,7 +468,7 @@ export function EventSupportRequestForm({
             Translation Assistance
           </h3>
 
-          <EventSelect {...eventSelectProps} />
+          {!lockEvent && <EventSelect {...eventSelectProps} />}
 
           <div className="space-y-2">
             <Label>Language required</Label>
@@ -513,7 +525,7 @@ export function EventSupportRequestForm({
             Accommodation Assistance
           </h3>
 
-          <EventSelect {...eventSelectProps} />
+          {!lockEvent && <EventSelect {...eventSelectProps} />}
 
           <div className="space-y-2">
             <Label htmlFor="hotelName">Hotel name</Label>

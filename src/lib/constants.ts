@@ -93,6 +93,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Manage Lobby", href: "/dashboard/lobby" },
       { label: "Manage Sessions", href: "/dashboard/sessions" },
+      { label: "Manage Assistance", href: "/dashboard/assistance" },
       // { label: "Manage Travel Requests", href: "/dashboard/travel" },
       // { label: "Manage Medical Requests", href: "/dashboard/medical" },
       // { label: "Manage Translation Requests", href: "/dashboard/translation" },

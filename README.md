@@ -230,6 +230,7 @@ Page / Component
 | `/dashboard` | Role-based dashboard home |
 | `/dashboard/lobby` | Manage registrations |
 | `/dashboard/sessions` | Event day session scheduler (add / edit / delete / drag) |
+| `/dashboard/assistance` | Assistance hub — event-scoped quick launch to enabled assistance managers |
 | `/dashboard/travel` | Manage travel assistance |
 | `/dashboard/medical` | Manage medical assistance |
 | `/dashboard/translation` | Manage translation assistance |
@@ -289,11 +290,13 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/auth/sign_up/` | User registration (`role`, nested `address`, profile fields) |
 | `POST` | `/auth/login/` | Login → access + refresh tokens |
 | `POST` | `/auth/verify-otp/` | OTP verification |
+| `POST` | `/auth/resend-otp/` | Resend email OTP (`{ "email": "..." }`) |
 | `POST` | `/auth/forgot-password/` | Password reset request (`{ "email": "..." }`) |
 | `POST` | `/auth/reset-password/` | Reset password with OTP (`email`, `otp`, `new_password`, `confirm_password`) |
 | `POST` | `/auth/logout/` | Logout (refresh token in body) |
 | `POST` | `/auth/token/refresh/` | Refresh access token |
 | `GET` | `/auth/me/` | Current user profile |
+| `PATCH` | `/auth/me/` | Update profile name (`salutation`, `first_name`, `middle_name`, `last_name`) |
 | `GET` | `/auth/users/` | Paginated user list (admin) |
 | `DELETE` | `/auth/users/:id/` | Delete user |
 
@@ -302,6 +305,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/events/event/upcoming/` | Paginated upcoming events (`results[]` with `is_registered` + `summary`) |
+| `GET` | `/events/event/dropdown/` | Event options (incl. `allowed_travel` / `allowed_medical` / `allowed_translation` / `allowed_accommodation`) |
 | `GET` | `/events/event/?type=upcoming\|live\|past` | Filtered event list |
 | `GET` | `/events/event/` | All events |
 | `GET` | `/events/event/:id/` | Single event |
@@ -457,6 +461,13 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-11
 
+- **OTP — resend:** The email verification page now has a **Resend OTP** action (`POST /auth/resend-otp/` with `{ email }`) for when the code is invalid/expired. Includes a 30s cooldown (`Resend OTP in Ns`), clears the entered code, and shows a success confirmation.
+- **Events list — upcoming source:** The dashboard events "Upcoming" tab (and every `getEvents("upcoming")` caller) now loads from `GET /events/event/upcoming/` instead of `/events/event/?type=upcoming`, because the upcoming payload includes the `allowed_travel` / `allowed_medical` / `allowed_translation` / `allowed_accommodation` flags — so the Edit Event dialog can prefill the assistance toggles. Live/past tabs still use `/events/event/?type=`.
+- **Base user — post-registration assistance:** After a base user completes event registration, if the chosen event enables any assistance (`allowed_travel` / `allowed_medical` / `allowed_translation` / `allowed_accommodation`), they're routed to `/profile?event=<id>&services=<enabled>` which shows **only** the enabled assistance forms to fill (submits to `/registrations/request-travel|request-medical|request-translation|accommodation-assistance/`) then returns home; a **Maybe later** skip also goes home. When the event enables no assistance, registration goes straight home. `EventSupportRequestForm` now accepts `allowedServices` (filter) + `lockEvent` (hide event picker); `buildProfileSupportUrl(eventId, services)` carries the enabled list.
+- **Manage Assistance (Lobby):** New **Lobby → Manage Assistance** tab (`/dashboard/assistance`). Loads `GET /events/event/dropdown/` and, based on each event's `allowed_travel` / `allowed_medical` / `allowed_translation` / `allowed_accommodation` flags, shows quick-launch cards for **Manage Travel / Medical / Translation / Accommodation** (hidden when a type is `false`). Selecting a card sets the lobby event and opens the matching management page. `EventDropdownOption` now carries the four assistance booleans.
+- **Profile page (dashboard):** Moderators / event admins can now update their name (salutation, first, middle, last) and reset their password from **Settings → Profile**. Name update sends `PATCH /auth/me/`. Password reset reuses the OTP flow: **Send OTP** calls `POST /auth/forgot-password/` for the signed-in email, then OTP + new password submit to `POST /auth/reset-password/`. Uses react-hook-form + Zod with inline validation and success/error feedback; updated name syncs into the auth store.
+- **Event creation — assistance flags:** Create/Edit event form now has 4 boolean toggles — **Travel**, **Medical**, **Translation**, **Accommodation** assistance — so event admins/moderators declare which assistance types an event offers (types left off are hidden in the lobby). Payload sends `allowed_travel` / `allowed_medical` / `allowed_translation` / `allowed_accommodation` (backend live); `Event` maps them back.
+- **Docs — Event registration user guide:** Added `docs/EVENT_REGISTRATION_USER_GUIDE.md` covering the end-user journey (sign up → verify email → sign in → register for event) with required fields and the per-day multi-session participation flow.
 - **Event registration — MULTI_SESSION payload:** `POST /registrations/registration/` now sends `{ event, sessions: [{ day, attendance_mode, session_ids }] }` with per-day attendance (`PHYSICAL` / `VIRTUAL`). Step 3 supports **multi-day** selection; each selected day has its own attendance mode and session multi-select.
 - **Manage Lobby — Add Users:** MULTI_SESSION registration matches the new multi-day sessions payload and UI (per-day attendance + sessions).
 - **Manage Lobby — Edit registration:** MULTI_SESSION edit now uses the same multi-day flow (per-day attendance + session multi-select), prefilled from the `days[]` detail response, and sends the `sessions[]` payload on `PUT`.

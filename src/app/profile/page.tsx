@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
 import { LandingNavbar } from "@/components/layout/LandingNavbar";
 import { LandingFooter } from "@/components/layout/LandingFooter";
 import { RouteGuard } from "@/components/layout/RouteGuard";
@@ -13,46 +16,140 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RoleBadge } from "@/components/shared/RoleBadge";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
-import { ROUTES } from "@/lib/routes";
-
-/* Assistance services disabled
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
 import { EventSupportRequestForm } from "@/components/profile/EventSupportRequestForm";
-import { useEventSupportStore } from "@/store/useEventSupportStore";
 import {
   eventSupportSchema,
   EMPTY_EVENT_SUPPORT,
+  SERVICE_TYPES,
   type EventSupportFormValues,
+  type ServiceType,
 } from "@/features/profile/event-support.schema";
-import { PROFILE_SUPPORT_EVENT_KEY } from "@/lib/routes";
-import { useHomeDataStore } from "@/store/useHomeDataStore";
 import {
   requestAccommodationSupport,
   requestMedicalSupport,
   requestTranslationSupport,
   requestTravelSupport,
 } from "@/services/registration.service";
-
-function getHomeAuthKey(isAuthenticated: boolean, userId?: string): string {
-  return `${isAuthenticated}:${userId ?? ""}`;
-}
-*/
+import { ROUTES } from "@/lib/routes";
 
 function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const presetEventId = searchParams.get("event");
+  const servicesParam = searchParams.get("services");
   const user = useAuthStore((s) => s.user);
 
-  useEffect(() => {
-    if (presetEventId) {
-      router.replace(ROUTES.profile);
+  const allowedServices = useMemo<ServiceType[]>(() => {
+    if (!servicesParam) return [];
+    return servicesParam
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value): value is ServiceType =>
+        (SERVICE_TYPES as readonly string[]).includes(value),
+      );
+  }, [servicesParam]);
+
+  const showAssistance = Boolean(presetEventId) && allowedServices.length > 0;
+
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<EventSupportFormValues>({
+    resolver: zodResolver(eventSupportSchema),
+    defaultValues: {
+      ...EMPTY_EVENT_SUPPORT,
+      serviceType: allowedServices[0] ?? "travel",
+      eventId: presetEventId ?? "",
+    },
+  });
+
+  const values = watch();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onSubmitRequest = async (data: EventSupportFormValues) => {
+    setSaveError(null);
+    setIsSubmitting(true);
+    try {
+      switch (data.serviceType) {
+        case "travel":
+          await requestTravelSupport(data);
+          break;
+        case "medical":
+          await requestMedicalSupport(data);
+          break;
+        case "translation":
+          await requestTranslationSupport(data);
+          break;
+        case "accommodation":
+          await requestAccommodationSupport(data);
+          break;
+      }
+      router.replace(ROUTES.home);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to submit request");
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [presetEventId, router]);
+  };
 
   if (!user) return null;
+
+  if (showAssistance) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <div>
+          <h1 className="text-2xl font-bold">Assistance Request</h1>
+          <p className="text-muted-foreground">
+            You&apos;re registered! This event offers the assistance below — fill in what you need,
+            or skip to continue.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmitRequest)} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Support Request</CardTitle>
+              <CardDescription>
+                Request assistance for the event you just registered for
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EventSupportRequestForm
+                control={control}
+                values={values}
+                errors={errors}
+                setValue={setValue}
+                presetEventId={presetEventId}
+                allowedServices={allowedServices}
+                lockEvent
+              />
+            </CardContent>
+          </Card>
+
+          {saveError && <p className="text-sm text-destructive">{saveError}</p>}
+
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Submitting..." : "Submit Request"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.replace(ROUTES.home)}
+              disabled={isSubmitting}
+            >
+              Maybe later
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -60,41 +157,6 @@ function ProfileContent() {
         <h1 className="text-2xl font-bold">Profile</h1>
         <p className="text-muted-foreground">View and manage your account details</p>
       </div>
-
-      {/* Assistance services disabled — travel, medical, translation, accommodation
-      {fromRegistration && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-          You&apos;re registered for the event. Submit a travel, medical, translation, or accommodation
-          support request below if you need assistance.
-        </div>
-      )}
-      <form key={formKey} onSubmit={handleSubmit(onSubmitRequest)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Event Support Request</CardTitle>
-            <CardDescription>
-              Request travel, medical, translation, or accommodation assistance for an upcoming event
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EventSupportRequestForm
-              control={control}
-              values={values}
-              errors={errors}
-              setValue={setValue}
-              presetEventId={presetEventId}
-            />
-          </CardContent>
-        </Card>
-
-        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-
-        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isSubmitting ? "Submitting..." : "Submit Request"}
-        </Button>
-      </form>
-      */}
 
       <Card>
         <CardHeader>

@@ -21,6 +21,10 @@ export function toCreateEventPayload(data: CreateEventPayload) {
     video_muted_by_default: data.videoMutedByDefault,
     pause_continue_enabled: data.pauseContinueEnabled,
     schedule_type: data.scheduleType,
+    allowed_travel: data.travelAssistance,
+    allowed_medical: data.medicalAssistance,
+    allowed_translation: data.translationAssistance,
+    allowed_accommodation: data.accommodationAssistance,
   };
 }
 
@@ -46,6 +50,10 @@ export function toUpdateEventPayload(data: UpdateEventPayload) {
   if (data.videoMutedByDefault !== undefined) payload.video_muted_by_default = data.videoMutedByDefault;
   if (data.pauseContinueEnabled !== undefined) payload.pause_continue_enabled = data.pauseContinueEnabled;
   if (data.scheduleType !== undefined) payload.schedule_type = data.scheduleType;
+  if (data.travelAssistance !== undefined) payload.allowed_travel = data.travelAssistance;
+  if (data.medicalAssistance !== undefined) payload.allowed_medical = data.medicalAssistance;
+  if (data.translationAssistance !== undefined) payload.allowed_translation = data.translationAssistance;
+  if (data.accommodationAssistance !== undefined) payload.allowed_accommodation = data.accommodationAssistance;
 
   return payload;
 }
@@ -104,6 +112,10 @@ export function mapApiEventDropdownOption(raw: Record<string, unknown>): EventDr
     date: String(raw.scheduled_start ?? raw.date ?? ""),
     endDate: raw.scheduled_end ? String(raw.scheduled_end) : undefined,
     scheduleType,
+    travelAssistance: Boolean(raw.allowed_travel ?? raw.travel_assistance ?? false),
+    medicalAssistance: Boolean(raw.allowed_medical ?? raw.medical_assistance ?? false),
+    translationAssistance: Boolean(raw.allowed_translation ?? raw.translation_assistance ?? false),
+    accommodationAssistance: Boolean(raw.allowed_accommodation ?? raw.accommodation_assistance ?? false),
   };
 }
 
@@ -131,5 +143,9 @@ export function mapApiEventToEvent(raw: Record<string, unknown>): Event {
     createdAt: String(raw.created_at ?? raw.createdAt ?? now),
     updatedAt: String(raw.updated_at ?? raw.updatedAt ?? now),
     scheduleType,
+    travelAssistance: Boolean(raw.allowed_travel ?? raw.travel_assistance ?? false),
+    medicalAssistance: Boolean(raw.allowed_medical ?? raw.medical_assistance ?? false),
+    translationAssistance: Boolean(raw.allowed_translation ?? raw.translation_assistance ?? false),
+    accommodationAssistance: Boolean(raw.allowed_accommodation ?? raw.accommodation_assistance ?? false),
   };
 }

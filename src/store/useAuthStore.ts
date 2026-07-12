@@ -26,6 +26,12 @@ interface AuthState {
   verifyOtp: (payload: VerifyOtpPayload) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (payload: ResetPasswordPayload) => Promise<void>;
+  updateProfile: (payload: {
+    salutation?: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   clearError: () => void;
@@ -139,6 +145,21 @@ export const useAuthStore = create<AuthState>()(
           });
           throw err;
         }
+      },
+
+      updateProfile: async (payload) => {
+        await authService.updateProfile(payload);
+        set((state) => ({
+          user: state.user
+            ? {
+                ...state.user,
+                salutation: payload.salutation ?? state.user.salutation,
+                firstName: payload.firstName,
+                middleName: payload.middleName,
+                lastName: payload.lastName,
+              }
+            : state.user,
+        }));
       },
 
       logout: async () => {

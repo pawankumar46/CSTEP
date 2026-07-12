@@ -81,9 +81,12 @@ export function getHomeRegisterHref(
 
 export const PROFILE_SUPPORT_EVENT_KEY = "profile-support-event";
 
-export function buildProfileSupportUrl(eventId?: string): string {
+export function buildProfileSupportUrl(eventId?: string, services?: string[]): string {
   if (!eventId) return ROUTES.profile;
   const search = new URLSearchParams({ event: eventId });
+  if (services && services.length > 0) {
+    search.set("services", services.join(","));
+  }
   return `${ROUTES.profile}?${search.toString()}`;
 }
 

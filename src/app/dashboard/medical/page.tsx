@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Check, Loader2, Pause, Pencil, Stethoscope, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Check, Loader2, Pause, Pencil, Stethoscope, X } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -295,6 +296,12 @@ function MedicalContent() {
 
   return (
     <div className="space-y-6">
+      <Button variant="ghost" size="sm" asChild className="-ml-2 w-fit text-muted-foreground">
+        <Link href="/dashboard/assistance">
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to Manage Assistance
+        </Link>
+      </Button>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Manage Medical Requests</h1>
