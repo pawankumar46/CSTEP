@@ -459,6 +459,10 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-13
+
+- **Moderator dashboard — registered users fix:** The Moderator dashboard summary cards now aggregate the event summaries from `GET /events/event/upcoming/` (`total_registered_users`, `participants_attended/accepted/rejected/pending/held`) instead of `GET /analytics/dashboard/`, which was reporting `users.total` as `0`. "Registered Users" (and the other cards) now reflect the actual per-event counts.
+
 ### 2026-07-11
 
 - **OTP — resend:** The email verification page now has a **Resend OTP** action (`POST /auth/resend-otp/` with `{ email }`) for when the code is invalid/expired. Includes a 30s cooldown (`Resend OTP in Ns`), clears the entered code, and shows a success confirmation.
