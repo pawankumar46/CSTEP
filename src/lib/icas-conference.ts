@@ -40,7 +40,7 @@ export const ICAS_CONFERENCE = {
   ],
   contact: {
     name: "Arundati Ganesh, Consultant, Air Quality",
-    email: "arundati.g@cstep.in",
+    email: "icas@cstep.in",
   },
 } as const;
 

@@ -1,27 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, Calendar, GraduationCap, Layers, Mail, MapPin, Monitor, Wind, FileText, BarChart3 } from "lucide-react";
+import { Calendar, GraduationCap, Layers, Mail, MapPin, Monitor, Wind, FileText, BarChart3 } from "lucide-react";
 import { LandingNavbar } from "@/components/layout/LandingNavbar";
 import { LandingFooter } from "@/components/layout/LandingFooter";
 import { HeroSection } from "@/components/layout/HeroSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { mockFAQs } from "@/mock/events";
 import { useHomeEvent } from "@/hooks/useHomeEvent";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomCTASkeleton } from "@/components/shared/LoadingSkeleton";
 import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
 import {
-  formatEventDateRange,
+  formatHomeEventDateRange,
 } from "@/lib/event-display";
-import { formatParticipationDatesFaqAnswer } from "@/lib/participation-dates";
 import { ICAS_CONFERENCE } from "@/lib/icas-conference";
 
 const HIGHLIGHT_ICONS = [Wind, Layers, FileText, BarChart3, GraduationCap] as const;
-
-const MVP_FAQS = mockFAQs.slice(0, 4);
 
 function BottomCTA() {
   const {
@@ -34,7 +30,7 @@ function BottomCTA() {
 
   const title = upcomingEvent?.name ?? "";
   const dates = upcomingEvent
-    ? formatEventDateRange(upcomingEvent.date, upcomingEvent.endDate)
+    ? formatHomeEventDateRange(upcomingEvent.name, upcomingEvent.date, upcomingEvent.endDate)
     : "";
   const registerHref = upcomingEvent
     ? getHomeRegisterHref(isAuthenticated, isRegistered, upcomingEvent.id)
@@ -86,7 +82,7 @@ function AboutSection() {
   const { isLoading, hasEvent, upcomingEvent } = useHomeEvent();
 
   const dateRange = upcomingEvent
-    ? formatEventDateRange(upcomingEvent.date, upcomingEvent.endDate)
+    ? formatHomeEventDateRange(upcomingEvent.name, upcomingEvent.date, upcomingEvent.endDate)
     : ICAS_CONFERENCE.datesLabel;
 
   return (
@@ -182,35 +178,6 @@ function AboutSection() {
   );
 }
 
-function FaqSection() {
-  const { upcomingEvent, hasEvent } = useHomeEvent();
-
-  const faqs = MVP_FAQS.map((faq) =>
-    faq.id === "faq-3" && hasEvent
-      ? { ...faq, answer: formatParticipationDatesFaqAnswer(upcomingEvent) }
-      : faq,
-  );
-
-  return (
-    <section id="faq" className="py-16 lg:py-20 bg-muted/30">
-      <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-10">Frequently Asked Questions</h2>
-        <div className="max-w-2xl mx-auto space-y-3">
-          {faqs.map((faq) => (
-            <details key={faq.id} className="group rounded-lg border bg-background p-4">
-              <summary className="flex cursor-pointer items-center justify-between font-medium">
-                {faq.question}
-                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-              </summary>
-              <p className="mt-3 text-sm text-muted-foreground">{faq.answer}</p>
-            </details>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -218,8 +185,6 @@ export default function LandingPage() {
       <HeroSection />
 
       <AboutSection />
-
-      <FaqSection />
 
       <BottomCTA />
       <LandingFooter />

@@ -5,40 +5,25 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
-import { SignupAddressFields } from "@/components/auth/SignupAddressFields";
-import { EMPTY_SIGNUP_ADDRESS, signupAddressSchema } from "@/features/auth/signup.schema";
+import {
+  EMPTY_PUBLIC_SIGNUP,
+  publicSignupSchema,
+  SIGNUP_ORG_TYPES,
+  type PublicSignupFormValues,
+} from "@/features/auth/signup.schema";
 import { useAuthStore } from "@/store/useAuthStore";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
-
-const signupSchema = z.object({
-  salutation: z.string().min(1, "Salutation is required"),
-  firstName: z.string().min(1, "First name is required"),
-  middleName: z.string().optional(),
-  lastName: z.string().min(1, "Last name is required"),
-  phone: z
-    .string()
-    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
-  email: z.string().email("Valid email is required"),
-  address: signupAddressSchema,
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string().min(1, "Please confirm your password"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
-
-type SignupForm = z.infer<typeof signupSchema>;
 
 function SignupForm() {
   const router = useRouter();
@@ -46,22 +31,20 @@ function SignupForm() {
   const redirectTo = searchParams.get("redirect");
   const { signUp, isLoading, error, clearError } = useAuthStore();
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<SignupForm>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: {
-      salutation: "",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      phone: "",
-      email: "",
-      address: { ...EMPTY_SIGNUP_ADDRESS },
-      password: "",
-      confirmPassword: "",
-    },
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    formState: { errors },
+  } = useForm<PublicSignupFormValues>({
+    resolver: zodResolver(publicSignupSchema),
+    defaultValues: { ...EMPTY_PUBLIC_SIGNUP },
   });
 
-  const onSubmit = async (data: SignupForm) => {
+  const orgType = watch("orgType");
+
+  const onSubmit = async (data: PublicSignupFormValues) => {
     clearError();
     try {
       await signUp({
@@ -71,11 +54,17 @@ function SignupForm() {
         lastName: data.lastName,
         phone: data.phone,
         email: data.email,
-        address: data.address,
+        designation: data.designation,
+        orgType: data.orgType,
+        orgName: data.orgName,
+        motivation: data.motivation,
+        city: data.city,
+        state: data.state,
         password: data.password,
       });
       const params = new URLSearchParams({
         email: data.email.trim().toLowerCase(),
+        phone: data.phone.trim(),
       });
       if (redirectTo) params.set("redirect", redirectTo);
       router.push(`${ROUTES.otp}?${params.toString()}`);
@@ -90,126 +79,232 @@ function SignupForm() {
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-2xl"
     >
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
-              {APP_SHORT_NAME}
-            </div>
-            <span className="font-semibold text-2xl">{APP_NAME}</span>
-          </Link>
-        </div>
+      <div className="text-center mb-8">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+            {APP_SHORT_NAME}
+          </div>
+          <span className="font-semibold text-2xl">{APP_NAME}</span>
+        </Link>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Create your account</CardTitle>
-            <CardDescription>
-              Sign up to access event registration and the live stream. This creates your user account — event registration comes after you sign in.
-            </CardDescription>
-          </CardHeader>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <CardContent className="space-y-4">
-              {redirectTo === ROUTES.streaming && (
-                <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
-                  Create an account to watch the live stream.
-                </div>
-              )}
-              {redirectTo?.startsWith(ROUTES.eventRegister) && (
-                <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
-                  Create an account to complete your event registration.
-                </div>
-              )}
-              {error && (
-                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
-              )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Create your account</CardTitle>
+          <CardDescription>
+            Sign up to access event registration and the live stream. This creates your user account — event registration comes after you sign in.
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            {redirectTo === ROUTES.streaming && (
+              <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+                Create an account to watch the live stream.
+              </div>
+            )}
+            {redirectTo?.startsWith(ROUTES.eventRegister) && (
+              <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+                Create an account to complete your event registration.
+              </div>
+            )}
+            {error && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+            )}
 
-              <div className="space-y-2">
-                <Label>Salutation</Label>
-                <Controller name="salutation" control={control} render={({ field }) => (
+            <div className="space-y-2">
+              <Label>Salutation</Label>
+              <Controller
+                name="salutation"
+                control={control}
+                render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select salutation" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select salutation" />
+                    </SelectTrigger>
                     <SelectContent>
                       {["Mr", "Mrs", "Ms", "Dr", "Prof"].map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                )} />
-                {errors.salutation && <p className="text-xs text-destructive">{errors.salutation.message}</p>}
-              </div>
+                )}
+              />
+              {errors.salutation && (
+                <p className="text-xs text-destructive">{errors.salutation.message}</p>
+              )}
+            </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" {...register("firstName")} />
-                  {errors.firstName && <p className="text-xs text-destructive">{errors.firstName.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input id="middleName" {...register("middleName")} />
-                </div>
-              </div>
-
+            <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" {...register("lastName")} />
-                {errors.lastName && <p className="text-xs text-destructive">{errors.lastName.message}</p>}
+                <Label htmlFor="firstName">First Name</Label>
+                <Input id="firstName" {...register("firstName")} />
+                {errors.firstName && (
+                  <p className="text-xs text-destructive">{errors.firstName.message}</p>
+                )}
               </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Controller
-                    name="phone"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        id="phone"
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={10}
-                        placeholder="9999999999"
-                        value={field.value}
-                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                      />
-                    )}
-                  />
-                  {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" type="email" placeholder="you@example.com" {...register("email")} />
-                  {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="middleName">Middle Name</Label>
+                <Input id="middleName" {...register("middleName")} />
               </div>
+            </div>
 
-              <SignupAddressFields register={register} errors={errors} />
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input id="lastName" {...register("lastName")} />
+              {errors.lastName && (
+                <p className="text-xs text-destructive">{errors.lastName.message}</p>
+              )}
+            </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <PasswordInput id="password" {...register("password")} />
-                  {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <PasswordInput id="confirmPassword" {...register("confirmPassword")} />
-                  {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
-                </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Controller
+                  name="phone"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      id="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      placeholder="9999999999"
+                      value={field.value}
+                      onChange={(e) =>
+                        field.onChange(e.target.value.replace(/\D/g, "").slice(0, 10))
+                      }
+                    />
+                  )}
+                />
+                {errors.phone && (
+                  <p className="text-xs text-destructive">{errors.phone.message}</p>
+                )}
               </div>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-3">
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {isLoading ? "Creating account..." : "Create Account"}
-              </Button>
-              <p className="text-sm text-muted-foreground text-center">
-                Already have an account?{" "}
-                <Link href={buildAuthUrl(ROUTES.login, { redirect: redirectTo })} className="text-primary hover:underline">Sign in</Link>
-              </p>
-            </CardFooter>
-          </form>
-        </Card>
-      </motion.div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  {...register("email")}
+                />
+                {errors.email && (
+                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="designation">Designation</Label>
+              <Input id="designation" placeholder="e.g. Researcher, Student" {...register("designation")} />
+              {errors.designation && (
+                <p className="text-xs text-destructive">{errors.designation.message}</p>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Organisation type</Label>
+                <Controller
+                  name="orgType"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SIGNUP_ORG_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.orgType && (
+                  <p className="text-xs text-destructive">{errors.orgType.message}</p>
+                )}
+              </div>
+              {orgType === "ORGANISATION" && (
+                <div className="space-y-2">
+                  <Label htmlFor="orgName">Organisation name</Label>
+                  <Input id="orgName" {...register("orgName")} />
+                  {errors.orgName && (
+                    <p className="text-xs text-destructive">{errors.orgName.message}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="motivation">What motivates you to attend this event?</Label>
+              <Textarea
+                id="motivation"
+                rows={3}
+                placeholder="Share a brief note about why you want to attend"
+                {...register("motivation")}
+              />
+              {errors.motivation && (
+                <p className="text-xs text-destructive">{errors.motivation.message}</p>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input id="city" {...register("city")} />
+                {errors.city && (
+                  <p className="text-xs text-destructive">{errors.city.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input id="state" {...register("state")} />
+                {errors.state && (
+                  <p className="text-xs text-destructive">{errors.state.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <PasswordInput id="password" {...register("password")} />
+                {errors.password && (
+                  <p className="text-xs text-destructive">{errors.password.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <PasswordInput id="confirmPassword" {...register("confirmPassword")} />
+                {errors.confirmPassword && (
+                  <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {isLoading ? "Creating account..." : "Create Account"}
+            </Button>
+            <p className="text-sm text-muted-foreground text-center">
+              Already have an account?{" "}
+              <Link
+                href={buildAuthUrl(ROUTES.login, { redirect: redirectTo })}
+                className="text-primary hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
+    </motion.div>
   );
 }
 

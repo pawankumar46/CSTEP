@@ -49,14 +49,10 @@ function LoginForm() {
         identifier: data.identifier.trim().toLowerCase(),
       });
       const user = useAuthStore.getState().user;
-      const safeRedirect = sanitizeRedirect(redirectTo);
-      if (safeRedirect) {
-        router.push(safeRedirect);
-      } else if (user) {
-        router.push(getDefaultRouteForRole(user.role));
-      } else {
-        router.push(ROUTES.home);
-      }
+      const destination =
+        sanitizeRedirect(redirectTo) ??
+        (user ? getDefaultRouteForRole(user.role) : ROUTES.home);
+      router.replace(destination);
     } catch {
       // error handled in store
     }

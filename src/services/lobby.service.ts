@@ -48,6 +48,12 @@ export const createLobbyUser = async (
     lastName,
     phone,
     email: normalizeAuthIdentifier(email),
+    designation: "None",
+    orgType: "INDEPENDENT",
+    orgName: "",
+    motivation: "",
+    city: address.city,
+    state: address.state,
     address,
     password,
   });

@@ -18,8 +18,9 @@ import {
   toResetPasswordPayload,
   toUpdateProfilePayload,
   toVerifyOtpPayload,
+  toResendOtpPayload,
 } from "@/lib/auth-mappers";
-import type { AuthResponse, LoginCredentials, ResetPasswordPayload, SignupCredentials, User, VerifyOtpPayload } from "@/types";
+import type { AuthResponse, LoginCredentials, OtpVerifyMethod, ResetPasswordPayload, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
 async function fetchCurrentUser(fallbackEmail?: string): Promise<User | null> {
   try {
@@ -117,9 +118,16 @@ export const verifyOtp = async (payload: VerifyOtpPayload): Promise<{ success: b
   }
 };
 
-export const resendOtp = async (email: string): Promise<{ success: boolean }> => {
+export const resendOtp = async (
+  method: OtpVerifyMethod,
+  contact: string,
+): Promise<{ success: boolean }> => {
+  if (!contact.trim()) {
+    throw new Error(method === "phone" ? "Phone number is required" : "Email is required");
+  }
+
   try {
-    await apiClient.post("/auth/resend-otp/", { email: normalizeAuthIdentifier(email) });
+    await apiClient.post("/auth/resend-otp/", toResendOtpPayload(method, contact));
     return { success: true };
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));

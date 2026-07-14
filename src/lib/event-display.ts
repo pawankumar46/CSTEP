@@ -1,3 +1,10 @@
+import { isIcasEventName } from "@/lib/icas-conference";
+
+export interface UpcomingEventDay {
+  day: number;
+  suffix: string;
+}
+
 function getOrdinalSuffix(day: number): string {
   if (day >= 11 && day <= 13) return "th";
   switch (day % 10) {
@@ -15,6 +22,16 @@ function getOrdinalSuffix(day: number): string {
 function parseEventDate(value: string): Date | null {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+const ICAS_HOME_LEAD_DAY = 19;
+
+function prependIcasLeadDay(days: UpcomingEventDay[]): UpcomingEventDay[] {
+  if (days.length === 0 || days.some((d) => d.day === ICAS_HOME_LEAD_DAY)) return days;
+  if (days[0].day > ICAS_HOME_LEAD_DAY) {
+    return [{ day: ICAS_HOME_LEAD_DAY, suffix: getOrdinalSuffix(ICAS_HOME_LEAD_DAY) }, ...days];
+  }
+  return days;
 }
 
 export function formatEventDateRange(start: string, end?: string): string {
@@ -39,11 +56,6 @@ export function formatEventDateRange(start: string, end?: string): string {
   return `${startLabel} ${startMonth} – ${endLabel} ${endMonth} ${year}`;
 }
 
-export interface UpcomingEventDay {
-  day: number;
-  suffix: string;
-}
-
 export function getUpcomingEventDays(start: string, end?: string): UpcomingEventDay[] {
   const startDate = parseEventDate(start);
   const endDate = parseEventDate(end ?? start);
@@ -63,6 +75,43 @@ export function getUpcomingEventDays(start: string, end?: string): UpcomingEvent
   }
 
   return days;
+}
+
+/** Home page dates — ICAS events prepend 19th before API range (e.g. 19, 20, 21). */
+export function getHomeEventDays(
+  eventName: string | undefined,
+  start: string,
+  end?: string,
+): UpcomingEventDay[] {
+  const days = getUpcomingEventDays(start, end);
+  if (eventName && isIcasEventName(eventName)) {
+    return prependIcasLeadDay(days);
+  }
+  return days;
+}
+
+export function formatHomeEventDateRange(
+  eventName: string | undefined,
+  start: string,
+  end?: string,
+): string {
+  if (eventName && isIcasEventName(eventName)) {
+    const days = prependIcasLeadDay(getUpcomingEventDays(start, end));
+    if (days.length === 0) return formatEventDateRange(start, end);
+
+    const endDate = parseEventDate(end ?? start);
+    if (!endDate) return formatEventDateRange(start, end);
+
+    const month = endDate.toLocaleDateString("en-IN", { month: "long" });
+    const year = endDate.getFullYear();
+    const first = days[0];
+    const last = days[days.length - 1];
+    const startLabel = `${first.day}${first.suffix}`;
+    const endLabel = `${last.day}${last.suffix}`;
+    if (first.day === last.day) return `${startLabel} ${month} ${year}`;
+    return `${startLabel} – ${endLabel} ${month} ${year}`;
+  }
+  return formatEventDateRange(start, end);
 }
 
 export function getUpcomingEventMonthLabel(start: string, end?: string): string {

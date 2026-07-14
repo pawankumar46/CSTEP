@@ -19,6 +19,7 @@ function isPublicAuthRequest(url?: string): boolean {
     url.includes("/auth/login/")
     || url.includes("/auth/sign_up/")
     || url.includes("/auth/verify-otp/")
+    || url.includes("/auth/resend-otp/")
     || url.includes("/auth/forgot-password/")
     || url.includes("/auth/reset-password/")
     || url.includes("/auth/token/refresh/")
@@ -58,6 +59,40 @@ export function isExpiredAccessTokenError(error: unknown): boolean {
 
 export function isForbiddenError(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 403;
+}
+
+/** 403 from permission denied must not log the user out — only token/auth-related 403s. */
+export function isAuthRelatedForbiddenError(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 403) return false;
+
+  const data = error.response.data;
+  if (!data || typeof data !== "object") return false;
+
+  const record = data as Record<string, unknown>;
+  if (record.code === "token_not_valid") return true;
+
+  const detail = String(record.detail ?? "").toLowerCase();
+  if (
+    detail.includes("token not valid")
+    || detail.includes("token is invalid")
+    || detail.includes("token has expired")
+    || detail.includes("invalid token")
+    || detail.includes("authentication credentials")
+    || detail.includes("not authenticated")
+  ) {
+    return true;
+  }
+
+  const messages = record.messages;
+  if (!Array.isArray(messages)) return false;
+
+  return messages.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const message = entry as Record<string, unknown>;
+    const tokenType = String(message.token_type ?? message.token_class ?? "").toLowerCase();
+    const text = String(message.message ?? "").toLowerCase();
+    return tokenType.includes("access") || text.includes("expired") || text.includes("invalid");
+  });
 }
 
 export async function forceSessionExpiredRedirect(): Promise<void> {
@@ -102,5 +137,6 @@ export async function forceSessionExpiredRedirect(): Promise<void> {
 
 export function shouldForceLoginOnAuthError(error: unknown, requestUrl?: string): boolean {
   if (isPublicAuthRequest(requestUrl)) return false;
-  return isExpiredAccessTokenError(error) || isForbiddenError(error);
+  if (isExpiredAccessTokenError(error)) return true;
+  return isAuthRelatedForbiddenError(error);
 }

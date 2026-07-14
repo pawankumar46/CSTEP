@@ -1,6 +1,6 @@
 import axios from "axios";
 import { mapApiRoleToAppRole } from "@/lib/user-roles";
-import type { SignupAddress, SignupCredentials, User } from "@/types";
+import type { SignupCredentials, User } from "@/types";
 
 export function normalizeAuthIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase();
@@ -22,6 +22,13 @@ export function toVerifyOtpPayload(method: "phone" | "email", otp: string, conta
   return { email: normalizeAuthIdentifier(contact), otp };
 }
 
+export function toResendOtpPayload(method: "phone" | "email", contact: string) {
+  if (method === "phone") {
+    return { phone_number: formatPhoneForApi(contact) };
+  }
+  return { email: normalizeAuthIdentifier(contact) };
+}
+
 export function toResetPasswordPayload(data: {
   email: string;
   otp: string;
@@ -36,19 +43,17 @@ export function toResetPasswordPayload(data: {
   };
 }
 
-function toSignupAddressPayload(address: SignupAddress) {
+function resolveSignupCityState(data: SignupCredentials): { city: string; state: string } {
   return {
-    address_line_1: address.addressLine1,
-    address_line_2: address.addressLine2 ?? "",
-    city: address.city,
-    district: address.district,
-    state: address.state,
-    country: address.country,
-    postal_code: address.postalCode,
+    city: (data.city || data.address?.city || "").trim(),
+    state: (data.state || data.address?.state || "").trim(),
   };
 }
 
 export function toSignupPayload(data: SignupCredentials) {
+  const { city, state } = resolveSignupCityState(data);
+  const orgType = data.orgType ?? "INDEPENDENT";
+
   return {
     salutation: data.salutation,
     first_name: data.firstName,
@@ -57,7 +62,12 @@ export function toSignupPayload(data: SignupCredentials) {
     role: "BASE_USER",
     phone_number: formatPhoneForApi(data.phone),
     email: normalizeAuthIdentifier(data.email),
-    address: toSignupAddressPayload(data.address),
+    designation: data.designation.trim() || "None",
+    org_type: orgType,
+    org_name: orgType === "ORGANISATION" ? (data.orgName ?? "").trim() : "",
+    motivation: (data.motivation ?? "").trim(),
+    city,
+    state,
     password: data.password,
   };
 }
@@ -65,6 +75,8 @@ export function toSignupPayload(data: SignupCredentials) {
 /** Manage Lobby step 1 — matches POST /auth/sign_up/ admin payload */
 export function toLobbySignupPayload(data: SignupCredentials) {
   const digits = data.phone.replace(/\D/g, "");
+  const { city, state } = resolveSignupCityState(data);
+  const orgType = data.orgType ?? "INDEPENDENT";
 
   return {
     salutation: data.salutation,
@@ -74,7 +86,12 @@ export function toLobbySignupPayload(data: SignupCredentials) {
     role: "BASE_USER",
     phone_number: digits,
     email: normalizeAuthIdentifier(data.email),
-    address: toSignupAddressPayload(data.address),
+    designation: (data.designation ?? "None").trim() || "None",
+    org_type: orgType,
+    org_name: orgType === "ORGANISATION" ? (data.orgName ?? "").trim() : "",
+    motivation: (data.motivation ?? "").trim(),
+    city,
+    state,
     password: data.password,
   };
 }
@@ -179,29 +196,52 @@ const SUCCESS_RESPONSE_KEYS = new Set([
   "access",
   "refresh",
   "token",
+  "tokens",
   "user",
   "data",
 ]);
+
+function isLikelySuccessPayload(record: Record<string, unknown>): boolean {
+  if (record.success === true) return true;
+  if (extractToken(record)) return true;
+  if (record.user && typeof record.user === "object") return true;
+  return false;
+}
 
 export function extractApiErrorFromData(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
 
   const record = data as Record<string, unknown>;
 
+  if (isLikelySuccessPayload(record)) return null;
+
   if (Array.isArray(record.non_field_errors) && record.non_field_errors[0]) {
     return String(record.non_field_errors[0]);
   }
 
-  if (record.detail && typeof record.detail === "string") {
+  if (typeof record.detail === "string" && record.detail) {
     return record.detail;
   }
 
-  for (const [key, value] of Object.entries(record)) {
-    if (SUCCESS_RESPONSE_KEYS.has(key)) continue;
-    if (Array.isArray(value) && value[0]) return String(value[0]);
+  if (typeof record.error === "string" && record.error) {
+    return record.error;
   }
 
-  return null;
+  if (typeof record.message === "string" && record.message) {
+    return record.message;
+  }
+
+  const messages: string[] = [];
+  for (const [key, value] of Object.entries(record)) {
+    if (SUCCESS_RESPONSE_KEYS.has(key)) continue;
+    if (Array.isArray(value) && value[0]) {
+      messages.push(String(value[0]));
+    } else if (typeof value === "string" && value.trim()) {
+      messages.push(value);
+    }
+  }
+
+  return messages.length > 0 ? messages.join(" ") : null;
 }
 
 export function extractApiErrorMessage(error: unknown): string {

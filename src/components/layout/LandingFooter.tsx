@@ -19,7 +19,6 @@ export function LandingFooter() {
               <li><Link href={ROUTES.login} className="hover:text-foreground">Sign In</Link></li>
               <li><Link href={ROUTES.eventRegister} className="hover:text-foreground">Event Registration</Link></li>
               <li><Link href="/streaming" className="hover:text-foreground">Live Stream</Link></li>
-              <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
             </ul>
           </div>
           <div>

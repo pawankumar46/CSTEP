@@ -30,6 +30,7 @@ import { getEventDays, getEventDropdown, getScheduleItemsDropdown } from "@/serv
 import { useRegistrationStore } from "@/store/useRegistrationStore";
 import { ROUTES, buildProfileSupportUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { useHomeDataStore } from "@/store/useHomeDataStore";
 import type { EventDay, ScheduleItemRecord } from "@/services/event.service";
 import type { AttendanceMode, EventDropdownOption } from "@/types";
 
@@ -61,8 +62,22 @@ function EventRegisterForm() {
   const [daySelectionError, setDaySelectionError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const fetchedScheduleDayIdsRef = useRef<Set<string>>(new Set());
+  const submitErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { submitRegistration, isLoading } = useRegistrationStore();
+
+  const showSubmitError = useCallback((message: string) => {
+    setSubmitError(message);
+    if (submitErrorTimerRef.current) clearTimeout(submitErrorTimerRef.current);
+    submitErrorTimerRef.current = setTimeout(() => setSubmitError(null), 5000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (submitErrorTimerRef.current) clearTimeout(submitErrorTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,10 +209,32 @@ function EventRegisterForm() {
     setSessionSelectionError(null);
   };
 
+  const autoSelectAllSessionsForDay = useCallback(
+    (dayId: string, items: ScheduleItemRecord[]) => {
+      const allIds = items.map((item) => item.id);
+      const sessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+      sessionsByDay[dayId] = allIds;
+      setValue("sessionsByDay", sessionsByDay, { shouldValidate: true });
+      setSessionSelectionError(null);
+    },
+    [getValues, setValue],
+  );
+
   const setDayAttendance = (dayId: string, mode: AttendanceMode) => {
     const attendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
     attendanceByDay[dayId] = mode;
     setValue("attendanceByDay", attendanceByDay, { shouldValidate: true });
+
+    if (mode === "physical") {
+      const dayItems = scheduleItemsByDay[dayId] ?? [];
+      if (dayItems.length > 0) {
+        autoSelectAllSessionsForDay(dayId, dayItems);
+      }
+    } else if (mode === "virtual") {
+      const sessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+      sessionsByDay[dayId] = [];
+      setValue("sessionsByDay", sessionsByDay, { shouldValidate: true });
+    }
   };
 
   useEffect(() => {
@@ -291,6 +328,39 @@ function EventRegisterForm() {
     };
   }, [isMultiSession, values.selectedDayIds]);
 
+  useEffect(() => {
+    if (!isMultiSession) return;
+
+    const selectedDayIds = values.selectedDayIds ?? [];
+    const attendanceByDay = values.attendanceByDay ?? {};
+
+    for (const dayId of selectedDayIds) {
+      const mode = attendanceByDay[dayId] ?? "physical";
+      if (mode !== "physical") continue;
+
+      const dayItems = scheduleItemsByDay[dayId] ?? [];
+      if (dayItems.length === 0 || scheduleLoadingByDay[dayId]) continue;
+
+      const selectedForDay = values.sessionsByDay?.[dayId] ?? [];
+      const allIds = dayItems.map((item) => item.id);
+      const alreadyAllSelected =
+        allIds.length === selectedForDay.length &&
+        allIds.every((id) => selectedForDay.includes(id));
+
+      if (!alreadyAllSelected) {
+        autoSelectAllSessionsForDay(dayId, dayItems);
+      }
+    }
+  }, [
+    isMultiSession,
+    values.selectedDayIds,
+    values.attendanceByDay,
+    values.sessionsByDay,
+    scheduleItemsByDay,
+    scheduleLoadingByDay,
+    autoSelectAllSessionsForDay,
+  ]);
+
   const formatSessionTime = (value: string) => {
     const [hh = "0", mm = "0"] = value.split(":");
     const hour = Number(hh);
@@ -312,7 +382,11 @@ function EventRegisterForm() {
 
       if (isMultiSession) {
         const sessionsByDay = getValues("sessionsByDay") ?? {};
+        const attendanceByDay = getValues("attendanceByDay") ?? {};
         for (const dayId of selectedDayIdList) {
+          const mode = attendanceByDay[dayId] ?? "physical";
+          if (mode === "physical") continue;
+
           const dayItems = scheduleItemsByDay[dayId] ?? [];
           const selectedForDay = sessionsByDay[dayId] ?? [];
           if (dayItems.length > 0 && selectedForDay.length === 0) {
@@ -352,6 +426,10 @@ function EventRegisterForm() {
         scheduleType: selectedEvent?.scheduleType ?? "WHOLE_DAY",
       });
 
+      const authKey = `true:${user?.id ?? ""}`;
+      useHomeDataStore.getState().invalidate();
+      await useHomeDataStore.getState().load(authKey, { force: true });
+
       const enabledServices: string[] = [];
       if (selectedEvent?.travelAssistance) enabledServices.push("travel");
       if (selectedEvent?.medicalAssistance) enabledServices.push("medical");
@@ -366,8 +444,15 @@ function EventRegisterForm() {
     } catch (err) {
       if (err instanceof AlreadyRegisteredError) {
         setAlreadyRegistered(true);
+        const authKey = `true:${user?.id ?? ""}`;
+        useHomeDataStore.getState().invalidate();
+        await useHomeDataStore.getState().load(authKey, { force: true });
         router.replace("/");
+        return;
       }
+      showSubmitError(
+        err instanceof Error ? err.message : "Failed to submit registration",
+      );
     }
   };
 
@@ -403,6 +488,14 @@ function EventRegisterForm() {
 
         <Card>
           <CardContent className="pt-6">
+            {submitError && (
+              <div
+                role="alert"
+                className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive text-center"
+              >
+                {submitError}
+              </div>
+            )}
             <MultiStepForm
               steps={REGISTRATION_STEPS}
               currentStep={step}
@@ -582,72 +675,78 @@ function EventRegisterForm() {
                               </Select>
                             </div>
 
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <Label>Select Sessions</Label>
-                                {selectedForDay.length > 0 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {selectedForDay.length} selected
-                                  </span>
+                            {dayAttendance === "physical" ? (
+                              <p className="text-sm text-muted-foreground">
+                                On-site attendance includes all sessions for this day.
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <Label>Select Sessions</Label>
+                                  {selectedForDay.length > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {selectedForDay.length} selected
+                                    </span>
+                                  )}
+                                </div>
+                                {loading ? (
+                                  <p className="text-sm text-muted-foreground">Loading sessions…</p>
+                                ) : error ? (
+                                  <p className="text-sm text-destructive">{error}</p>
+                                ) : dayItems.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
+                                ) : (
+                                  <SessionScrollRow>
+                                    {dayItems.map((item) => {
+                                      const isSelected = selectedForDay.includes(item.id);
+                                      return (
+                                        <div
+                                          key={item.id}
+                                          role="button"
+                                          tabIndex={0}
+                                          aria-pressed={isSelected}
+                                          onClick={() => toggleSessionForDay(dayId, item.id)}
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                              event.preventDefault();
+                                              toggleSessionForDay(dayId, item.id);
+                                            }
+                                          }}
+                                          className={cn(
+                                            "min-w-[240px] max-w-[260px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                            isSelected
+                                              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                              : "border-border bg-card hover:border-primary/40",
+                                          )}
+                                        >
+                                          <div className="p-3 space-y-2">
+                                            <div className="flex items-start gap-2">
+                                              <div
+                                                aria-hidden
+                                                className={cn(
+                                                  "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                                  isSelected && "bg-primary text-primary-foreground",
+                                                )}
+                                              >
+                                                {isSelected && <Check className="h-3 w-3" />}
+                                              </div>
+                                              <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground pl-6">
+                                              {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
+                                              <Mic className="h-3 w-3" />
+                                              {item.speakerName || "Speaker TBA"}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </SessionScrollRow>
                                 )}
                               </div>
-                              {loading ? (
-                                <p className="text-sm text-muted-foreground">Loading sessions…</p>
-                              ) : error ? (
-                                <p className="text-sm text-destructive">{error}</p>
-                              ) : dayItems.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
-                              ) : (
-                                <SessionScrollRow>
-                                  {dayItems.map((item) => {
-                                    const isSelected = selectedForDay.includes(item.id);
-                                    return (
-                                      <div
-                                        key={item.id}
-                                        role="button"
-                                        tabIndex={0}
-                                        aria-pressed={isSelected}
-                                        onClick={() => toggleSessionForDay(dayId, item.id)}
-                                        onKeyDown={(event) => {
-                                          if (event.key === "Enter" || event.key === " ") {
-                                            event.preventDefault();
-                                            toggleSessionForDay(dayId, item.id);
-                                          }
-                                        }}
-                                        className={cn(
-                                          "min-w-[240px] max-w-[260px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                          isSelected
-                                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                                            : "border-border bg-card hover:border-primary/40",
-                                        )}
-                                      >
-                                        <div className="p-3 space-y-2">
-                                          <div className="flex items-start gap-2">
-                                            <div
-                                              aria-hidden
-                                              className={cn(
-                                                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                                isSelected && "bg-primary text-primary-foreground",
-                                              )}
-                                            >
-                                              {isSelected && <Check className="h-3 w-3" />}
-                                            </div>
-                                            <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
-                                          </div>
-                                          <p className="text-xs text-muted-foreground pl-6">
-                                            {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
-                                            <Mic className="h-3 w-3" />
-                                            {item.speakerName || "Speaker TBA"}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </SessionScrollRow>
-                              )}
-                            </div>
+                            )}
                           </div>
                         );
                       })}
@@ -707,7 +806,9 @@ function EventRegisterForm() {
                                 <li key={dayId}>
                                   <p className="font-medium">{getDayLabel(day)}</p>
                                   <p className="text-muted-foreground">{getRegistrationOptionLabel(dayAttendance)}</p>
-                                  {daySessions.length > 0 && (
+                                  {dayAttendance === "physical" ? (
+                                    <p className="mt-1 text-muted-foreground">All sessions for this day</p>
+                                  ) : daySessions.length > 0 ? (
                                     <ul className="mt-1 space-y-1 text-muted-foreground">
                                       {daySessions.map((session) => (
                                         <li key={session.id}>
@@ -715,7 +816,7 @@ function EventRegisterForm() {
                                         </li>
                                       ))}
                                     </ul>
-                                  )}
+                                  ) : null}
                                 </li>
                               );
                             })}

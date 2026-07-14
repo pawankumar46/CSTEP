@@ -545,6 +545,8 @@ export interface SignupAddress {
   postalCode: string;
 }
 
+export type SignupOrgType = "ORGANISATION" | "INDEPENDENT";
+
 export interface SignupCredentials {
   salutation: string;
   firstName: string;
@@ -552,7 +554,14 @@ export interface SignupCredentials {
   lastName: string;
   phone: string;
   email: string;
-  address: SignupAddress;
+  designation: string;
+  orgType: SignupOrgType;
+  orgName?: string;
+  motivation: string;
+  city: string;
+  state: string;
+  /** Lobby signup may still collect a full address; city/state are preferred when set. */
+  address?: SignupAddress;
   password: string;
 }
 

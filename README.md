@@ -287,10 +287,10 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/sign_up/` | User registration (`role`, nested `address`, profile fields) |
+| `POST` | `/auth/sign_up/` | User registration (`role: BASE_USER`, `designation`, `org_type` ORGANISATION/INDEPENDENT, `org_name`, `motivation`, `city`, `state`, profile fields) |
 | `POST` | `/auth/login/` | Login → access + refresh tokens |
-| `POST` | `/auth/verify-otp/` | OTP verification |
-| `POST` | `/auth/resend-otp/` | Resend email OTP (`{ "email": "..." }`) |
+| `POST` | `/auth/verify-otp/` | OTP verification (`{ email, otp }` or `{ phone_number, otp }`) |
+| `POST` | `/auth/resend-otp/` | Resend OTP (`{ "email": "..." }` or `{ "phone_number": "..." }`) |
 | `POST` | `/auth/forgot-password/` | Password reset request (`{ "email": "..." }`) |
 | `POST` | `/auth/reset-password/` | Reset password with OTP (`email`, `otp`, `new_password`, `confirm_password`) |
 | `POST` | `/auth/logout/` | Logout (refresh token in body) |
@@ -399,7 +399,7 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 
 ### 2. Lobby: add user (two-step wizard)
 
-1. **Signup** → `POST /auth/sign_up/` with `role: BASE_USER` and nested `address` (`auth-mappers.toLobbySignupPayload` / `toSignupPayload`)
+1. **Signup** → `POST /auth/sign_up/` with `role: BASE_USER`, `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (`auth-mappers.toLobbySignupPayload` / `toSignupPayload`)
 2. **Register for event** → `POST /registrations/registration/` with `user` id (`registration-mappers.toLobbyRegistrationApiPayload`)
 
 Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
@@ -458,6 +458,17 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-07-14
+
+- **Event registration — Physical vs Virtual sessions:** On Step 3 (MULTI_SESSION), **Physical** hides the session picker and auto-selects all sessions for that day; **Virtual** shows the session list for manual selection. After a successful registration, home upcoming data is force-refetched via `GET /events/event/upcoming/` so registration status updates immediately.
+- **Signup — new profile fields:** Public signup now collects **Designation**, **Organisation type** (`ORGANISATION` → “Institution or Organisation” / `INDEPENDENT` → “Independent”), **Organisation name** (required when ORGANISATION), **What motivates you to attend this event?**, plus **City** and **State**. `POST /auth/sign_up/` sends flat `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (nested address removed for public signup).
+- **Login redirect fix:** After sign-in, navigation now uses `router.replace` to the home page (base users) or dashboard (staff). Fixed login treating `{ message: "Login successful", tokens, user }` as an error (blocked redirect). Fixed a loop where a **403 permission** response on public APIs after login was treated as session expiry and sent the user back to `/login`.
+- **Home page — ICAS dates:** Hero and About sections now show **19th** alongside API dates (e.g. `19th – 21st August 2026` and `19, 20 and 21 August` in the heading) for ICAS events; countdown still uses Aug 19 start.
+- **Event registration — error feedback:** Failed `POST /registrations/registration/` now shows the API error message on the registration form for 5 seconds (was silently ignored except for already-registered).
+- **OTP — email + mobile:** After signup, `/otp` now verifies **email then mobile** (step 1 → step 2). Signup passes both `email` and `phone` query params. Verify uses `POST /auth/verify-otp/` with `{ email, otp }` or `{ phone_number, otp }`. Resend supports both channels via `POST /auth/resend-otp/` with `{ email }` or `{ phone_number }` (30s cooldown each step).
+- **Contact email:** Home/About contact updated from `arundati.g@cstep.in` to `icas@cstep.in`.
+- **Home page cleanup:** Removed the **FAQs** section (and FAQ links from the navbar/footer). Removed the **registered count** (`N registered`) from the hero metadata row; date and venue remain.
 
 ### 2026-07-13
 

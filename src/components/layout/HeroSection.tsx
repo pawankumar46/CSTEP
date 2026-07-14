@@ -10,13 +10,12 @@ import {
   ChevronRight,
   MapPin,
   Sparkles,
-  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { APP_NAME } from "@/lib/constants";
 import { getConferenceVenue, ICAS_CONFERENCE, isIcasEventName } from "@/lib/icas-conference";
-import { formatEventDateRange, getUpcomingEventDays, getUpcomingEventMonthLabel } from "@/lib/event-display";
+import { formatHomeEventDateRange, getHomeEventDays, getUpcomingEventMonthLabel } from "@/lib/event-display";
 import { useHomeEvent } from "@/hooks/useHomeEvent";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
 import { HeroSectionSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -28,13 +27,15 @@ import type { UpcomingEvent } from "@/types";
 const HOME_HERO_IMAGE = "/imge2.jpg";
 
 function UpcomingEventHeading({
+  eventName,
   eventStart,
   eventEnd,
 }: {
+  eventName: string;
   eventStart: string;
   eventEnd?: string;
 }) {
-  const days = getUpcomingEventDays(eventStart, eventEnd);
+  const days = getHomeEventDays(eventName, eventStart, eventEnd);
   const month = getUpcomingEventMonthLabel(eventStart, eventEnd);
 
   return (
@@ -89,11 +90,10 @@ function HeroEventSlide({
       : null
     : getHomeRegisterLabel(isAuthenticated, eventIsRegistered);
 
-  const dates = formatEventDateRange(event.date, event.endDate);
+  const dates = formatHomeEventDateRange(event.name, event.date, event.endDate);
   const countdownStart = isIcasEventName(event.name)
     ? ICAS_CONFERENCE.eventStartIso
     : event.date;
-  const participantsRegistered = event.summary?.totalRegisteredUsers ?? null;
   const venue = getConferenceVenue(event.name, event.location);
   const showTheme = isIcasEventName(event.name);
 
@@ -110,7 +110,7 @@ function HeroEventSlide({
       </div>
 
       <div className="order-1 flex w-full min-w-0 max-w-xl flex-col justify-center gap-5 lg:order-2 lg:w-auto lg:max-w-lg xl:max-w-xl lg:gap-6">
-        <UpcomingEventHeading eventStart={event.date} eventEnd={event.endDate} />
+        <UpcomingEventHeading eventName={event.name} eventStart={event.date} eventEnd={event.endDate} />
 
         <div className="space-y-4 lg:space-y-5">
           <Badge variant="secondary" className="w-fit gap-1.5">
@@ -138,12 +138,6 @@ function HeroEventSlide({
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
               {venue}
             </span>
-            {participantsRegistered !== null && (
-              <span className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 shrink-0 text-primary" />
-                {participantsRegistered.toLocaleString()} registered
-              </span>
-            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
