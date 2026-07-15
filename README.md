@@ -462,6 +462,8 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ### 2026-07-15
 
 - **OTP — mobile only:** After signup, `/otp` now verifies **mobile only** (email verification commented out). User enters phone OTP, then redirects to home. Resend uses `POST /auth/resend-otp/` with `{ phone_number }`.
+- **Event registration — review:** For Physical attendance, Step 4 no longer shows “All sessions for this day”; only the day and attendance mode are listed.
+- **Home hero — registered status:** “You’re registered for this event…” now sits directly under the Upcoming Event heading (above the brand badge).
 
 ### 2026-07-14
 

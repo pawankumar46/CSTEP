@@ -112,6 +112,12 @@ function HeroEventSlide({
       <div className="order-1 flex w-full min-w-0 max-w-xl flex-col justify-center gap-5 lg:order-2 lg:w-auto lg:max-w-lg xl:max-w-xl lg:gap-6">
         <UpcomingEventHeading eventName={event.name} eventStart={event.date} eventEnd={event.endDate} />
 
+        {isAuthenticated && eventIsRegistered && (
+          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            You&apos;re registered for this event. Join the live stream when it begins.
+          </p>
+        )}
+
         <div className="space-y-4 lg:space-y-5">
           <Badge variant="secondary" className="w-fit gap-1.5">
             <Sparkles className="h-3 w-3" />
@@ -167,11 +173,6 @@ function HeroEventSlide({
         {isAuthenticated && !eventIsRegistered && (
           <p className="text-sm text-muted-foreground">
             You&apos;re signed in. Complete event registration to confirm your participation.
-          </p>
-        )}
-        {isAuthenticated && eventIsRegistered && (
-          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-            You&apos;re registered for this event. Join the live stream when it begins.
           </p>
         )}
       </div>

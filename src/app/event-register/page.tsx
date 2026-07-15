@@ -806,9 +806,7 @@ function EventRegisterForm() {
                                 <li key={dayId}>
                                   <p className="font-medium">{getDayLabel(day)}</p>
                                   <p className="text-muted-foreground">{getRegistrationOptionLabel(dayAttendance)}</p>
-                                  {dayAttendance === "physical" ? (
-                                    <p className="mt-1 text-muted-foreground">All sessions for this day</p>
-                                  ) : daySessions.length > 0 ? (
+                                  {dayAttendance !== "physical" && daySessions.length > 0 && (
                                     <ul className="mt-1 space-y-1 text-muted-foreground">
                                       {daySessions.map((session) => (
                                         <li key={session.id}>
@@ -816,7 +814,7 @@ function EventRegisterForm() {
                                         </li>
                                       ))}
                                     </ul>
-                                  ) : null}
+                                  )}
                                 </li>
                               );
                             })}
