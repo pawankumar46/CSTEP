@@ -90,9 +90,10 @@ export function buildProfileSupportUrl(eventId?: string, services?: string[]): s
   return `${ROUTES.profile}?${search.toString()}`;
 }
 
-export function buildResetPasswordUrl(email?: string): string {
-  if (!email?.trim()) return ROUTES.resetPassword;
-  const search = new URLSearchParams({ email: email.trim().toLowerCase() });
+export function buildResetPasswordUrl(phone?: string): string {
+  if (!phone?.trim()) return ROUTES.resetPassword;
+  const digits = phone.replace(/\D/g, "").slice(-10);
+  const search = new URLSearchParams({ phone: digits });
   return `${ROUTES.resetPassword}?${search.toString()}`;
 }
 

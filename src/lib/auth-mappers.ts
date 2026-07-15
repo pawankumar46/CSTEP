@@ -30,13 +30,13 @@ export function toResendOtpPayload(method: "phone" | "email", contact: string) {
 }
 
 export function toResetPasswordPayload(data: {
-  email: string;
+  phone: string;
   otp: string;
   newPassword: string;
   confirmPassword: string;
 }) {
   return {
-    email: normalizeAuthIdentifier(data.email),
+    phone_number: formatPhoneForApi(data.phone),
     otp: data.otp.trim(),
     new_password: data.newPassword,
     confirm_password: data.confirmPassword,

@@ -19,6 +19,7 @@ import {
   toUpdateProfilePayload,
   toVerifyOtpPayload,
   toResendOtpPayload,
+  formatPhoneForApi,
 } from "@/lib/auth-mappers";
 import type { AuthResponse, LoginCredentials, OtpVerifyMethod, ResetPasswordPayload, SignupCredentials, User, VerifyOtpPayload } from "@/types";
 
@@ -134,9 +135,11 @@ export const resendOtp = async (
   }
 };
 
-export const forgotPassword = async (email: string): Promise<{ success: boolean }> => {
+export const forgotPassword = async (phone: string): Promise<{ success: boolean }> => {
   try {
-    await apiClient.post("/auth/forgot-password/", { email: normalizeAuthIdentifier(email) });
+    await apiClient.post("/auth/forgot-password/", {
+      phone_number: formatPhoneForApi(phone),
+    });
     return { success: true };
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));

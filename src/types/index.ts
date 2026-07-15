@@ -529,7 +529,7 @@ export interface VerifyOtpPayload {
 }
 
 export interface ResetPasswordPayload {
-  email: string;
+  phone: string;
   otp: string;
   newPassword: string;
   confirmPassword: string;

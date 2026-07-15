@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { CheckCircle, Loader2 } from "lucide-react";
@@ -21,7 +21,7 @@ import { ROUTES } from "@/lib/routes";
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const prefilledEmail = searchParams.get("email") ?? "";
+  const prefilledPhone = (searchParams.get("phone") ?? "").replace(/\D/g, "").slice(0, 10);
 
   const { resetPassword, isLoading, error, clearError } = useAuthStore();
   const [success, setSuccess] = useState(false);
@@ -30,12 +30,13 @@ function ResetPasswordForm() {
   const {
     register,
     handleSubmit,
+    control,
     setValue,
     formState: { errors },
   } = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      email: prefilledEmail,
+      phone: prefilledPhone,
       otp: "",
       newPassword: "",
       confirmPassword: "",
@@ -43,10 +44,10 @@ function ResetPasswordForm() {
   });
 
   useEffect(() => {
-    if (prefilledEmail) {
-      setValue("email", prefilledEmail);
+    if (prefilledPhone) {
+      setValue("phone", prefilledPhone);
     }
-  }, [prefilledEmail, setValue]);
+  }, [prefilledPhone, setValue]);
 
   useEffect(() => {
     setValue("otp", otp, { shouldValidate: otp.length === 6 });
@@ -56,7 +57,7 @@ function ResetPasswordForm() {
     clearError();
     try {
       await resetPassword({
-        email: data.email,
+        phone: data.phone,
         otp: data.otp,
         newPassword: data.newPassword,
         confirmPassword: data.confirmPassword,
@@ -89,7 +90,7 @@ function ResetPasswordForm() {
         <CardHeader>
           <CardTitle>Reset Password</CardTitle>
           <CardDescription>
-            Enter the OTP from your email and choose a new password.
+            Enter the OTP sent to your mobile number and choose a new password.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -98,15 +99,26 @@ function ResetPasswordForm() {
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                readOnly={Boolean(prefilledEmail)}
-                {...register("email")}
+              <Label htmlFor="phone">Mobile Number</Label>
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="9999999999"
+                    readOnly={Boolean(prefilledPhone)}
+                    value={field.value}
+                    onChange={(e) =>
+                      field.onChange(e.target.value.replace(/\D/g, "").slice(0, 10))
+                    }
+                  />
+                )}
               />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
             </div>
             <div className="space-y-2">
               <Label>OTP Code</Label>

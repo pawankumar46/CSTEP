@@ -24,7 +24,7 @@ interface AuthState {
   signUp: (data: SignupCredentials) => Promise<void>;
   login: (credentials: LoginCredentials) => Promise<void>;
   verifyOtp: (payload: VerifyOtpPayload) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
+  forgotPassword: (phone: string) => Promise<void>;
   resetPassword: (payload: ResetPasswordPayload) => Promise<void>;
   updateProfile: (payload: {
     salutation?: string;
@@ -119,14 +119,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      forgotPassword: async (email) => {
+      forgotPassword: async (phone) => {
         set({ isLoading: true, error: null });
         try {
-          await authService.forgotPassword(email);
+          await authService.forgotPassword(phone);
           set({ isLoading: false });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Failed to send reset email",
+            error: err instanceof Error ? err.message : "Failed to send reset OTP",
             isLoading: false,
           });
           throw err;

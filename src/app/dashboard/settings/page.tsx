@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Loader2, Mail } from "lucide-react";
+import { CheckCircle2, Loader2, Smartphone } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,10 @@ import {
 } from "@/features/dashboard/admin-profile.schema";
 import { resetPasswordSchema, type ResetPasswordFormValues } from "@/features/auth/reset-password.schema";
 
+function digitsPhone(phone?: string | null): string {
+  return (phone ?? "").replace(/\D/g, "").slice(-10);
+}
+
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const updateProfile = useAuthStore((s) => s.updateProfile);
@@ -63,7 +67,7 @@ export default function SettingsPage() {
   const passwordForm = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      email: user?.email ?? "",
+      phone: digitsPhone(user?.phone),
       otp: "",
       newPassword: "",
       confirmPassword: "",
@@ -78,7 +82,7 @@ export default function SettingsPage() {
       middleName: user.middleName ?? "",
       lastName: user.lastName ?? "",
     });
-    passwordForm.setValue("email", user.email ?? "");
+    passwordForm.setValue("phone", digitsPhone(user.phone));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -109,7 +113,7 @@ export default function SettingsPage() {
   const resetPasswordForm = () => {
     setOtp("");
     passwordForm.reset({
-      email: user.email ?? "",
+      phone: digitsPhone(user.phone),
       otp: "",
       newPassword: "",
       confirmPassword: "",
@@ -121,7 +125,7 @@ export default function SettingsPage() {
     setPasswordError(null);
     setPasswordSuccess(false);
     try {
-      await forgotPassword(user.email);
+      await forgotPassword(digitsPhone(user.phone));
       resetPasswordForm();
       setResetDialogOpen(true);
     } catch (err) {
@@ -136,7 +140,7 @@ export default function SettingsPage() {
     setPasswordSuccess(false);
     try {
       await resetPassword({
-        email: values.email,
+        phone: values.phone,
         otp: values.otp,
         newPassword: values.newPassword,
         confirmPassword: values.confirmPassword,
@@ -255,16 +259,16 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Security</CardTitle>
           <CardDescription>
-            Reset your password using an OTP sent to your email
+            Reset your password using an OTP sent to your mobile number
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={user.email} type="email" readOnly disabled />
+              <Label>Mobile Number</Label>
+              <Input value={user.phone} type="tel" readOnly disabled />
               <p className="text-xs text-muted-foreground">
-                We&apos;ll send a 6-digit verification code to this email.
+                We&apos;ll send a 6-digit verification code to this mobile number.
               </p>
             </div>
 
@@ -277,11 +281,11 @@ export default function SettingsPage() {
               </p>
             )}
 
-            <Button type="button" onClick={onSendOtp} disabled={sendingOtp}>
+            <Button type="button" onClick={onSendOtp} disabled={sendingOtp || !digitsPhone(user.phone)}>
               {sendingOtp ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Mail className="mr-2 h-4 w-4" />
+                <Smartphone className="mr-2 h-4 w-4" />
               )}
               {sendingOtp ? "Sending..." : "Send OTP"}
             </Button>
@@ -305,7 +309,7 @@ export default function SettingsPage() {
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
               Enter the 6-digit code sent to{" "}
-              <span className="font-medium text-foreground">{user.email}</span> and choose a new
+              <span className="font-medium text-foreground">{user.phone}</span> and choose a new
               password.
             </DialogDescription>
           </DialogHeader>
