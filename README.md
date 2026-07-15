@@ -459,14 +459,19 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-15
+
+- **OTP — mobile only:** After signup, `/otp` now verifies **mobile only** (email verification commented out). User enters phone OTP, then redirects to home. Resend uses `POST /auth/resend-otp/` with `{ phone_number }`.
+
 ### 2026-07-14
 
+- **Signup — required fields:** First name, last name, phone number, and email now show a required marker (`*`) and clearer empty-field validation messages.
 - **Event registration — Physical vs Virtual sessions:** On Step 3 (MULTI_SESSION), **Physical** hides the session picker and auto-selects all sessions for that day; **Virtual** shows the session list for manual selection. After a successful registration, home upcoming data is force-refetched via `GET /events/event/upcoming/` so registration status updates immediately.
 - **Signup — new profile fields:** Public signup now collects **Designation**, **Organisation type** (`ORGANISATION` → “Institution or Organisation” / `INDEPENDENT` → “Independent”), **Organisation name** (required when ORGANISATION), **What motivates you to attend this event?**, plus **City** and **State**. `POST /auth/sign_up/` sends flat `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (nested address removed for public signup).
 - **Login redirect fix:** After sign-in, navigation now uses `router.replace` to the home page (base users) or dashboard (staff). Fixed login treating `{ message: "Login successful", tokens, user }` as an error (blocked redirect). Fixed a loop where a **403 permission** response on public APIs after login was treated as session expiry and sent the user back to `/login`.
 - **Home page — ICAS dates:** Hero and About sections now show **19th** alongside API dates (e.g. `19th – 21st August 2026` and `19, 20 and 21 August` in the heading) for ICAS events; countdown still uses Aug 19 start.
 - **Event registration — error feedback:** Failed `POST /registrations/registration/` now shows the API error message on the registration form for 5 seconds (was silently ignored except for already-registered).
-- **OTP — email + mobile:** After signup, `/otp` now verifies **email then mobile** (step 1 → step 2). Signup passes both `email` and `phone` query params. Verify uses `POST /auth/verify-otp/` with `{ email, otp }` or `{ phone_number, otp }`. Resend supports both channels via `POST /auth/resend-otp/` with `{ email }` or `{ phone_number }` (30s cooldown each step).
+- **OTP — mobile only:** After signup, `/otp` verifies mobile only (`POST /auth/verify-otp/` with `{ phone_number, otp }`); email step disabled. Resend supports `{ phone_number }` (30s cooldown). Previously supported email + mobile two-step flow.
 - **Contact email:** Home/About contact updated from `arundati.g@cstep.in` to `icas@cstep.in`.
 - **Home page cleanup:** Removed the **FAQs** section (and FAQ links from the navbar/footer). Removed the **registered count** (`N registered`) from the hero metadata row; date and venue remain.
 

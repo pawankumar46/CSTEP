@@ -25,6 +25,10 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
+function RequiredMark() {
+  return <span className="text-destructive" aria-hidden>*</span>;
+}
+
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -138,8 +142,10 @@ function SignupForm() {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" {...register("firstName")} />
+                <Label htmlFor="firstName">
+                  First Name <RequiredMark />
+                </Label>
+                <Input id="firstName" required aria-required="true" {...register("firstName")} />
                 {errors.firstName && (
                   <p className="text-xs text-destructive">{errors.firstName.message}</p>
                 )}
@@ -151,8 +157,10 @@ function SignupForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input id="lastName" {...register("lastName")} />
+              <Label htmlFor="lastName">
+                Last Name <RequiredMark />
+              </Label>
+              <Input id="lastName" required aria-required="true" {...register("lastName")} />
               {errors.lastName && (
                 <p className="text-xs text-destructive">{errors.lastName.message}</p>
               )}
@@ -160,7 +168,9 @@ function SignupForm() {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">
+                  Phone Number <RequiredMark />
+                </Label>
                 <Controller
                   name="phone"
                   control={control}
@@ -171,6 +181,8 @@ function SignupForm() {
                       inputMode="numeric"
                       maxLength={10}
                       placeholder="9999999999"
+                      required
+                      aria-required="true"
                       value={field.value}
                       onChange={(e) =>
                         field.onChange(e.target.value.replace(/\D/g, "").slice(0, 10))
@@ -183,11 +195,15 @@ function SignupForm() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">
+                  Email Address <RequiredMark />
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
+                  required
+                  aria-required="true"
                   {...register("email")}
                 />
                 {errors.email && (

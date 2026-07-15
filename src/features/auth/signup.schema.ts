@@ -36,11 +36,17 @@ const signupOrgTypeEnum = z.enum(["ORGANISATION", "INDEPENDENT"]);
 
 const signupBaseFields = {
   salutation: z.string().min(1, "Salutation is required"),
-  firstName: z.string().min(1, "First name is required"),
+  firstName: requiredText("First name is required"),
   middleName: z.string().optional(),
-  lastName: z.string().min(1, "Last name is required"),
-  phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
-  email: z.string().email("Valid email is required"),
+  lastName: requiredText("Last name is required"),
+  phone: z
+    .string()
+    .min(1, "Phone number is required")
+    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Valid email is required"),
   designation: requiredText("Designation is required"),
   orgType: signupOrgTypeEnum,
   orgName: z.string().trim().optional(),

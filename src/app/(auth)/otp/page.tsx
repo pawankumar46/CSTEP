@@ -14,22 +14,20 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { resendOtp } from "@/services/auth.service";
 import { ROUTES, buildAuthUrl, sanitizeRedirect } from "@/lib/routes";
-import type { OtpVerifyMethod } from "@/types";
 
 const RESEND_COOLDOWN_SECONDS = 30;
-
-type VerifyStep = OtpVerifyMethod;
 
 function OTPForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const prefilledEmail = searchParams.get("email") ?? "";
+  // const prefilledEmail = searchParams.get("email") ?? "";
   const prefilledPhone = searchParams.get("phone") ?? "";
   const redirectTo = sanitizeRedirect(searchParams.get("redirect")) ?? ROUTES.home;
 
   const { verifyOtp, isLoading, error, clearError } = useAuthStore();
-  const [step, setStep] = useState<VerifyStep>("email");
-  const [email, setEmail] = useState(prefilledEmail);
+  // Email verification disabled — mobile only after signup.
+  // const [step, setStep] = useState<VerifyStep>("email");
+  // const [email, setEmail] = useState(prefilledEmail);
   const [phone, setPhone] = useState(prefilledPhone);
   const [otp, setOtp] = useState("");
   const [success, setSuccess] = useState(false);
@@ -38,9 +36,9 @@ function OTPForm() {
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
-  useEffect(() => {
-    if (prefilledEmail) setEmail(prefilledEmail);
-  }, [prefilledEmail]);
+  // useEffect(() => {
+  //   if (prefilledEmail) setEmail(prefilledEmail);
+  // }, [prefilledEmail]);
 
   useEffect(() => {
     if (prefilledPhone) setPhone(prefilledPhone);
@@ -52,30 +50,23 @@ function OTPForm() {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
-  const isEmailStep = step === "email";
-  const contactLabel = isEmailStep ? "email" : "mobile number";
-
   const handleResend = async () => {
     if (resending || cooldown > 0) return;
     clearError();
     setFormError(null);
     setResendMessage(null);
 
-    const contact = isEmailStep ? email.trim() : phone.trim();
+    const contact = phone.trim();
     if (!contact) {
-      setFormError(isEmailStep ? "Email is required" : "Phone number is required");
+      setFormError("Phone number is required");
       return;
     }
 
     setResending(true);
     try {
-      await resendOtp(step, contact);
+      await resendOtp("phone", contact);
       setOtp("");
-      setResendMessage(
-        isEmailStep
-          ? "A new OTP has been sent to your email."
-          : "A new OTP has been sent to your mobile number.",
-      );
+      setResendMessage("A new OTP has been sent to your mobile number.");
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to resend OTP");
@@ -89,11 +80,7 @@ function OTPForm() {
     setFormError(null);
     setResendMessage(null);
 
-    if (isEmailStep && !email.trim()) {
-      setFormError("Email is required");
-      return;
-    }
-    if (!isEmailStep && !phone.trim()) {
+    if (!phone.trim()) {
       setFormError("Phone number is required");
       return;
     }
@@ -103,18 +90,19 @@ function OTPForm() {
     }
 
     try {
-      if (isEmailStep) {
-        await verifyOtp({
-          method: "email",
-          otp,
-          email: email.trim().toLowerCase(),
-        });
-        setOtp("");
-        setResendMessage(null);
-        setCooldown(0);
-        setStep("phone");
-        return;
-      }
+      // Email verification disabled — skip straight to mobile OTP only.
+      // if (isEmailStep) {
+      //   await verifyOtp({
+      //     method: "email",
+      //     otp,
+      //     email: email.trim().toLowerCase(),
+      //   });
+      //   setOtp("");
+      //   setResendMessage(null);
+      //   setCooldown(0);
+      //   setStep("phone");
+      //   return;
+      // }
 
       await verifyOtp({
         method: "phone",
@@ -133,8 +121,8 @@ function OTPForm() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center space-y-4">
           <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto" />
-          <h2 className="text-2xl font-bold">Account verified!</h2>
-          <p className="text-muted-foreground">Email and mobile verified. Redirecting...</p>
+          <h2 className="text-2xl font-bold">Mobile verified!</h2>
+          <p className="text-muted-foreground">Redirecting to home...</p>
         </motion.div>
       </div>
     );
@@ -142,20 +130,15 @@ function OTPForm() {
 
   return (
     <motion.div
-      key={step}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-md"
     >
       <Card>
         <CardHeader className="text-center">
-          <CardTitle>
-            {isEmailStep ? "Verify your email" : "Verify your mobile number"}
-          </CardTitle>
+          <CardTitle>Verify your mobile number</CardTitle>
           <CardDescription>
-            {isEmailStep
-              ? "Step 1 of 2 — Enter the 6-digit OTP sent to your email after registration."
-              : "Step 2 of 2 — Enter the 6-digit OTP sent to your mobile number."}
+            Enter the 6-digit OTP sent to your mobile number after registration.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -171,6 +154,7 @@ function OTPForm() {
             </div>
           )}
 
+          {/* Email verification step — disabled for now
           {isEmailStep ? (
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
@@ -184,19 +168,20 @@ function OTPForm() {
               />
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="phone">Mobile Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                inputMode="numeric"
-                placeholder="10-digit mobile number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                readOnly={Boolean(prefilledPhone)}
-              />
-            </div>
-          )}
+          */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Mobile Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              inputMode="numeric"
+              placeholder="10-digit mobile number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              readOnly={Boolean(prefilledPhone)}
+            />
+          </div>
+          {/* )} */}
 
           <div className="space-y-2">
             <Label>OTP Code</Label>
@@ -206,11 +191,7 @@ function OTPForm() {
         <CardFooter className="flex flex-col gap-3">
           <Button className="w-full" onClick={handleVerify} disabled={otp.length !== 6 || isLoading}>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {isLoading
-              ? "Verifying..."
-              : isEmailStep
-                ? "Verify Email"
-                : "Verify Mobile"}
+            {isLoading ? "Verifying..." : "Verify Mobile"}
           </Button>
 
           <p className="text-sm text-muted-foreground">
@@ -225,7 +206,7 @@ function OTPForm() {
                 ? "Resending..."
                 : cooldown > 0
                   ? `Resend OTP in ${cooldown}s`
-                  : `Resend OTP to ${contactLabel}`}
+                  : "Resend OTP to mobile number"}
             </button>
           </p>
 
