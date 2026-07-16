@@ -22,8 +22,10 @@ import {
   getSharedAttendanceModeOptions,
   normalizeAttendanceMode,
 } from "@/lib/registration-options";
+import { filterEventDaysForRegistration } from "@/lib/icas-conference";
 import {
   buildParticipationDateOptionsFromEventDays,
+  formatEventDayDateLabel,
 } from "@/lib/participation-dates";
 import { EventRegisterGuard } from "@/components/auth/EventRegisterGuard";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -153,13 +155,17 @@ function EventRegisterForm() {
   const values = watch();
   const selectedEvent = events.find((e) => e.id === values.eventId);
   const isMultiSession = selectedEvent?.scheduleType === "MULTI_SESSION";
+  const registrationEventDays = useMemo(
+    () => filterEventDaysForRegistration(eventDays, selectedEvent?.name),
+    [eventDays, selectedEvent?.name],
+  );
   const participationDateOptions = useMemo(
-    () => buildParticipationDateOptionsFromEventDays(eventDays, false),
-    [eventDays],
+    () => buildParticipationDateOptionsFromEventDays(registrationEventDays, false),
+    [registrationEventDays],
   );
   const selectedDays = useMemo(
-    () => eventDays.filter((day) => values.selectedDayIds?.includes(day.id)),
-    [eventDays, values.selectedDayIds],
+    () => registrationEventDays.filter((day) => values.selectedDayIds?.includes(day.id)),
+    [registrationEventDays, values.selectedDayIds],
   );
   const sharedAttendanceOptions = useMemo(
     () => getSharedAttendanceModeOptions(selectedDays),
@@ -167,9 +173,8 @@ function EventRegisterForm() {
   );
   const getDayLabel = useCallback(
     (day: EventDay) =>
-      day.label?.trim()
-      || participationDateOptions.find((option) => option.value === day.date)?.label
-      || day.date,
+      participationDateOptions.find((option) => option.value === day.date)?.label
+      ?? formatEventDayDateLabel(day.date),
     [participationDateOptions],
   );
 
@@ -196,7 +201,7 @@ function EventRegisterForm() {
           return copy;
         });
       } else {
-        const day = eventDays.find((entry) => entry.id === dayId);
+        const day = registrationEventDays.find((entry) => entry.id === dayId);
         attendanceByDay[dayId] = normalizeAttendanceMode(
           attendanceByDay[dayId],
           day?.allowedAttendanceModes,
@@ -287,14 +292,40 @@ function EventRegisterForm() {
   }, [values.eventId, setValue]);
 
   useEffect(() => {
-    if (!isMultiSession || eventDays.length === 0) return;
+    const allowedIds = new Set(registrationEventDays.map((day) => day.id));
+    const current = getValues("selectedDayIds") ?? [];
+    const next = current.filter((id) => allowedIds.has(id));
+    if (next.length === current.length) return;
+
+    setValue("selectedDayIds", next, { shouldValidate: true });
+
+    const sessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+    const attendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
+    let sessionsChanged = false;
+
+    for (const id of Object.keys(sessionsByDay)) {
+      if (!allowedIds.has(id)) {
+        delete sessionsByDay[id];
+        delete attendanceByDay[id];
+        sessionsChanged = true;
+      }
+    }
+
+    if (sessionsChanged) {
+      setValue("sessionsByDay", sessionsByDay, { shouldValidate: true });
+      setValue("attendanceByDay", attendanceByDay, { shouldValidate: true });
+    }
+  }, [registrationEventDays, getValues, setValue]);
+
+  useEffect(() => {
+    if (!isMultiSession || registrationEventDays.length === 0) return;
 
     const selectedDayIds = getValues("selectedDayIds") ?? [];
     const attendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
     let changed = false;
 
     for (const dayId of selectedDayIds) {
-      const day = eventDays.find((entry) => entry.id === dayId);
+      const day = registrationEventDays.find((entry) => entry.id === dayId);
       if (!day) continue;
 
       const normalized = normalizeAttendanceMode(
@@ -310,7 +341,7 @@ function EventRegisterForm() {
     if (changed) {
       setValue("attendanceByDay", attendanceByDay, { shouldValidate: true });
     }
-  }, [eventDays, isMultiSession, getValues, setValue, values.selectedDayIds]);
+  }, [registrationEventDays, isMultiSession, getValues, setValue, values.selectedDayIds]);
 
   useEffect(() => {
     if (isMultiSession || selectedDays.length === 0) return;
@@ -437,7 +468,7 @@ function EventRegisterForm() {
           const dayItems = scheduleItemsByDay[dayId] ?? [];
           const selectedForDay = sessionsByDay[dayId] ?? [];
           if (dayItems.length > 0 && selectedForDay.length === 0) {
-            const day = eventDays.find((entry) => entry.id === dayId);
+            const day = registrationEventDays.find((entry) => entry.id === dayId);
             setSessionSelectionError(
               `Please select at least one session for ${day ? getDayLabel(day) : "the selected day"}`,
             );
@@ -644,11 +675,11 @@ function EventRegisterForm() {
                       <p className="text-sm text-muted-foreground">Loading event dates…</p>
                     ) : eventDaysError ? (
                       <p className="text-sm text-destructive">{eventDaysError}</p>
-                    ) : eventDays.length === 0 ? (
+                    ) : registrationEventDays.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No participation dates available for this event.</p>
                     ) : (
                       <div className="flex flex-col gap-3">
-                        {eventDays.map((day) => {
+                        {registrationEventDays.map((day) => {
                           const isSelected = values.selectedDayIds?.includes(day.id) ?? false;
                           return (
                             <div

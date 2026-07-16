@@ -54,6 +54,10 @@ function formatIsoDateLabel(isoDate: string): string {
   return formatDayLabel(parsed);
 }
 
+export function formatEventDayDateLabel(isoDate: string): string {
+  return formatIsoDateLabel(isoDate);
+}
+
 export interface EventDayDateSource {
   date: string;
   label?: string;
@@ -69,7 +73,7 @@ export function buildParticipationDateOptionsFromEventDays(
 
   const dayOptions = sorted.map((day) => ({
     value: day.date,
-    label: day.label?.trim() ? day.label.trim() : formatIsoDateLabel(day.date),
+    label: formatIsoDateLabel(day.date),
   }));
 
   if (includeAllDays && dayOptions.length > 1) {

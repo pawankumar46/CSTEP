@@ -22,7 +22,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatEventDateRange } from "@/lib/event-display";
-import { buildParticipationDateOptionsFromEventDays } from "@/lib/participation-dates";
+import {
+  buildParticipationDateOptionsFromEventDays,
+  formatEventDayDateLabel,
+} from "@/lib/participation-dates";
 import { ATTENDANCE_MODES } from "@/lib/registration-options";
 import { SessionScrollRow } from "@/components/shared/SessionScrollRow";
 import { cn } from "@/lib/utils";
@@ -118,9 +121,8 @@ export function EditRegistrationDialog({
   );
   const getDayLabel = useCallback(
     (day: EventDay) =>
-      day.label?.trim()
-      || participationDateOptions.find((option) => option.value === day.date)?.label
-      || day.date,
+      participationDateOptions.find((option) => option.value === day.date)?.label
+      ?? formatEventDayDateLabel(day.date),
     [participationDateOptions],
   );
 

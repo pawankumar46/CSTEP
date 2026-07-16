@@ -49,6 +49,17 @@ export function isIcasEventName(name: string): boolean {
   return normalized.includes("icas") || normalized.includes("clean air summit");
 }
 
+/** Training day on 19 Aug is shown on home but excluded from delegate registration. */
+export const ICAS_REGISTRATION_EXCLUDED_DATES = new Set(["2026-08-19"]);
+
+export function filterEventDaysForRegistration<T extends { date: string }>(
+  days: T[],
+  eventName?: string | null,
+): T[] {
+  if (!eventName || !isIcasEventName(eventName)) return days;
+  return days.filter((day) => !ICAS_REGISTRATION_EXCLUDED_DATES.has(day.date));
+}
+
 export function getConferenceVenue(eventName?: string | null, apiLocation?: string | null): string {
   if (eventName && isIcasEventName(eventName)) {
     return ICAS_CONFERENCE.venue;

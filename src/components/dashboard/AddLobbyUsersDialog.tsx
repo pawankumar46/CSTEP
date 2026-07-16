@@ -34,7 +34,10 @@ import {
   type LobbyUserRegistrationFormValues,
   type LobbyUserSignupFormValues,
 } from "@/features/dashboard/admin-lobby-user.schema";
-import { buildParticipationDateOptionsFromEventDays } from "@/lib/participation-dates";
+import {
+  buildParticipationDateOptionsFromEventDays,
+  formatEventDayDateLabel,
+} from "@/lib/participation-dates";
 import { ATTENDANCE_MODES } from "@/lib/registration-options";
 import { getEventDays, getScheduleItemsDropdown } from "@/services/event.service";
 import { cn } from "@/lib/utils";
@@ -119,9 +122,8 @@ export function AddLobbyUsersDialog({
   );
   const getDayLabel = useCallback(
     (day: EventDay) =>
-      day.label?.trim()
-      || participationDateOptions.find((option) => option.value === day.date)?.label
-      || day.date,
+      participationDateOptions.find((option) => option.value === day.date)?.label
+      ?? formatEventDayDateLabel(day.date),
     [participationDateOptions],
   );
 

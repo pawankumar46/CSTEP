@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import { extractApiErrorMessage } from "@/lib/auth-mappers";
+import { formatEventDayDateLabel } from "@/lib/participation-dates";
 import { mapApiAllowedAttendanceModes, mapAppAllowedAttendanceModesToApi } from "@/lib/registration-mappers";
 import {
   extractEventList,
@@ -184,25 +185,31 @@ export const updateEventDayAttendanceModes = async (
   }
 };
 
+function mapEventDayDisplayLabel(date: string, apiLabel: string): string {
+  const trimmedDate = date.trim();
+  if (trimmedDate) return formatEventDayDateLabel(trimmedDate);
+  return apiLabel.trim();
+}
+
 function mapApiEventDay(item: Record<string, unknown>, eventId: string): EventDay {
+  const date = String(item.date ?? "");
   return {
     id: String(item.id ?? ""),
     eventId: String(item.event ?? eventId),
-    date: String(item.date ?? ""),
+    date,
     dayNumber: Number(item.day_number ?? 0),
-    label: String(item.label ?? ""),
+    label: mapEventDayDisplayLabel(date, String(item.label ?? "")),
     allowedAttendanceModes: mapApiAllowedAttendanceModes(item.allowed_attendance_modes),
   };
 }
 
 function mapApiEventDayDropdownOption(item: Record<string, unknown>): EventDayDropdownOption {
   const date = String(item.date ?? "");
-  const label = String(item.label ?? "").trim();
   return {
     id: String(item.id ?? ""),
     dayNumber: Number(item.day_number ?? 0),
     date,
-    label: label || date,
+    label: mapEventDayDisplayLabel(date, String(item.label ?? "")),
     allowedAttendanceModes: mapApiAllowedAttendanceModes(item.allowed_attendance_modes),
   };
 }
