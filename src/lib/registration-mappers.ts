@@ -263,8 +263,10 @@ function mapAppFoodPreferenceToApi(preference: FoodPreference): string {
 }
 
 function extractParticipationDatesFromApi(raw: Record<string, unknown>): string[] {
-  const dates = raw.participation_dates;
-  if (Array.isArray(dates)) {
+  const candidates = [raw.registration_dates, raw.participation_dates];
+
+  for (const dates of candidates) {
+    if (!Array.isArray(dates)) continue;
     return dates
       .map((item) => {
         if (item && typeof item === "object" && "date" in item) {
@@ -346,7 +348,7 @@ export function toRegistrationApiPayload(
         .filter((id) => !Number.isNaN(id)),
     }));
   } else {
-    payload.attendance_mode = mapAppAttendanceModeToApi(data.attendanceMode);
+    payload.attendance_mode = mapAppAttendanceModeToApi(data.attendanceMode ?? "physical");
     payload.day_ids = (data.selectedDayIds ?? [])
       .map((id) => Number(id))
       .filter((id) => !Number.isNaN(id));
@@ -836,12 +838,17 @@ export function mapApiRegistrationToRegistration(
   const registeredDaysRaw = raw.registered_days_count ?? raw.registeredDaysCount;
   const registeredDaysCount =
     registeredDaysRaw == null || registeredDaysRaw === ""
-      ? registrationDays.length > 0
-        ? registrationDays.length
-        : selectedDayIds.length > 0
-          ? selectedDayIds.length
-          : undefined
+      ? apiParticipationDates.length > 0
+        ? apiParticipationDates.length
+        : registrationDays.length > 0
+          ? registrationDays.length
+          : selectedDayIds.length > 0
+            ? selectedDayIds.length
+            : undefined
       : Number(registeredDaysRaw);
+
+  const hasAttendanceMode =
+    raw.attendance_mode != null && String(raw.attendance_mode).trim() !== "";
 
   return {
     id: String(raw.id ?? raw.pk ?? ""),
@@ -862,7 +869,9 @@ export function mapApiRegistrationToRegistration(
     selectedDayIds,
     days: registrationDays,
     sessionRegistrations,
-    attendanceMode: mapApiAttendanceMode(raw.attendance_mode),
+    attendanceMode: hasAttendanceMode
+      ? mapApiAttendanceMode(raw.attendance_mode)
+      : undefined,
     foodPreference: mapApiFoodPreference(raw.food_preference ?? details.food_preference),
     travelAssistance,
     translationAssistance,

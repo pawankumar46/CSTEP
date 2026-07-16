@@ -151,7 +151,7 @@ export function EditRegistrationDialog({
       selectedSessionIds: [],
       sessionsByDay: {},
       attendanceByDay: {},
-      attendanceMode: registration.attendanceMode,
+      attendanceMode: registration.attendanceMode ?? "physical",
     });
     setDaySelectionError(null);
     setSessionSelectionError(null);
@@ -199,7 +199,7 @@ export function EditRegistrationDialog({
           setValue("attendanceByDay", nextAttendanceByDay);
         } else {
           setValue("selectedDayIds", dayIds);
-          setValue("attendanceMode", detail.attendanceMode);
+          setValue("attendanceMode", detail.attendanceMode ?? "physical");
         }
       } catch {
         // Keep list-row defaults if detail fetch fails.

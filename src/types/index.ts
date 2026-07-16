@@ -250,7 +250,8 @@ export interface Registration {
   selectedDayIds?: string[];
   days?: RegistrationDay[];
   sessionRegistrations?: SessionRegistration[];
-  attendanceMode: AttendanceMode;
+  /** Present on detail / filtered list; omitted on lobby list when API sends only registration_dates. */
+  attendanceMode?: AttendanceMode;
   foodPreference: FoodPreference;
   travelAssistance?: TravelAssistanceItem[];
   translationAssistance?: TranslationAssistanceItem;

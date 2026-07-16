@@ -205,10 +205,15 @@ function LobbyContent() {
       { accessorKey: "phone", header: "Phone Number" },
       { accessorKey: "email", header: "Email" },
       {
-        accessorKey: "registeredDaysCount",
-        header: "Days",
+        accessorKey: "participationDateLabel",
+        header: "Dates",
         cell: ({ row }) => (
-          <span className="tabular-nums">{row.original.registeredDaysCount ?? 0}</span>
+          <span className="text-sm">
+            {row.original.participationDateLabel
+              ?? (row.original.registeredDaysCount != null
+                ? `${row.original.registeredDaysCount} day(s)`
+                : "—")}
+          </span>
         ),
       },
       {
@@ -230,13 +235,6 @@ function LobbyContent() {
             </button>
           );
         },
-      },
-      {
-        accessorKey: "attendanceMode",
-        header: "Attendance",
-        cell: ({ row }) => (
-          <span className="capitalize">{row.original.attendanceMode}</span>
-        ),
       },
       {
         accessorKey: "status",

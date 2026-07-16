@@ -87,7 +87,7 @@ export function SessionRegistrationsDialog({
         id: "all",
         dayId: "",
         date: sessions[0]?.date ?? "",
-        attendanceMode: detail.attendanceMode,
+        attendanceMode: detail.attendanceMode ?? "physical",
         sessions,
       },
     ];
