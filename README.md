@@ -462,6 +462,8 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ### 2026-07-16
 
 - **Manage Sessions — timeline window:** Session scheduler timeline and time picker now use **8:00 AM – 9:00 PM** (was 9:00 AM – 6:00 PM) for placing and editing sessions/breaks.
+- **Manage Sessions — time picker:** Fixed minutes dropdown so it’s not clipped and is scrollable inside the “Add/Edit session” dialog.
+- **Manage Sessions — session modal:** Reduced the Add/Edit session modal width and spacing to make the time picker area less cramped.
 - **Events — Edit Attendance mode:** Moderators and event admins now see an **Edit Attendance mode** action on each event card in the Events marketplace. It loads days from `GET /events/event-days/dropdown/?event=<id>`, lets staff pick a date and toggle Physical / Virtual (or both), and saves via `PATCH /events/event-days/<dayId>/` with `allowed_attendance_modes`.
 - **Event registration — attendance modes per day:** Step 3 attendance dropdowns now respect each event day’s `allowed_attendance_modes` from `GET /events/event-days/`. Days that only allow Physical (e.g. 19 Aug) no longer show Virtual; multi-session events filter per day, and whole-day events use the intersection across selected days.
 - **Signup → login → registration flow:** After signup and mobile OTP verification, users are now sent to `/login` (instead of home). On successful login, base users are routed by `is_registered` from `GET /events/event/upcoming/`: `false` → `/event-register`, `true` → home. An explicit `redirect` param still wins, and staff continue to their dashboard.
