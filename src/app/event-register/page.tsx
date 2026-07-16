@@ -69,7 +69,7 @@ function EventRegisterForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fetchedScheduleDayIdsRef = useRef<Set<string>>(new Set());
   const submitErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoAdvancedToStep2Ref = useRef(false);
+  const autoAdvancedToParticipationRef = useRef(false);
   const { submitRegistration, isLoading } = useRegistrationStore();
 
   const resolvePreferredEventId = useCallback(
@@ -163,14 +163,14 @@ function EventRegisterForm() {
   }, [user, reset, events, resolvePreferredEventId]);
 
   useEffect(() => {
-    if (autoAdvancedToStep2Ref.current || eventsLoading || events.length === 0) return;
+    if (autoAdvancedToParticipationRef.current || eventsLoading || events.length === 0) return;
 
     const preferredEventId = resolvePreferredEventId(events);
     if (!preferredEventId) return;
 
     setValue("eventId", preferredEventId, { shouldValidate: true });
-    autoAdvancedToStep2Ref.current = true;
-    setStep(1);
+    autoAdvancedToParticipationRef.current = true;
+    setStep(2);
   }, [events, eventsLoading, resolvePreferredEventId, setValue]);
 
   const values = watch();
