@@ -37,7 +37,7 @@ export function readPublicEnv(name: string): string | undefined {
 
 /** Django / REST API origin. Set NEXT_PUBLIC_API_URL in .env.local */
 export function getApiBaseUrl(): string {
-  const url = trimEnv(process.env.NEXT_PUBLIC_API_URL);
+  const url = readPublicEnv("NEXT_PUBLIC_API_URL");
   if (!url) {
     throw new Error(
       "NEXT_PUBLIC_API_URL is not set. Add it to .env.local (see .env.example).",
@@ -48,10 +48,10 @@ export function getApiBaseUrl(): string {
 
 /** Public frontend origin for absolute links (share, emails). */
 export function getAppBaseUrl(): string | undefined {
-  const explicit = trimEnv(process.env.NEXT_PUBLIC_APP_URL);
+  const explicit = readPublicEnv("NEXT_PUBLIC_APP_URL");
   if (explicit) return normalizeBaseUrl(explicit);
 
-  const vercel = trimEnv(process.env.VERCEL_URL);
+  const vercel = readPublicEnv("VERCEL_URL");
   if (vercel) return `https://${normalizeBaseUrl(vercel)}`;
 
   return undefined;

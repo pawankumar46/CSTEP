@@ -7,7 +7,6 @@ import {
 import { getApiBaseUrl } from "@/lib/env";
 
 export const apiClient = axios.create({
-  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },
@@ -15,6 +14,9 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  // Always resolve from env at request time so login/signup never hit the page origin (localhost).
+  config.baseURL = getApiBaseUrl();
+
   const token = getAccessToken();
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);

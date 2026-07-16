@@ -459,6 +459,10 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-16
+
+- **API client — base URL:** `apiClient` now sets `baseURL` from `NEXT_PUBLIC_API_URL` on every request (via interceptor), so login/signup and other calls always hit the Django API host instead of falling back to the page origin (`localhost`).
+
 ### 2026-07-15
 
 - **Forgot / reset password — mobile:** Sign-in forgot-password and reset-password now use **mobile number** (`phone_number`) instead of email. OTP is sent to the phone; dashboard Profile password reset uses the signed-in user’s phone as well.
