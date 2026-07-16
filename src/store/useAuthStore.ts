@@ -148,8 +148,18 @@ export const useAuthStore = create<AuthState>()(
       verifyOtp: async (payload) => {
         set({ isLoading: true, error: null });
         try {
-          await authService.verifyOtp(payload);
-          set({ isLoading: false });
+          const { user, token, refreshToken } = await authService.verifyOtp(payload);
+          syncTokenToStorage(token, refreshToken || null);
+          syncRefreshToStorage(refreshToken || null);
+          markAccessTokenRefreshed();
+          set({
+            user,
+            token,
+            refreshToken: refreshToken || null,
+            isAuthenticated: true,
+            isLoading: false,
+            hasHydrated: true,
+          });
         } catch (err) {
           set({
             error: err instanceof Error ? err.message : "OTP verification failed",

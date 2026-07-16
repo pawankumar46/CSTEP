@@ -13,6 +13,7 @@ import { OTPInput } from "@/components/shared/OTPInput";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { resendOtp } from "@/services/auth.service";
+import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { ROUTES, buildAuthUrl, sanitizeRedirect } from "@/lib/routes";
 
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -20,14 +21,10 @@ const RESEND_COOLDOWN_SECONDS = 30;
 function OTPForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // const prefilledEmail = searchParams.get("email") ?? "";
   const prefilledPhone = searchParams.get("phone") ?? "";
-  const redirectTo = sanitizeRedirect(searchParams.get("redirect")) ?? ROUTES.home;
+  const redirectParam = searchParams.get("redirect");
 
   const { verifyOtp, isLoading, error, clearError } = useAuthStore();
-  // Email verification disabled — mobile only after signup.
-  // const [step, setStep] = useState<VerifyStep>("email");
-  // const [email, setEmail] = useState(prefilledEmail);
   const [phone, setPhone] = useState(prefilledPhone);
   const [otp, setOtp] = useState("");
   const [success, setSuccess] = useState(false);
@@ -35,10 +32,6 @@ function OTPForm() {
   const [resending, setResending] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
-
-  // useEffect(() => {
-  //   if (prefilledEmail) setEmail(prefilledEmail);
-  // }, [prefilledEmail]);
 
   useEffect(() => {
     if (prefilledPhone) setPhone(prefilledPhone);
@@ -90,28 +83,19 @@ function OTPForm() {
     }
 
     try {
-      // Email verification disabled — skip straight to mobile OTP only.
-      // if (isEmailStep) {
-      //   await verifyOtp({
-      //     method: "email",
-      //     otp,
-      //     email: email.trim().toLowerCase(),
-      //   });
-      //   setOtp("");
-      //   setResendMessage(null);
-      //   setCooldown(0);
-      //   setStep("phone");
-      //   return;
-      // }
-
       await verifyOtp({
         method: "phone",
         otp,
         phone: phone.trim(),
       });
       setSuccess(true);
-      const loginUrl = buildAuthUrl(ROUTES.login, { redirect: searchParams.get("redirect") });
-      setTimeout(() => router.push(loginUrl), 1500);
+
+      const user = useAuthStore.getState().user;
+      const destination = user
+        ? await resolvePostAuthDestination(user.id, user.role, redirectParam)
+        : sanitizeRedirect(redirectParam) ?? ROUTES.eventRegister;
+
+      setTimeout(() => router.replace(destination), 1200);
     } catch {
       // error handled in store
     }
@@ -123,7 +107,7 @@ function OTPForm() {
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center space-y-4">
           <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto" />
           <h2 className="text-2xl font-bold">Mobile verified!</h2>
-          <p className="text-muted-foreground">Redirecting to sign in...</p>
+          <p className="text-muted-foreground">You&apos;re signed in. Redirecting...</p>
         </motion.div>
       </div>
     );
@@ -155,21 +139,6 @@ function OTPForm() {
             </div>
           )}
 
-          {/* Email verification step — disabled for now
-          {isEmailStep ? (
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                readOnly={Boolean(prefilledEmail)}
-              />
-            </div>
-          ) : (
-          */}
           <div className="space-y-2">
             <Label htmlFor="phone">Mobile Number</Label>
             <div className="flex items-center rounded-md border border-input bg-transparent shadow-sm focus-within:ring-2 focus-within:ring-ring">
@@ -186,7 +155,6 @@ function OTPForm() {
               />
             </div>
           </div>
-          {/* )} */}
 
           <div className="space-y-2">
             <Label>OTP Code</Label>
@@ -216,7 +184,7 @@ function OTPForm() {
           </p>
 
           <Link
-            href={buildAuthUrl(ROUTES.login, { redirect: searchParams.get("redirect") })}
+            href={buildAuthUrl(ROUTES.login, { redirect: redirectParam })}
             className="text-sm text-primary hover:underline"
           >
             Back to sign in

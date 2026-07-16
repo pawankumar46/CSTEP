@@ -69,7 +69,18 @@ function EventRegisterForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fetchedScheduleDayIdsRef = useRef<Set<string>>(new Set());
   const submitErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoAdvancedToStep2Ref = useRef(false);
   const { submitRegistration, isLoading } = useRegistrationStore();
+
+  const resolvePreferredEventId = useCallback(
+    (eventList: EventDropdownOption[]) => {
+      if (presetEventId && eventList.some((event) => event.id === presetEventId)) {
+        return presetEventId;
+      }
+      return eventList[0]?.id ?? "";
+    },
+    [presetEventId],
+  );
 
   const showSubmitError = useCallback((message: string) => {
     setSubmitError(message);
@@ -131,10 +142,9 @@ function EventRegisterForm() {
 
   useEffect(() => {
     if (user) {
+      const preferredEventId = resolvePreferredEventId(events);
       reset({
-        eventId: presetEventId && events.some((event) => event.id === presetEventId)
-          ? presetEventId
-          : "",
+        eventId: preferredEventId,
         salutation: user.salutation ?? "",
         firstName: user.firstName,
         middleName: user.middleName ?? "",
@@ -150,7 +160,18 @@ function EventRegisterForm() {
         attendanceMode: "physical",
       });
     }
-  }, [user, reset, presetEventId, events]);
+  }, [user, reset, events, resolvePreferredEventId]);
+
+  useEffect(() => {
+    if (autoAdvancedToStep2Ref.current || eventsLoading || events.length === 0) return;
+
+    const preferredEventId = resolvePreferredEventId(events);
+    if (!preferredEventId) return;
+
+    setValue("eventId", preferredEventId, { shouldValidate: true });
+    autoAdvancedToStep2Ref.current = true;
+    setStep(1);
+  }, [events, eventsLoading, resolvePreferredEventId, setValue]);
 
   const values = watch();
   const selectedEvent = events.find((e) => e.id === values.eventId);

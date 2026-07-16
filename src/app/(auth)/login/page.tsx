@@ -18,10 +18,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useHomeDataStore } from "@/store/useHomeDataStore";
-import { getDefaultRouteForRole, isStaffRole } from "@/lib/auth-utils";
+import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
-import { ROUTES, buildAuthUrl, sanitizeRedirect } from "@/lib/routes";
+import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
 const loginSchema = z.object({
   identifier: z.string().min(1, "Email is required"),
@@ -36,18 +35,6 @@ const phoneOtpSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 type PhoneOtpForm = z.infer<typeof phoneOtpSchema>;
 type LoginMethod = "email" | "phone";
-
-async function resolveBaseUserDestination(userId: string): Promise<string> {
-  try {
-    const authKey = `true:${userId}`;
-    await useHomeDataStore.getState().load(authKey, { force: true });
-    const events = useHomeDataStore.getState().upcomingEvents;
-    const isRegistered = events.some((event) => event.isRegistered);
-    return isRegistered ? ROUTES.home : ROUTES.eventRegister;
-  } catch {
-    return ROUTES.home;
-  }
-}
 
 function LoginForm() {
   const router = useRouter();
@@ -80,19 +67,12 @@ function LoginForm() {
 
   const finishLogin = async () => {
     const user = useAuthStore.getState().user;
-    const safeRedirect = sanitizeRedirect(redirectTo);
-
-    if (safeRedirect) {
-      router.replace(safeRedirect);
+    if (!user) {
+      router.replace(ROUTES.home);
       return;
     }
 
-    if (!user || isStaffRole(user.role)) {
-      router.replace(user ? getDefaultRouteForRole(user.role) : ROUTES.home);
-      return;
-    }
-
-    const destination = await resolveBaseUserDestination(user.id);
+    const destination = await resolvePostAuthDestination(user.id, user.role, redirectTo);
     router.replace(destination);
   };
 

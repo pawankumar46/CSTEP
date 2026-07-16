@@ -116,11 +116,19 @@ export const loginWithPhoneOtp = async (
   phone: string,
   otp: string,
 ): Promise<AuthResponse> => {
+  return verifyOtp({ method: "phone", otp, phone });
+};
+
+export const verifyOtp = async (payload: VerifyOtpPayload): Promise<AuthResponse> => {
+  const contact = payload.method === "phone" ? payload.phone : payload.email;
+  if (!contact) {
+    throw new Error(payload.method === "phone" ? "Phone number is required" : "Email is required");
+  }
+
   try {
-    const payload = toVerifyOtpPayload("phone", otp, phone);
     const { data } = await apiClient.post<Record<string, unknown>>(
       "/auth/verify-otp/",
-      payload,
+      toVerifyOtpPayload(payload.method, payload.otp, contact),
     );
 
     const bodyError = extractApiErrorFromData(data);
@@ -133,33 +141,18 @@ export const loginWithPhoneOtp = async (
 
     const refreshToken = extractRefreshToken(data);
     const responseUser = data.user as Record<string, unknown> | undefined;
-    let user = mapApiUser(responseUser ?? data, formatPhoneForApi(phone));
+    const fallbackIdentifier =
+      payload.method === "phone" ? formatPhoneForApi(contact) : normalizeAuthIdentifier(contact);
+    let user = mapApiUser(responseUser ?? data, fallbackIdentifier);
 
     if (!user.firstName || !user.lastName) {
-      const profile = await fetchCurrentUser();
+      const profile = await fetchCurrentUser(fallbackIdentifier);
       if (profile) {
         user = profile;
       }
     }
 
     return { user, token, refreshToken };
-  } catch (error) {
-    throw new Error(extractApiErrorMessage(error));
-  }
-};
-
-export const verifyOtp = async (payload: VerifyOtpPayload): Promise<{ success: boolean }> => {
-  const contact = payload.method === "phone" ? payload.phone : payload.email;
-  if (!contact) {
-    throw new Error(payload.method === "phone" ? "Phone number is required" : "Email is required");
-  }
-
-  try {
-    await apiClient.post(
-      "/auth/verify-otp/",
-      toVerifyOtpPayload(payload.method, payload.otp, contact)
-    );
-    return { success: true };
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
