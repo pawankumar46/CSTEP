@@ -17,8 +17,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { registrationSchema, REGISTRATION_STEPS, type RegistrationFormValues } from "@/features/registration/registration.schema";
 import {
-  ATTENDANCE_MODES,
+  getAttendanceModeOptions,
   getRegistrationOptionLabel,
+  getSharedAttendanceModeOptions,
+  normalizeAttendanceMode,
 } from "@/lib/registration-options";
 import {
   buildParticipationDateOptionsFromEventDays,
@@ -159,6 +161,10 @@ function EventRegisterForm() {
     () => eventDays.filter((day) => values.selectedDayIds?.includes(day.id)),
     [eventDays, values.selectedDayIds],
   );
+  const sharedAttendanceOptions = useMemo(
+    () => getSharedAttendanceModeOptions(selectedDays),
+    [selectedDays],
+  );
   const getDayLabel = useCallback(
     (day: EventDay) =>
       day.label?.trim()
@@ -190,7 +196,11 @@ function EventRegisterForm() {
           return copy;
         });
       } else {
-        attendanceByDay[dayId] = attendanceByDay[dayId] ?? "physical";
+        const day = eventDays.find((entry) => entry.id === dayId);
+        attendanceByDay[dayId] = normalizeAttendanceMode(
+          attendanceByDay[dayId],
+          day?.allowedAttendanceModes,
+        );
         sessionsByDay[dayId] = sessionsByDay[dayId] ?? [];
       }
 
@@ -275,6 +285,43 @@ function EventRegisterForm() {
       cancelled = true;
     };
   }, [values.eventId, setValue]);
+
+  useEffect(() => {
+    if (!isMultiSession || eventDays.length === 0) return;
+
+    const selectedDayIds = getValues("selectedDayIds") ?? [];
+    const attendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
+    let changed = false;
+
+    for (const dayId of selectedDayIds) {
+      const day = eventDays.find((entry) => entry.id === dayId);
+      if (!day) continue;
+
+      const normalized = normalizeAttendanceMode(
+        attendanceByDay[dayId],
+        day.allowedAttendanceModes,
+      );
+      if (attendanceByDay[dayId] !== normalized) {
+        attendanceByDay[dayId] = normalized;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setValue("attendanceByDay", attendanceByDay, { shouldValidate: true });
+    }
+  }, [eventDays, isMultiSession, getValues, setValue, values.selectedDayIds]);
+
+  useEffect(() => {
+    if (isMultiSession || selectedDays.length === 0) return;
+
+    const current = getValues("attendanceMode");
+    const allowed = sharedAttendanceOptions.map((option) => option.value);
+    const normalized = normalizeAttendanceMode(current, allowed);
+    if (current !== normalized) {
+      setValue("attendanceMode", normalized, { shouldValidate: true });
+    }
+  }, [isMultiSession, selectedDays, sharedAttendanceOptions, getValues, setValue]);
 
   useEffect(() => {
     if (!isMultiSession) {
@@ -652,7 +699,11 @@ function EventRegisterForm() {
                         const dayId = day.id;
                         const dayItems = scheduleItemsByDay[dayId] ?? [];
                         const selectedForDay = values.sessionsByDay?.[dayId] ?? [];
-                        const dayAttendance = values.attendanceByDay?.[dayId] ?? "physical";
+                        const dayAttendance = normalizeAttendanceMode(
+                          values.attendanceByDay?.[dayId],
+                          day.allowedAttendanceModes,
+                        );
+                        const dayAttendanceOptions = getAttendanceModeOptions(day.allowedAttendanceModes);
                         const loading = scheduleLoadingByDay[dayId];
                         const error = scheduleErrorByDay[dayId];
 
@@ -668,7 +719,7 @@ function EventRegisterForm() {
                               >
                                 <SelectTrigger><SelectValue placeholder="Select attendance mode" /></SelectTrigger>
                                 <SelectContent>
-                                  {ATTENDANCE_MODES.map((option) => (
+                                  {dayAttendanceOptions.map((option) => (
                                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                                   ))}
                                 </SelectContent>
@@ -763,7 +814,7 @@ function EventRegisterForm() {
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger><SelectValue placeholder="Select attendance mode" /></SelectTrigger>
                           <SelectContent>
-                            {ATTENDANCE_MODES.map((option) => (
+                            {sharedAttendanceOptions.map((option) => (
                               <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                           </SelectContent>

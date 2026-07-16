@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   currentMinutesSinceMidnight,
   formatMinutesLabel,
+  formatSchedulerWindowLabel,
   getHourMarkers,
   minutesToLeftPx,
   SCHEDULER_DAY_END_MINUTES,
@@ -50,7 +52,7 @@ export function SessionTimeline({
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground sm:hidden">
-        Scroll sideways to see 9 AM–6 PM →
+        Scroll sideways to see {formatSchedulerWindowLabel()} →
       </p>
       <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
         <div
@@ -58,17 +60,29 @@ export function SessionTimeline({
           style={{ width: SCHEDULER_TIMELINE_WIDTH_PX, minWidth: "100%" }}
         >
           <div className="relative h-8 border-b border-border">
-            {hourMarkers.map((minutes) => (
-              <div
-                key={minutes}
-                className="absolute top-0 flex h-full flex-col justify-end pb-1"
-                style={{ left: minutesToLeftPx(minutes) }}
-              >
-                <span className="-translate-x-1/2 text-[10px] tabular-nums text-muted-foreground">
-                  {formatMinutesLabel(minutes)}
-                </span>
-              </div>
-            ))}
+            {hourMarkers.map((minutes) => {
+              const isFirst = minutes === SCHEDULER_DAY_START_MINUTES;
+              const isLast = minutes === SCHEDULER_DAY_END_MINUTES;
+
+              return (
+                <div
+                  key={minutes}
+                  className="absolute top-0 flex h-full flex-col justify-end pb-1"
+                  style={{ left: minutesToLeftPx(minutes) }}
+                >
+                  <span
+                    className={cn(
+                      "text-[10px] tabular-nums text-muted-foreground whitespace-nowrap",
+                      isFirst && "translate-x-0",
+                      isLast && "-translate-x-full",
+                      !isFirst && !isLast && "-translate-x-1/2",
+                    )}
+                  >
+                    {formatMinutesLabel(minutes)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="relative h-24">

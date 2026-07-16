@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import { extractApiErrorMessage } from "@/lib/auth-mappers";
+import { mapApiAllowedAttendanceModes, mapAppAllowedAttendanceModesToApi } from "@/lib/registration-mappers";
 import {
   extractEventList,
   mapApiEventDropdownOption,
@@ -9,6 +10,7 @@ import {
   toUpdateEventPayload,
 } from "@/lib/event-mappers";
 import type {
+  AttendanceMode,
   CreateEventPayload,
   Event,
   EventDropdownOption,
@@ -23,6 +25,15 @@ export interface EventDay {
   date: string;
   dayNumber: number;
   label: string;
+  allowedAttendanceModes: AttendanceMode[];
+}
+
+export interface EventDayDropdownOption {
+  id: string;
+  dayNumber: number;
+  date: string;
+  label: string;
+  allowedAttendanceModes: AttendanceMode[];
 }
 
 export interface CreateScheduleItemPayload {
@@ -141,17 +152,60 @@ export const getEventDays = async (eventId: string): Promise<EventDay[]> => {
     const { data } = await apiClient.get<unknown>("/events/event-days/", {
       params: { event: eventId },
     });
-    return extractEventList(data).map((item) => ({
-      id: String(item.id ?? ""),
-      eventId: String(item.event ?? eventId),
-      date: String(item.date ?? ""),
-      dayNumber: Number(item.day_number ?? 0),
-      label: String(item.label ?? ""),
-    }));
+    return extractEventList(data).map((item) => mapApiEventDay(item, eventId));
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
 };
+
+export const getEventDaysDropdown = async (
+  eventId: string,
+): Promise<EventDayDropdownOption[]> => {
+  try {
+    const { data } = await apiClient.get<unknown>("/events/event-days/dropdown/", {
+      params: { event: eventId },
+    });
+    return extractEventList(data).map((item) => mapApiEventDayDropdownOption(item));
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const updateEventDayAttendanceModes = async (
+  dayId: string,
+  modes: AttendanceMode[],
+): Promise<void> => {
+  try {
+    await apiClient.patch(`/events/event-days/${dayId}/`, {
+      allowed_attendance_modes: mapAppAllowedAttendanceModesToApi(modes),
+    });
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+function mapApiEventDay(item: Record<string, unknown>, eventId: string): EventDay {
+  return {
+    id: String(item.id ?? ""),
+    eventId: String(item.event ?? eventId),
+    date: String(item.date ?? ""),
+    dayNumber: Number(item.day_number ?? 0),
+    label: String(item.label ?? ""),
+    allowedAttendanceModes: mapApiAllowedAttendanceModes(item.allowed_attendance_modes),
+  };
+}
+
+function mapApiEventDayDropdownOption(item: Record<string, unknown>): EventDayDropdownOption {
+  const date = String(item.date ?? "");
+  const label = String(item.label ?? "").trim();
+  return {
+    id: String(item.id ?? ""),
+    dayNumber: Number(item.day_number ?? 0),
+    date,
+    label: label || date,
+    allowedAttendanceModes: mapApiAllowedAttendanceModes(item.allowed_attendance_modes),
+  };
+}
 
 export const createScheduleItem = async (
   payload: CreateScheduleItemPayload,

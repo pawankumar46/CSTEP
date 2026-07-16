@@ -150,6 +150,20 @@ function mapApiAttendanceMode(value: unknown): AttendanceMode {
   return "physical";
 }
 
+const DEFAULT_ATTENDANCE_MODES: AttendanceMode[] = ["physical", "virtual"];
+
+export function mapApiAllowedAttendanceModes(values: unknown): AttendanceMode[] {
+  if (!Array.isArray(values) || values.length === 0) {
+    return DEFAULT_ATTENDANCE_MODES;
+  }
+
+  const mapped = values
+    .map((value) => mapApiAttendanceMode(value))
+    .filter((mode, index, list) => list.indexOf(mode) === index);
+
+  return mapped.length > 0 ? mapped : DEFAULT_ATTENDANCE_MODES;
+}
+
 function mapApiFoodPreference(value: unknown): FoodPreference {
   if (value == null || value === "") return "veg";
   const normalized = String(value).toUpperCase();
@@ -233,6 +247,10 @@ function mapAppParticipationTimeToApi(time: ParticipationTime): string {
 
 export function mapAppAttendanceModeToApi(mode: AttendanceMode): string {
   return ATTENDANCE_MODE_TO_API[mode];
+}
+
+export function mapAppAllowedAttendanceModesToApi(modes: AttendanceMode[]): string[] {
+  return modes.map(mapAppAttendanceModeToApi);
 }
 
 /** Registration `sessions[].attendance_mode` values (PHYSICAL / VIRTUAL). */

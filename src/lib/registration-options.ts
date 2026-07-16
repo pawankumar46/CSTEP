@@ -9,10 +9,44 @@ export const PARTICIPATION_TIMES = [
   { value: "full_day", label: "Full Day" },
 ] as const;
 
+import type { AttendanceMode } from "@/types";
+
 export const ATTENDANCE_MODES = [
   { value: "physical", label: "Physical (On-site)" },
   { value: "virtual", label: "Virtual (Online)" },
 ] as const;
+
+const DEFAULT_ATTENDANCE_MODES: AttendanceMode[] = ["physical", "virtual"];
+
+export function getAttendanceModeOptions(allowedModes?: AttendanceMode[]) {
+  const allowed = allowedModes?.length ? allowedModes : DEFAULT_ATTENDANCE_MODES;
+  return ATTENDANCE_MODES.filter((option) => allowed.includes(option.value));
+}
+
+export function normalizeAttendanceMode(
+  mode: AttendanceMode | undefined,
+  allowedModes?: AttendanceMode[],
+): AttendanceMode {
+  const allowed = allowedModes?.length ? allowedModes : DEFAULT_ATTENDANCE_MODES;
+  if (mode && allowed.includes(mode)) return mode;
+  return allowed[0] ?? "physical";
+}
+
+export function getSharedAttendanceModeOptions(
+  days: Array<{ allowedAttendanceModes?: AttendanceMode[] }>,
+) {
+  if (days.length === 0) return getAttendanceModeOptions();
+
+  const intersection = days.reduce<AttendanceMode[]>((acc, day, index) => {
+    const dayModes = day.allowedAttendanceModes?.length
+      ? day.allowedAttendanceModes
+      : DEFAULT_ATTENDANCE_MODES;
+    if (index === 0) return [...dayModes];
+    return acc.filter((mode) => dayModes.includes(mode));
+  }, []);
+
+  return getAttendanceModeOptions(intersection.length > 0 ? intersection : ["physical"]);
+}
 
 export const TRAVEL_TYPES = [
   { value: "flight_taxi_hotel", label: "Flight + Taxi + Hotel" },

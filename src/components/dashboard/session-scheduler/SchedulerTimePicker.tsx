@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/select";
 import {
   SCHEDULER_MINUTE_OPTIONS,
+  formatSchedulerWindowLabel,
+  getSchedulerDefaultStartTime,
+  getSchedulerHour12OptionsForPeriod,
   timeInputTo12HourParts,
   twelveHourPartsToTimeInput,
   type TwelveHourPeriod,
@@ -35,9 +38,9 @@ export function SchedulerTimePicker({
   onChange,
   error,
 }: SchedulerTimePickerProps) {
-  const parts = timeInputTo12HourParts(value || "09:00");
+  const parts = timeInputTo12HourParts(value || getSchedulerDefaultStartTime());
   const hourOptions = useMemo(
-    () => (parts.period === "AM" ? [9, 10, 11] : [12, 1, 2, 3, 4, 5]),
+    () => getSchedulerHour12OptionsForPeriod(parts.period),
     [parts.period],
   );
 
@@ -108,7 +111,7 @@ export function SchedulerTimePicker({
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : (
-        <p className="text-xs text-muted-foreground">Timeline window: 9:00 AM – 6:00 PM</p>
+        <p className="text-xs text-muted-foreground">Timeline window: {formatSchedulerWindowLabel()}</p>
       )}
     </div>
   );

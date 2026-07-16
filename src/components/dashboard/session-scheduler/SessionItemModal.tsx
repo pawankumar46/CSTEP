@@ -30,6 +30,7 @@ import {
   SCHEDULER_DAY_START_MINUTES,
   SCHEDULER_DURATION_PRESETS,
   formatMinutesLabel,
+  getSchedulerDefaultStartTime,
   minutesToTimeInput,
   scheduleTypeToTimelineType,
   timeInputToMinutes,
@@ -63,14 +64,14 @@ const formSchema = z
     if (start < SCHEDULER_DAY_START_MINUTES) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Start time cannot be before 9:00 AM",
+        message: `Start time cannot be before ${formatMinutesLabel(SCHEDULER_DAY_START_MINUTES)}`,
         path: ["startTime"],
       });
     }
     if (start > SCHEDULER_DAY_END_MINUTES - 5) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Start time cannot be after 5:55 PM",
+        message: `Start time cannot be after ${formatMinutesLabel(SCHEDULER_DAY_END_MINUTES - 5)}`,
         path: ["startTime"],
       });
     }
@@ -132,7 +133,7 @@ export function SessionItemModal({
   const duration = watch("duration");
 
   const endPreview = useMemo(() => {
-    const start = timeInputToMinutes(startTime || "09:00");
+    const start = timeInputToMinutes(startTime || getSchedulerDefaultStartTime());
     return formatMinutesLabel(start + (Number(duration) || 0));
   }, [startTime, duration]);
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { EventCard } from "@/components/dashboard/EventCard";
+import { EditAttendanceModeDialog } from "@/components/dashboard/EditAttendanceModeDialog";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -200,8 +201,10 @@ export default function EventsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
+  const [attendanceEvent, setAttendanceEvent] = useState<Event | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState(defaultForm);
 
@@ -293,6 +296,14 @@ export default function EventsPage() {
     if (event) {
       setDeletingEvent(event);
       setDeleteOpen(true);
+    }
+  };
+
+  const openAttendance = (id: string) => {
+    const event = events.find((item) => item.id === id);
+    if (event) {
+      setAttendanceEvent(event);
+      setAttendanceOpen(true);
     }
   };
 
@@ -396,6 +407,7 @@ export default function EventsPage() {
               listType={eventListType}
               showActions={canManage}
               onEdit={() => openEdit(event)}
+              onEditAttendance={openAttendance}
               onDelete={openDelete}
             />
           ))}
@@ -437,6 +449,15 @@ export default function EventsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditAttendanceModeDialog
+        open={attendanceOpen}
+        onOpenChange={(open) => {
+          setAttendanceOpen(open);
+          if (!open) setAttendanceEvent(null);
+        }}
+        event={attendanceEvent}
+      />
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>

@@ -21,19 +21,20 @@ export type ScheduleByDate = Record<string, TimelineItem[]>;
 
 export type ScheduleByEvent = Record<string, ScheduleByDate>;
 
-export const SCHEDULER_DAY_START_MINUTES = 9 * 60;
-export const SCHEDULER_DAY_END_MINUTES = 18 * 60;
+export const SCHEDULER_DAY_START_MINUTES = 8 * 60;
+export const SCHEDULER_DAY_END_MINUTES = 21 * 60;
 export const SCHEDULER_PX_PER_HOUR = 160;
 export const SCHEDULER_PX_PER_MINUTE = SCHEDULER_PX_PER_HOUR / 60;
 export const SCHEDULER_SNAP_MINUTES = 5;
 export const SCHEDULER_MIN_BLOCK_PX = 56;
 export const SCHEDULER_DURATION_PRESETS = [15, 30, 45, 60, 90] as const;
+export const SCHEDULER_TIMELINE_EDGE_PADDING_PX = 44;
 
 export const SCHEDULER_TOTAL_HOURS =
   (SCHEDULER_DAY_END_MINUTES - SCHEDULER_DAY_START_MINUTES) / 60;
 
 export const SCHEDULER_TIMELINE_WIDTH_PX =
-  SCHEDULER_TOTAL_HOURS * SCHEDULER_PX_PER_HOUR;
+  SCHEDULER_TOTAL_HOURS * SCHEDULER_PX_PER_HOUR + SCHEDULER_TIMELINE_EDGE_PADDING_PX * 2;
 
 export function todayDateString(): string {
   const now = new Date();
@@ -84,7 +85,30 @@ export function twelveHourPartsToTimeInput({
   return minutesToTimeInput(h24 * 60 + minute);
 }
 
-export const SCHEDULER_HOUR_12_OPTIONS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
+export function getSchedulerHour12OptionsForPeriod(period: TwelveHourPeriod): number[] {
+  const hours: number[] = [];
+
+  for (let minutes = SCHEDULER_DAY_START_MINUTES; minutes < SCHEDULER_DAY_END_MINUTES; minutes += 60) {
+    const parts = timeInputTo12HourParts(minutesToTimeInput(minutes));
+    if (parts.period === period && !hours.includes(parts.hour12)) {
+      hours.push(parts.hour12);
+    }
+  }
+
+  if (period === "PM") {
+    return hours.sort((a, b) => (a === 12 ? 0 : a + 12) - (b === 12 ? 0 : b + 12));
+  }
+
+  return hours.sort((a, b) => a - b);
+}
+
+export function formatSchedulerWindowLabel(): string {
+  return `${formatMinutesLabel(SCHEDULER_DAY_START_MINUTES)} – ${formatMinutesLabel(SCHEDULER_DAY_END_MINUTES)}`;
+}
+
+export function getSchedulerDefaultStartTime(): string {
+  return minutesToTimeInput(SCHEDULER_DAY_START_MINUTES);
+}
 
 export const SCHEDULER_MINUTE_OPTIONS = Array.from(
   { length: 60 / SCHEDULER_SNAP_MINUTES },
@@ -96,7 +120,10 @@ export function snapMinutes(minutes: number): number {
 }
 
 export function minutesToLeftPx(minutes: number): number {
-  return (minutes - SCHEDULER_DAY_START_MINUTES) * SCHEDULER_PX_PER_MINUTE;
+  return (
+    (minutes - SCHEDULER_DAY_START_MINUTES) * SCHEDULER_PX_PER_MINUTE
+    + SCHEDULER_TIMELINE_EDGE_PADDING_PX
+  );
 }
 
 export function durationToWidthPx(duration: number): number {
@@ -108,7 +135,10 @@ export function gapToWidthPx(duration: number): number {
 }
 
 export function pxToMinutes(px: number): number {
-  return px / SCHEDULER_PX_PER_MINUTE + SCHEDULER_DAY_START_MINUTES;
+  return (
+    (px - SCHEDULER_TIMELINE_EDGE_PADDING_PX) / SCHEDULER_PX_PER_MINUTE
+    + SCHEDULER_DAY_START_MINUTES
+  );
 }
 
 export function formatMinutesLabel(minutes: number): string {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Users, Pencil, Trash2 } from "lucide-react";
+import { Calendar, Users, Pencil, Trash2, MapPin } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,11 +31,19 @@ interface EventCardProps {
   event: Event;
   listType?: EventListType;
   onEdit?: (id: string) => void;
+  onEditAttendance?: (id: string) => void;
   onDelete?: (id: string) => void;
   showActions?: boolean;
 }
 
-export function EventCard({ event, listType, onEdit, onDelete, showActions = true }: EventCardProps) {
+export function EventCard({
+  event,
+  listType,
+  onEdit,
+  onEditAttendance,
+  onDelete,
+  showActions = true,
+}: EventCardProps) {
   return (
     <Card className="overflow-hidden group hover:shadow-lg transition-shadow">
       <div className="relative h-40 overflow-hidden">
@@ -67,17 +75,27 @@ export function EventCard({ event, listType, onEdit, onDelete, showActions = tru
         </div>
       </CardContent>
       {showActions && (
-        <CardFooter className="gap-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit?.(event.id)}>
-            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-          </Button>
+        <CardFooter className="flex flex-col gap-2">
+          <div className="flex w-full gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit?.(event.id)}>
+              <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-destructive hover:text-destructive"
+              onClick={() => onDelete?.(event.id)}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 text-destructive hover:text-destructive"
-            onClick={() => onDelete?.(event.id)}
+            className="w-full"
+            onClick={() => onEditAttendance?.(event.id)}
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+            <MapPin className="h-3.5 w-3.5 mr-1" /> Edit Attendance mode
           </Button>
         </CardFooter>
       )}
