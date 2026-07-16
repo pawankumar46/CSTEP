@@ -48,7 +48,7 @@ export function SessionScrollRow({
     const element = scrollRef.current;
     if (!element) return;
 
-    const amount = Math.max(252, element.clientWidth * 0.8);
+    const amount = Math.max(352, element.clientWidth * 0.8);
     element.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",

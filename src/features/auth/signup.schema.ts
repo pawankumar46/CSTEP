@@ -34,7 +34,7 @@ export const EMPTY_SIGNUP_ADDRESS: SignupAddressFormValues = {
 
 const signupOrgTypeEnum = z.enum(["ORGANISATION", "INDEPENDENT"]);
 
-const signupBaseFields = {
+export const signupBaseFields = {
   salutation: z.string().min(1, "Salutation is required"),
   firstName: requiredText("First name is required"),
   middleName: z.string().optional(),
@@ -57,24 +57,31 @@ const signupBaseFields = {
   confirmPassword: z.string().min(1, "Please confirm your password"),
 } as const;
 
+export type SignupBaseFormValues = z.infer<z.ZodObject<typeof signupBaseFields>>;
+
+export function refineSignupForm(
+  data: SignupBaseFormValues,
+  ctx: z.RefinementCtx,
+) {
+  if (data.password !== data.confirmPassword) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Passwords do not match",
+      path: ["confirmPassword"],
+    });
+  }
+  if (data.orgType === "ORGANISATION" && !(data.orgName ?? "").trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Organisation name is required",
+      path: ["orgName"],
+    });
+  }
+}
+
 export const publicSignupSchema = z
   .object(signupBaseFields)
-  .superRefine((data, ctx) => {
-    if (data.password !== data.confirmPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Passwords do not match",
-        path: ["confirmPassword"],
-      });
-    }
-    if (data.orgType === "ORGANISATION" && !(data.orgName ?? "").trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Organisation name is required",
-        path: ["orgName"],
-      });
-    }
-  });
+  .superRefine(refineSignupForm);
 
 export type PublicSignupFormValues = z.infer<typeof publicSignupSchema>;
 

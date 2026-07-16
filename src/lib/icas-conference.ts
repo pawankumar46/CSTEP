@@ -49,15 +49,20 @@ export function isIcasEventName(name: string): boolean {
   return normalized.includes("icas") || normalized.includes("clean air summit");
 }
 
-/** Training day on 19 Aug is shown on home but excluded from delegate registration. */
-export const ICAS_REGISTRATION_EXCLUDED_DATES = new Set(["2026-08-19"]);
+/** Training day on 19 Aug — hidden from self-registration only; lobby/admin flows keep all days. */
+export const ICAS_SELF_REGISTRATION_EXCLUDED_DATES = new Set(["2026-08-19"]);
 
-export function filterEventDaysForRegistration<T extends { date: string }>(
+/** Self-registration (`/event-register`) only — do not use in lobby/admin dialogs. */
+export function filterEventDaysForSelfRegistration<T extends { date: string }>(
   days: T[],
   eventName?: string | null,
 ): T[] {
   if (!eventName || !isIcasEventName(eventName)) return days;
-  return days.filter((day) => !ICAS_REGISTRATION_EXCLUDED_DATES.has(day.date));
+  return days.filter((day) => !ICAS_SELF_REGISTRATION_EXCLUDED_DATES.has(day.date));
+}
+
+export function sortEventDaysByDate<T extends { date: string }>(days: T[]): T[] {
+  return [...days].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function getConferenceVenue(eventName?: string | null, apiLocation?: string | null): string {

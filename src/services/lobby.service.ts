@@ -39,7 +39,21 @@ import type { AccommodationAssistanceRow, Event, MedicalAssistanceRow, Registrat
 export const createLobbyUser = async (
   values: LobbyUserSignupFormValues,
 ): Promise<string> => {
-  const { salutation, firstName, middleName, lastName, phone, email, password, address } = values;
+  const {
+    salutation,
+    firstName,
+    middleName,
+    lastName,
+    phone,
+    email,
+    designation,
+    orgType,
+    orgName,
+    motivation,
+    city,
+    state,
+    password,
+  } = values;
 
   const signupResult = await signUpLobbyUser({
     salutation,
@@ -48,13 +62,12 @@ export const createLobbyUser = async (
     lastName,
     phone,
     email: normalizeAuthIdentifier(email),
-    designation: "None",
-    orgType: "INDEPENDENT",
-    orgName: "",
-    motivation: "",
-    city: address.city,
-    state: address.state,
-    address,
+    designation,
+    orgType,
+    orgName,
+    motivation,
+    city,
+    state,
     password,
   });
 

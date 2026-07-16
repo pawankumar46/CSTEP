@@ -26,7 +26,11 @@ import {
   buildParticipationDateOptionsFromEventDays,
   formatEventDayDateLabel,
 } from "@/lib/participation-dates";
-import { ATTENDANCE_MODES } from "@/lib/registration-options";
+import {
+  getAttendanceModeOptions,
+  getSharedAttendanceModeOptions,
+  normalizeAttendanceMode,
+} from "@/lib/registration-options";
 import { SessionScrollRow } from "@/components/shared/SessionScrollRow";
 import { cn } from "@/lib/utils";
 import {
@@ -34,6 +38,7 @@ import {
   EMPTY_REGISTRATION_EDIT,
   type RegistrationEditFormValues,
 } from "@/features/dashboard/admin-registration.schema";
+import { sortEventDaysByDate } from "@/lib/icas-conference";
 import {
   getEventDays,
   getScheduleItemsDropdown,
@@ -118,6 +123,10 @@ export function EditRegistrationDialog({
   const selectedDays = useMemo(
     () => eventDays.filter((day) => selectedDayIds?.includes(day.id)),
     [eventDays, selectedDayIds],
+  );
+  const sharedAttendanceOptions = useMemo(
+    () => getSharedAttendanceModeOptions(selectedDays),
+    [selectedDays],
   );
   const getDayLabel = useCallback(
     (day: EventDay) =>
@@ -214,7 +223,7 @@ export function EditRegistrationDialog({
       setEventDaysError(null);
       try {
         const days = await getEventDays(selectedEventId);
-        if (!cancelled) setEventDays(days);
+        if (!cancelled) setEventDays(sortEventDaysByDate(days));
       } catch (err) {
         if (!cancelled) {
           setEventDays([]);
@@ -278,6 +287,76 @@ export function EditRegistrationDialog({
     };
   }, [open, isMultiSession, selectedDayIds]);
 
+  const autoSelectAllSessionsForDay = useCallback(
+    (dayId: string, items: ScheduleItemRecord[]) => {
+      const allIds = items.map((item) => item.id);
+      const nextSessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+      nextSessionsByDay[dayId] = allIds;
+      setValue("sessionsByDay", nextSessionsByDay, { shouldValidate: true });
+    },
+    [getValues, setValue],
+  );
+
+  useEffect(() => {
+    if (!open || !isMultiSession || eventDays.length === 0) return;
+
+    const dayIds = selectedDayIds ?? [];
+    const nextAttendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
+    let changed = false;
+
+    for (const dayId of dayIds) {
+      const day = eventDays.find((entry) => entry.id === dayId);
+      if (!day) continue;
+
+      const normalized = normalizeAttendanceMode(
+        nextAttendanceByDay[dayId],
+        day.allowedAttendanceModes,
+      );
+      if (nextAttendanceByDay[dayId] !== normalized) {
+        nextAttendanceByDay[dayId] = normalized;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setValue("attendanceByDay", nextAttendanceByDay, { shouldValidate: true });
+    }
+  }, [open, eventDays, isMultiSession, selectedDayIds, getValues, setValue]);
+
+  useEffect(() => {
+    if (!open || !isMultiSession) return;
+
+    const dayIds = selectedDayIds ?? [];
+    const attendanceMap = attendanceByDay ?? {};
+
+    for (const dayId of dayIds) {
+      const mode = attendanceMap[dayId] ?? "physical";
+      if (mode !== "physical") continue;
+
+      const dayItems = scheduleItemsByDay[dayId] ?? [];
+      if (dayItems.length === 0 || scheduleLoadingByDay[dayId]) continue;
+
+      const selectedForDay = sessionsByDay?.[dayId] ?? [];
+      const allIds = dayItems.map((item) => item.id);
+      const alreadyAllSelected =
+        allIds.length === selectedForDay.length &&
+        allIds.every((id) => selectedForDay.includes(id));
+
+      if (!alreadyAllSelected) {
+        autoSelectAllSessionsForDay(dayId, dayItems);
+      }
+    }
+  }, [
+    open,
+    isMultiSession,
+    selectedDayIds,
+    attendanceByDay,
+    sessionsByDay,
+    scheduleItemsByDay,
+    scheduleLoadingByDay,
+    autoSelectAllSessionsForDay,
+  ]);
+
   const toggleDay = (dayId: string) => {
     const current = getValues("selectedDayIds") ?? [];
     const isRemoving = current.includes(dayId);
@@ -295,7 +374,11 @@ export function EditRegistrationDialog({
         delete nextSessionsByDay[dayId];
         delete nextAttendanceByDay[dayId];
       } else {
-        nextAttendanceByDay[dayId] = nextAttendanceByDay[dayId] ?? "physical";
+        const day = eventDays.find((entry) => entry.id === dayId);
+        nextAttendanceByDay[dayId] = normalizeAttendanceMode(
+          nextAttendanceByDay[dayId],
+          day?.allowedAttendanceModes,
+        );
         nextSessionsByDay[dayId] = nextSessionsByDay[dayId] ?? [];
       }
 
@@ -318,6 +401,17 @@ export function EditRegistrationDialog({
     const nextAttendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
     nextAttendanceByDay[dayId] = mode;
     setValue("attendanceByDay", nextAttendanceByDay, { shouldValidate: true });
+
+    if (mode === "physical") {
+      const dayItems = scheduleItemsByDay[dayId] ?? [];
+      if (dayItems.length > 0) {
+        autoSelectAllSessionsForDay(dayId, dayItems);
+      }
+    } else if (mode === "virtual") {
+      const nextSessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+      nextSessionsByDay[dayId] = [];
+      setValue("sessionsByDay", nextSessionsByDay, { shouldValidate: true });
+    }
   };
 
   const handleFormSubmit = async (values: RegistrationEditFormValues) => {
@@ -334,7 +428,11 @@ export function EditRegistrationDialog({
         return;
       }
       const sessionsMap = values.sessionsByDay ?? {};
+      const attendanceMap = values.attendanceByDay ?? {};
       for (const dayId of dayIdList) {
+        const mode = attendanceMap[dayId] ?? "physical";
+        if (mode === "physical") continue;
+
         const dayItems = scheduleItemsByDay[dayId] ?? [];
         const selectedForDay = sessionsMap[dayId] ?? [];
         if (dayItems.length > 0 && selectedForDay.length === 0) {
@@ -506,7 +604,11 @@ export function EditRegistrationDialog({
                 const dayId = day.id;
                 const dayItems = scheduleItemsByDay[dayId] ?? [];
                 const selectedForDay = sessionsByDay?.[dayId] ?? [];
-                const dayAttendance = attendanceByDay?.[dayId] ?? "physical";
+                const dayAttendance = normalizeAttendanceMode(
+                  attendanceByDay?.[dayId],
+                  day.allowedAttendanceModes,
+                );
+                const dayAttendanceOptions = getAttendanceModeOptions(day.allowedAttendanceModes);
                 const loading = scheduleLoadingByDay[dayId];
                 const error = scheduleErrorByDay[dayId];
 
@@ -524,7 +626,7 @@ export function EditRegistrationDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {ATTENDANCE_MODES.map((option) => (
+                          {dayAttendanceOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>
@@ -533,72 +635,78 @@ export function EditRegistrationDialog({
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <Label>Select Sessions</Label>
-                        {selectedForDay.length > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            {selectedForDay.length} selected
-                          </span>
+                    {dayAttendance === "physical" ? (
+                      <p className="text-sm text-muted-foreground">
+                        On-site attendance includes all sessions for this day.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>Select Sessions</Label>
+                          {selectedForDay.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              {selectedForDay.length} selected
+                            </span>
+                          )}
+                        </div>
+                        {loading ? (
+                          <p className="text-sm text-muted-foreground">Loading sessions…</p>
+                        ) : error ? (
+                          <p className="text-sm text-destructive">{error}</p>
+                        ) : dayItems.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
+                        ) : (
+                          <SessionScrollRow>
+                            {dayItems.map((item) => {
+                              const isSelected = selectedForDay.includes(item.id);
+                              return (
+                                <div
+                                  key={item.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-pressed={isSelected}
+                                  onClick={() => toggleSessionForDay(dayId, item.id)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.preventDefault();
+                                      toggleSessionForDay(dayId, item.id);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                    isSelected
+                                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                      : "border-border bg-card hover:border-primary/40",
+                                  )}
+                                >
+                                  <div className="p-3 space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <div
+                                        aria-hidden
+                                        className={cn(
+                                          "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                          isSelected && "bg-primary text-primary-foreground",
+                                        )}
+                                      >
+                                        {isSelected && <Check className="h-3 w-3" />}
+                                      </div>
+                                      <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground pl-6">
+                                      {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
+                                      <Mic className="h-3 w-3" />
+                                      {item.speakerName || "Speaker TBA"}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </SessionScrollRow>
                         )}
                       </div>
-                      {loading ? (
-                        <p className="text-sm text-muted-foreground">Loading sessions…</p>
-                      ) : error ? (
-                        <p className="text-sm text-destructive">{error}</p>
-                      ) : dayItems.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
-                      ) : (
-                        <SessionScrollRow>
-                          {dayItems.map((item) => {
-                            const isSelected = selectedForDay.includes(item.id);
-                            return (
-                              <div
-                                key={item.id}
-                                role="button"
-                                tabIndex={0}
-                                aria-pressed={isSelected}
-                                onClick={() => toggleSessionForDay(dayId, item.id)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    toggleSessionForDay(dayId, item.id);
-                                  }
-                                }}
-                                className={cn(
-                                  "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                  isSelected
-                                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                                    : "border-border bg-card hover:border-primary/40",
-                                )}
-                              >
-                                <div className="p-3 space-y-2">
-                                  <div className="flex items-start gap-2">
-                                    <div
-                                      aria-hidden
-                                      className={cn(
-                                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                        isSelected && "bg-primary text-primary-foreground",
-                                      )}
-                                    >
-                                      {isSelected && <Check className="h-3 w-3" />}
-                                    </div>
-                                    <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground pl-6">
-                                    {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
-                                    <Mic className="h-3 w-3" />
-                                    {item.speakerName || "Speaker TBA"}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </SessionScrollRow>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -620,7 +728,7 @@ export function EditRegistrationDialog({
                       <SelectValue placeholder="Select attendance mode" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ATTENDANCE_MODES.map((option) => (
+                      {sharedAttendanceOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>

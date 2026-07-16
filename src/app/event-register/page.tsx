@@ -22,7 +22,7 @@ import {
   getSharedAttendanceModeOptions,
   normalizeAttendanceMode,
 } from "@/lib/registration-options";
-import { filterEventDaysForRegistration } from "@/lib/icas-conference";
+import { filterEventDaysForSelfRegistration } from "@/lib/icas-conference";
 import {
   buildParticipationDateOptionsFromEventDays,
   formatEventDayDateLabel,
@@ -156,7 +156,7 @@ function EventRegisterForm() {
   const selectedEvent = events.find((e) => e.id === values.eventId);
   const isMultiSession = selectedEvent?.scheduleType === "MULTI_SESSION";
   const registrationEventDays = useMemo(
-    () => filterEventDaysForRegistration(eventDays, selectedEvent?.name),
+    () => filterEventDaysForSelfRegistration(eventDays, selectedEvent?.name),
     [eventDays, selectedEvent?.name],
   );
   const participationDateOptions = useMemo(
@@ -795,14 +795,14 @@ function EventRegisterForm() {
                                             }
                                           }}
                                           className={cn(
-                                            "min-w-[240px] max-w-[260px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                            "w-[min(100%,22rem)] min-w-[20rem] max-w-[22rem] shrink-0 snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                             isSelected
                                               ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                                               : "border-border bg-card hover:border-primary/40",
                                           )}
                                         >
-                                          <div className="p-3 space-y-2">
-                                            <div className="flex items-start gap-2">
+                                          <div className="p-3.5 space-y-2.5">
+                                            <div className="flex items-start gap-2.5">
                                               <div
                                                 aria-hidden
                                                 className={cn(
@@ -812,14 +812,16 @@ function EventRegisterForm() {
                                               >
                                                 {isSelected && <Check className="h-3 w-3" />}
                                               </div>
-                                              <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
+                                              <p className="font-medium text-sm leading-snug break-words flex-1">
+                                                {item.title}
+                                              </p>
                                             </div>
                                             <p className="text-xs text-muted-foreground pl-6">
                                               {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
                                             </p>
-                                            <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
-                                              <Mic className="h-3 w-3" />
-                                              {item.speakerName || "Speaker TBA"}
+                                            <p className="text-xs text-muted-foreground inline-flex items-start gap-1 pl-6 break-words">
+                                              <Mic className="h-3 w-3 mt-0.5 shrink-0" />
+                                              <span>{item.speakerName || "Speaker TBA"}</span>
                                             </p>
                                           </div>
                                         </div>

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -24,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SignupAddressFields } from "@/components/auth/SignupAddressFields";
 import { SessionScrollRow } from "@/components/shared/SessionScrollRow";
 import {
   addLobbyUserSchema,
@@ -34,11 +34,17 @@ import {
   type LobbyUserRegistrationFormValues,
   type LobbyUserSignupFormValues,
 } from "@/features/dashboard/admin-lobby-user.schema";
+import { SIGNUP_ORG_TYPES } from "@/features/auth/signup.schema";
 import {
   buildParticipationDateOptionsFromEventDays,
   formatEventDayDateLabel,
 } from "@/lib/participation-dates";
-import { ATTENDANCE_MODES } from "@/lib/registration-options";
+import {
+  getAttendanceModeOptions,
+  getSharedAttendanceModeOptions,
+  normalizeAttendanceMode,
+} from "@/lib/registration-options";
+import { sortEventDaysByDate } from "@/lib/icas-conference";
 import { getEventDays, getScheduleItemsDropdown } from "@/services/event.service";
 import { cn } from "@/lib/utils";
 import type { EventDay, ScheduleItemRecord } from "@/services/event.service";
@@ -54,6 +60,10 @@ interface AddLobbyUsersDialogProps {
     values: LobbyUserRegistrationFormValues,
     scheduleType?: "WHOLE_DAY" | "MULTI_SESSION",
   ) => Promise<void>;
+}
+
+function RequiredMark() {
+  return <span className="text-destructive" aria-hidden>*</span>;
 }
 
 function formatSessionTime(value: string): string {
@@ -104,6 +114,7 @@ export function AddLobbyUsersDialog({
   });
 
   const selectedEventId = watch("eventId");
+  const orgType = watch("orgType");
   const selectedDayIds = watch("selectedDayIds");
   const sessionsByDay = watch("sessionsByDay");
   const attendanceByDay = watch("attendanceByDay");
@@ -119,6 +130,10 @@ export function AddLobbyUsersDialog({
   const selectedDays = useMemo(
     () => eventDays.filter((day) => selectedDayIds?.includes(day.id)),
     [eventDays, selectedDayIds],
+  );
+  const sharedAttendanceOptions = useMemo(
+    () => getSharedAttendanceModeOptions(selectedDays),
+    [selectedDays],
   );
   const getDayLabel = useCallback(
     (day: EventDay) =>
@@ -173,7 +188,7 @@ export function AddLobbyUsersDialog({
       fetchedScheduleDayIdsRef.current = new Set();
       try {
         const days = await getEventDays(selectedEventId);
-        if (!cancelled) setEventDays(days);
+        if (!cancelled) setEventDays(sortEventDaysByDate(days));
       } catch (err) {
         if (!cancelled) {
           setEventDays([]);
@@ -241,6 +256,75 @@ export function AddLobbyUsersDialog({
     };
   }, [isMultiSession, wizardStep, selectedDayIds]);
 
+  const autoSelectAllSessionsForDay = useCallback(
+    (dayId: string, items: ScheduleItemRecord[]) => {
+      const allIds = items.map((item) => item.id);
+      const nextSessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+      nextSessionsByDay[dayId] = allIds;
+      setValue("sessionsByDay", nextSessionsByDay, { shouldValidate: true });
+    },
+    [getValues, setValue],
+  );
+
+  useEffect(() => {
+    if (!isMultiSession || eventDays.length === 0) return;
+
+    const dayIds = selectedDayIds ?? [];
+    const nextAttendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
+    let changed = false;
+
+    for (const dayId of dayIds) {
+      const day = eventDays.find((entry) => entry.id === dayId);
+      if (!day) continue;
+
+      const normalized = normalizeAttendanceMode(
+        nextAttendanceByDay[dayId],
+        day.allowedAttendanceModes,
+      );
+      if (nextAttendanceByDay[dayId] !== normalized) {
+        nextAttendanceByDay[dayId] = normalized;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setValue("attendanceByDay", nextAttendanceByDay, { shouldValidate: true });
+    }
+  }, [eventDays, isMultiSession, selectedDayIds, getValues, setValue]);
+
+  useEffect(() => {
+    if (!isMultiSession) return;
+
+    const dayIds = selectedDayIds ?? [];
+    const attendanceMap = attendanceByDay ?? {};
+
+    for (const dayId of dayIds) {
+      const mode = attendanceMap[dayId] ?? "physical";
+      if (mode !== "physical") continue;
+
+      const dayItems = scheduleItemsByDay[dayId] ?? [];
+      if (dayItems.length === 0 || scheduleLoadingByDay[dayId]) continue;
+
+      const selectedForDay = sessionsByDay?.[dayId] ?? [];
+      const allIds = dayItems.map((item) => item.id);
+      const alreadyAllSelected =
+        allIds.length === selectedForDay.length &&
+        allIds.every((id) => selectedForDay.includes(id));
+
+      if (!alreadyAllSelected) {
+        autoSelectAllSessionsForDay(dayId, dayItems);
+      }
+    }
+  }, [
+    isMultiSession,
+    selectedDayIds,
+    attendanceByDay,
+    sessionsByDay,
+    scheduleItemsByDay,
+    scheduleLoadingByDay,
+    autoSelectAllSessionsForDay,
+  ]);
+
   const toggleDay = (dayId: string) => {
     const current = getValues("selectedDayIds") ?? [];
     const isRemoving = current.includes(dayId);
@@ -263,7 +347,11 @@ export function AddLobbyUsersDialog({
           return copy;
         });
       } else {
-        nextAttendanceByDay[dayId] = nextAttendanceByDay[dayId] ?? "physical";
+        const day = eventDays.find((entry) => entry.id === dayId);
+        nextAttendanceByDay[dayId] = normalizeAttendanceMode(
+          nextAttendanceByDay[dayId],
+          day?.allowedAttendanceModes,
+        );
         nextSessionsByDay[dayId] = nextSessionsByDay[dayId] ?? [];
       }
 
@@ -286,6 +374,17 @@ export function AddLobbyUsersDialog({
     const nextAttendanceByDay = { ...(getValues("attendanceByDay") ?? {}) };
     nextAttendanceByDay[dayId] = mode;
     setValue("attendanceByDay", nextAttendanceByDay, { shouldValidate: true });
+
+    if (mode === "physical") {
+      const dayItems = scheduleItemsByDay[dayId] ?? [];
+      if (dayItems.length > 0) {
+        autoSelectAllSessionsForDay(dayId, dayItems);
+      }
+    } else if (mode === "virtual") {
+      const nextSessionsByDay = { ...(getValues("sessionsByDay") ?? {}) };
+      nextSessionsByDay[dayId] = [];
+      setValue("sessionsByDay", nextSessionsByDay, { shouldValidate: true });
+    }
   };
 
   const resetAndClose = () => {
@@ -313,7 +412,12 @@ export function AddLobbyUsersDialog({
         "lastName",
         "phone",
         "email",
-        "address",
+        "designation",
+        "orgType",
+        "orgName",
+        "motivation",
+        "city",
+        "state",
         "password",
         "confirmPassword",
       ],
@@ -332,7 +436,12 @@ export function AddLobbyUsersDialog({
         lastName: signupValues.lastName,
         phone: signupValues.phone,
         email: signupValues.email,
-        address: signupValues.address,
+        designation: signupValues.designation,
+        orgType: signupValues.orgType,
+        orgName: signupValues.orgName,
+        motivation: signupValues.motivation,
+        city: signupValues.city,
+        state: signupValues.state,
         password: signupValues.password,
         confirmPassword: signupValues.confirmPassword,
       });
@@ -359,7 +468,11 @@ export function AddLobbyUsersDialog({
         return;
       }
       const sessionsMap = values.sessionsByDay ?? {};
+      const attendanceMap = values.attendanceByDay ?? {};
       for (const dayId of dayIdList) {
+        const mode = attendanceMap[dayId] ?? "physical";
+        if (mode === "physical") continue;
+
         const dayItems = scheduleItemsByDay[dayId] ?? [];
         const selectedForDay = sessionsMap[dayId] ?? [];
         if (dayItems.length > 0 && selectedForDay.length === 0) {
@@ -412,7 +525,7 @@ export function AddLobbyUsersDialog({
           Add Users
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add user & register to event</DialogTitle>
           <DialogDescription>
@@ -425,129 +538,192 @@ export function AddLobbyUsersDialog({
         <form onSubmit={(event) => void handleSubmit(handleFormSubmit)(event)} className="space-y-4">
           {wizardStep === 1 && (
             <>
+              <div className="space-y-2">
+                <Label htmlFor="lobby-salutation">Salutation</Label>
+                <Controller
+                  name="salutation"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="lobby-salutation">
+                        <SelectValue placeholder="Select salutation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LOBBY_USER_SALUTATIONS.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {item}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.salutation && (
+                  <p className="text-xs text-destructive">{errors.salutation.message}</p>
+                )}
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="lobby-salutation">Salutation</Label>
-                  <Controller
-                    name="salutation"
-                    control={control}
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger id="lobby-salutation">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LOBBY_USER_SALUTATIONS.map((item) => (
-                            <SelectItem key={item} value={item}>
-                              {item}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.salutation && (
-                    <p className="text-xs text-destructive">{errors.salutation.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lobby-first-name">First name</Label>
-                  <Controller
-                    name="firstName"
-                    control={control}
-                    render={({ field }) => (
-                      <Input id="lobby-first-name" placeholder="First name" {...field} />
-                    )}
-                  />
+                  <Label htmlFor="lobby-first-name">
+                    First Name <RequiredMark />
+                  </Label>
+                  <Input id="lobby-first-name" required aria-required="true" {...register("firstName")} />
                   {errors.firstName && (
                     <p className="text-xs text-destructive">{errors.firstName.message}</p>
                   )}
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lobby-middle-name">Middle Name</Label>
+                  <Input id="lobby-middle-name" {...register("middleName")} />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="lobby-middle-name">Middle name (optional)</Label>
-                <Controller
-                  name="middleName"
-                  control={control}
-                  render={({ field }) => (
-                    <Input id="lobby-middle-name" placeholder="Middle name" {...field} />
-                  )}
-                />
+                <Label htmlFor="lobby-last-name">
+                  Last Name <RequiredMark />
+                </Label>
+                <Input id="lobby-last-name" required aria-required="true" {...register("lastName")} />
+                {errors.lastName && (
+                  <p className="text-xs text-destructive">{errors.lastName.message}</p>
+                )}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="lobby-last-name">Last name</Label>
-                  <Controller
-                    name="lastName"
-                    control={control}
-                    render={({ field }) => (
-                      <Input id="lobby-last-name" placeholder="Last name" {...field} />
-                    )}
-                  />
-                  {errors.lastName && (
-                    <p className="text-xs text-destructive">{errors.lastName.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lobby-phone">Phone</Label>
+                  <Label htmlFor="lobby-phone">
+                    Phone Number <RequiredMark />
+                  </Label>
                   <Controller
                     name="phone"
                     control={control}
                     render={({ field }) => (
-                      <Input id="lobby-phone" placeholder="9999999999" {...field} />
+                      <Input
+                        id="lobby-phone"
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        placeholder="9999999999"
+                        required
+                        aria-required="true"
+                        value={field.value}
+                        onChange={(event) =>
+                          field.onChange(event.target.value.replace(/\D/g, "").slice(0, 10))
+                        }
+                      />
                     )}
                   />
                   {errors.phone && (
                     <p className="text-xs text-destructive">{errors.phone.message}</p>
                   )}
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lobby-email">
+                    Email Address <RequiredMark />
+                  </Label>
+                  <Input
+                    id="lobby-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    required
+                    aria-required="true"
+                    {...register("email")}
+                  />
+                  {errors.email && (
+                    <p className="text-xs text-destructive">{errors.email.message}</p>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="lobby-email">Email</Label>
-                <Controller
-                  name="email"
-                  control={control}
-                  render={({ field }) => (
-                    <Input id="lobby-email" type="email" placeholder="you@example.com" {...field} />
-                  )}
+                <Label htmlFor="lobby-designation">Designation</Label>
+                <Input
+                  id="lobby-designation"
+                  placeholder="e.g. Researcher, Student"
+                  {...register("designation")}
                 />
-                {errors.email && (
-                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                {errors.designation && (
+                  <p className="text-xs text-destructive">{errors.designation.message}</p>
                 )}
               </div>
 
-              <SignupAddressFields register={register} errors={errors} idPrefix="lobby" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Organisation type</Label>
+                  <Controller
+                    name="orgType"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SIGNUP_ORG_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.orgType && (
+                    <p className="text-xs text-destructive">{errors.orgType.message}</p>
+                  )}
+                </div>
+                {orgType === "ORGANISATION" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="lobby-org-name">Organisation name</Label>
+                    <Input id="lobby-org-name" {...register("orgName")} />
+                    {errors.orgName && (
+                      <p className="text-xs text-destructive">{errors.orgName.message}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lobby-motivation">What motivates you to attend this event?</Label>
+                <Textarea
+                  id="lobby-motivation"
+                  rows={3}
+                  placeholder="Share a brief note about why you want to attend"
+                  {...register("motivation")}
+                />
+                {errors.motivation && (
+                  <p className="text-xs text-destructive">{errors.motivation.message}</p>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="lobby-city">City</Label>
+                  <Input id="lobby-city" {...register("city")} />
+                  {errors.city && (
+                    <p className="text-xs text-destructive">{errors.city.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lobby-state">State</Label>
+                  <Input id="lobby-state" {...register("state")} />
+                  {errors.state && (
+                    <p className="text-xs text-destructive">{errors.state.message}</p>
+                  )}
+                </div>
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="lobby-password">Password</Label>
-                  <Controller
-                    name="password"
-                    control={control}
-                    render={({ field }) => (
-                      <PasswordInput id="lobby-password" placeholder="Password" {...field} />
-                    )}
-                  />
+                  <PasswordInput id="lobby-password" {...register("password")} />
                   {errors.password && (
                     <p className="text-xs text-destructive">{errors.password.message}</p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lobby-confirm-password">Confirm password</Label>
-                  <Controller
-                    name="confirmPassword"
-                    control={control}
-                    render={({ field }) => (
-                      <PasswordInput
-                        id="lobby-confirm-password"
-                        placeholder="Confirm password"
-                        {...field}
-                      />
-                    )}
-                  />
+                  <Label htmlFor="lobby-confirm-password">Confirm Password</Label>
+                  <PasswordInput id="lobby-confirm-password" {...register("confirmPassword")} />
                   {errors.confirmPassword && (
                     <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
                   )}
@@ -657,7 +833,11 @@ export function AddLobbyUsersDialog({
                     const dayId = day.id;
                     const dayItems = scheduleItemsByDay[dayId] ?? [];
                     const selectedForDay = sessionsByDay?.[dayId] ?? [];
-                    const dayAttendance = attendanceByDay?.[dayId] ?? "physical";
+                    const dayAttendance = normalizeAttendanceMode(
+                      attendanceByDay?.[dayId],
+                      day.allowedAttendanceModes,
+                    );
+                    const dayAttendanceOptions = getAttendanceModeOptions(day.allowedAttendanceModes);
                     const loading = scheduleLoadingByDay[dayId];
                     const error = scheduleErrorByDay[dayId];
 
@@ -675,7 +855,7 @@ export function AddLobbyUsersDialog({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {ATTENDANCE_MODES.map((option) => (
+                              {dayAttendanceOptions.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}
                                 </SelectItem>
@@ -684,72 +864,78 @@ export function AddLobbyUsersDialog({
                           </Select>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <Label>Select Sessions</Label>
-                            {selectedForDay.length > 0 && (
-                              <span className="text-xs text-muted-foreground">
-                                {selectedForDay.length} selected
-                              </span>
+                        {dayAttendance === "physical" ? (
+                          <p className="text-sm text-muted-foreground">
+                            On-site attendance includes all sessions for this day.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <Label>Select Sessions</Label>
+                              {selectedForDay.length > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {selectedForDay.length} selected
+                                </span>
+                              )}
+                            </div>
+                            {loading ? (
+                              <p className="text-sm text-muted-foreground">Loading sessions…</p>
+                            ) : error ? (
+                              <p className="text-sm text-destructive">{error}</p>
+                            ) : dayItems.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
+                            ) : (
+                              <SessionScrollRow>
+                                {dayItems.map((item) => {
+                                  const isSelected = selectedForDay.includes(item.id);
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      role="button"
+                                      tabIndex={0}
+                                      aria-pressed={isSelected}
+                                      onClick={() => toggleSessionForDay(dayId, item.id)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                          event.preventDefault();
+                                          toggleSessionForDay(dayId, item.id);
+                                        }
+                                      }}
+                                      className={cn(
+                                        "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                        isSelected
+                                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                          : "border-border bg-card hover:border-primary/40",
+                                      )}
+                                    >
+                                      <div className="p-3 space-y-2">
+                                        <div className="flex items-start gap-2">
+                                          <div
+                                            aria-hidden
+                                            className={cn(
+                                              "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                              isSelected && "bg-primary text-primary-foreground",
+                                            )}
+                                          >
+                                            {isSelected && <Check className="h-3 w-3" />}
+                                          </div>
+                                          <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground pl-6">
+                                          {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
+                                          <Mic className="h-3 w-3" />
+                                          {item.speakerName || "Speaker TBA"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </SessionScrollRow>
                             )}
                           </div>
-                          {loading ? (
-                            <p className="text-sm text-muted-foreground">Loading sessions…</p>
-                          ) : error ? (
-                            <p className="text-sm text-destructive">{error}</p>
-                          ) : dayItems.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
-                          ) : (
-                            <SessionScrollRow>
-                              {dayItems.map((item) => {
-                                const isSelected = selectedForDay.includes(item.id);
-                                return (
-                                  <div
-                                    key={item.id}
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-pressed={isSelected}
-                                    onClick={() => toggleSessionForDay(dayId, item.id)}
-                                    onKeyDown={(event) => {
-                                      if (event.key === "Enter" || event.key === " ") {
-                                        event.preventDefault();
-                                        toggleSessionForDay(dayId, item.id);
-                                      }
-                                    }}
-                                    className={cn(
-                                      "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                      isSelected
-                                        ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                                        : "border-border bg-card hover:border-primary/40",
-                                    )}
-                                  >
-                                    <div className="p-3 space-y-2">
-                                      <div className="flex items-start gap-2">
-                                        <div
-                                          aria-hidden
-                                          className={cn(
-                                            "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                            isSelected && "bg-primary text-primary-foreground",
-                                          )}
-                                        >
-                                          {isSelected && <Check className="h-3 w-3" />}
-                                        </div>
-                                        <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
-                                      </div>
-                                      <p className="text-xs text-muted-foreground pl-6">
-                                        {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
-                                        <Mic className="h-3 w-3" />
-                                        {item.speakerName || "Speaker TBA"}
-                                      </p>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </SessionScrollRow>
-                          )}
-                        </div>
+                        )}
                       </div>
                     );
                   })}
@@ -771,7 +957,7 @@ export function AddLobbyUsersDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {ATTENDANCE_MODES.map((option) => (
+                          {sharedAttendanceOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>

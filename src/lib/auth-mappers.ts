@@ -71,7 +71,6 @@ export function toSignupPayload(data: SignupCredentials) {
 
 /** Manage Lobby step 1 — matches POST /auth/sign_up/ admin payload */
 export function toLobbySignupPayload(data: SignupCredentials) {
-  const digits = data.phone.replace(/\D/g, "");
   const { city, state } = resolveSignupCityState(data);
   const orgType = data.orgType ?? "INDEPENDENT";
 
@@ -81,7 +80,7 @@ export function toLobbySignupPayload(data: SignupCredentials) {
     middle_name: data.middleName ?? "",
     last_name: data.lastName,
     role: "BASE_USER",
-    phone_number: digits,
+    phone_number: formatPhoneForApi(data.phone),
     email: normalizeAuthIdentifier(data.email),
     designation: (data.designation ?? "None").trim() || "None",
     org_type: orgType,
