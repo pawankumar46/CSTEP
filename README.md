@@ -461,6 +461,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-16
 
+- **Signup → login → registration flow:** After signup and mobile OTP verification, users are now sent to `/login` (instead of home). On successful login, base users are routed by `is_registered` from `GET /events/event/upcoming/`: `false` → `/event-register`, `true` → home. An explicit `redirect` param still wins, and staff continue to their dashboard.
 - **API client — base URL:** `apiClient` now sets `baseURL` from `NEXT_PUBLIC_API_URL` on every request (via interceptor), so login/signup and other calls always hit the Django API host instead of falling back to the page origin (`localhost`).
 
 ### 2026-07-15

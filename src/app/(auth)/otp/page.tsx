@@ -110,7 +110,8 @@ function OTPForm() {
         phone: phone.trim(),
       });
       setSuccess(true);
-      setTimeout(() => router.push(redirectTo), 1500);
+      const loginUrl = buildAuthUrl(ROUTES.login, { redirect: searchParams.get("redirect") });
+      setTimeout(() => router.push(loginUrl), 1500);
     } catch {
       // error handled in store
     }
@@ -122,7 +123,7 @@ function OTPForm() {
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center space-y-4">
           <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto" />
           <h2 className="text-2xl font-bold">Mobile verified!</h2>
-          <p className="text-muted-foreground">Redirecting to home...</p>
+          <p className="text-muted-foreground">Redirecting to sign in...</p>
         </motion.div>
       </div>
     );

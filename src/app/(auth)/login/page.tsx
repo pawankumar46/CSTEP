@@ -16,7 +16,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
-import { getDefaultRouteForRole } from "@/lib/auth-utils";
+import { useHomeDataStore } from "@/store/useHomeDataStore";
+import { getDefaultRouteForRole, isStaffRole } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl, sanitizeRedirect } from "@/lib/routes";
 
@@ -27,6 +28,18 @@ const loginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
+
+async function resolveBaseUserDestination(userId: string): Promise<string> {
+  try {
+    const authKey = `true:${userId}`;
+    await useHomeDataStore.getState().load(authKey, { force: true });
+    const events = useHomeDataStore.getState().upcomingEvents;
+    const isRegistered = events.some((event) => event.isRegistered);
+    return isRegistered ? ROUTES.home : ROUTES.eventRegister;
+  } catch {
+    return ROUTES.home;
+  }
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -49,9 +62,19 @@ function LoginForm() {
         identifier: data.identifier.trim().toLowerCase(),
       });
       const user = useAuthStore.getState().user;
-      const destination =
-        sanitizeRedirect(redirectTo) ??
-        (user ? getDefaultRouteForRole(user.role) : ROUTES.home);
+
+      const safeRedirect = sanitizeRedirect(redirectTo);
+      if (safeRedirect) {
+        router.replace(safeRedirect);
+        return;
+      }
+
+      if (!user || isStaffRole(user.role)) {
+        router.replace(user ? getDefaultRouteForRole(user.role) : ROUTES.home);
+        return;
+      }
+
+      const destination = await resolveBaseUserDestination(user.id);
       router.replace(destination);
     } catch {
       // error handled in store
