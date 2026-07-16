@@ -23,6 +23,8 @@ interface AuthState {
   hasHydrated: boolean;
   signUp: (data: SignupCredentials) => Promise<void>;
   login: (credentials: LoginCredentials) => Promise<void>;
+  requestPhoneOtpLogin: (phone: string) => Promise<void>;
+  loginWithPhoneOtp: (phone: string, otp: string) => Promise<void>;
   verifyOtp: (payload: VerifyOtpPayload) => Promise<void>;
   forgotPassword: (phone: string) => Promise<void>;
   resetPassword: (payload: ResetPasswordPayload) => Promise<void>;
@@ -99,6 +101,44 @@ export const useAuthStore = create<AuthState>()(
         } catch (err) {
           set({
             error: err instanceof Error ? err.message : "Login failed",
+            isLoading: false,
+          });
+          throw err;
+        }
+      },
+
+      requestPhoneOtpLogin: async (phone) => {
+        set({ isLoading: true, error: null });
+        try {
+          await authService.requestPhoneOtpLogin(phone);
+          set({ isLoading: false });
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : "Failed to send login OTP",
+            isLoading: false,
+          });
+          throw err;
+        }
+      },
+
+      loginWithPhoneOtp: async (phone, otp) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { user, token, refreshToken } = await authService.loginWithPhoneOtp(phone, otp);
+          syncTokenToStorage(token, refreshToken || null);
+          syncRefreshToStorage(refreshToken || null);
+          markAccessTokenRefreshed();
+          set({
+            user,
+            token,
+            refreshToken: refreshToken || null,
+            isAuthenticated: true,
+            isLoading: false,
+            hasHydrated: true,
+          });
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : "OTP login failed",
             isLoading: false,
           });
           throw err;

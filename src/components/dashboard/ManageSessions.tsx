@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useEventStore } from "@/store/useEventStore";
 import { useLobbyStore } from "@/store/useLobbyStore";
 import { getEventDays } from "@/services/event.service";
-import type { EventScheduleDay } from "@/lib/session-scheduler";
+import { formatSchedulerDayDate, type EventScheduleDay } from "@/lib/session-scheduler";
 
 export function ManageSessions() {
   const { events, isLoading: eventsLoading, fetchEvents } = useEventStore();
@@ -40,17 +40,13 @@ export function ManageSessions() {
         const mapped = dayRows
           .filter((day) => day.date)
           .sort((a, b) => a.dayNumber - b.dayNumber)
-          .map((day, index) => {
-            const parsed = new Date(day.date);
-            const shortLabel = Number.isNaN(parsed.getTime())
-              ? day.date
-              : parsed.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-            const dayLabel = day.label?.trim();
+          .map((day) => {
+            const dateLabel = formatSchedulerDayDate(day.date);
             return {
               value: day.date,
-              label: dayLabel || `Day ${day.dayNumber || index + 1} — ${shortLabel}`,
-              shortLabel,
-              dayId: day.id || String(day.dayNumber || ""),
+              label: dateLabel,
+              shortLabel: dateLabel,
+              dayId: day.id,
             };
           });
 

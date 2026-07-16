@@ -172,15 +172,19 @@ function OTPForm() {
           */}
           <div className="space-y-2">
             <Label htmlFor="phone">Mobile Number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              inputMode="numeric"
-              placeholder="10-digit mobile number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              readOnly={Boolean(prefilledPhone)}
-            />
+            <div className="flex items-center rounded-md border border-input bg-transparent shadow-sm focus-within:ring-2 focus-within:ring-ring">
+              <span className="border-r border-input px-3 text-sm text-muted-foreground">+91</span>
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="numeric"
+                placeholder="10-digit mobile number"
+                className="border-0 shadow-none focus-visible:ring-0"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                readOnly={Boolean(prefilledPhone)}
+              />
+            </div>
           </div>
           {/* )} */}
 

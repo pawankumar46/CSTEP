@@ -23,7 +23,7 @@ export type ScheduleByEvent = Record<string, ScheduleByDate>;
 
 export const SCHEDULER_DAY_START_MINUTES = 8 * 60;
 export const SCHEDULER_DAY_END_MINUTES = 21 * 60;
-export const SCHEDULER_PX_PER_HOUR = 160;
+export const SCHEDULER_PX_PER_HOUR = 240;
 export const SCHEDULER_PX_PER_MINUTE = SCHEDULER_PX_PER_HOUR / 60;
 export const SCHEDULER_SNAP_MINUTES = 5;
 export const SCHEDULER_MIN_BLOCK_PX = 56;
@@ -167,11 +167,11 @@ export function formatTimeRangeShort(start: number, duration: number): string {
 }
 
 export function isCompactBlockWidth(widthPx: number): boolean {
-  return widthPx < 100;
+  return widthPx < 120;
 }
 
 export function isMediumBlockWidth(widthPx: number): boolean {
-  return widthPx >= 100 && widthPx < 160;
+  return widthPx >= 120 && widthPx < 200;
 }
 
 export function itemEnd(item: Pick<TimelineItem, "start" | "duration">): number {
@@ -248,6 +248,16 @@ export function toIsoDateOnly(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function formatSchedulerDayDate(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  return parsed.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function getEventScheduleDays(
   startIso?: string | null,
   endIso?: string | null,
@@ -274,15 +284,13 @@ export function getEventScheduleDays(
     days.push(new Date(start));
   }
 
-  return days.map((day, index) => {
-    const shortLabel = day.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-    });
+  return days.map((day) => {
+    const value = toIsoDateOnly(day);
+    const dateLabel = formatSchedulerDayDate(value);
     return {
-      value: toIsoDateOnly(day),
-      label: `Day ${index + 1} — ${shortLabel}`,
-      shortLabel,
+      value,
+      label: dateLabel,
+      shortLabel: dateLabel,
     };
   });
 }

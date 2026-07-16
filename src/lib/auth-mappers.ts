@@ -7,12 +7,9 @@ export function normalizeAuthIdentifier(identifier: string): string {
 }
 
 export function formatPhoneForApi(phone: string): string {
-  const trimmed = phone.trim();
-  if (trimmed.startsWith("+")) return trimmed;
-
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.length === 10) return `+91${digits}`;
-  return trimmed;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits;
 }
 
 export function toVerifyOtpPayload(method: "phone" | "email", otp: string, contact: string) {
@@ -119,6 +116,12 @@ export function toLoginPayload(identifier: string, password: string) {
   return {
     username: normalizeAuthIdentifier(identifier),
     password,
+  };
+}
+
+export function toOtpLoginPayload(phone: string) {
+  return {
+    phone_number: formatPhoneForApi(phone),
   };
 }
 

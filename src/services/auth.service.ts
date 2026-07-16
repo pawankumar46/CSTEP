@@ -15,6 +15,7 @@ import {
   extractUserIdFromSignupResponse,
   toSignupPayload,
   toLobbySignupPayload,
+  toOtpLoginPayload,
   toResetPasswordPayload,
   toUpdateProfilePayload,
   toVerifyOtpPayload,
@@ -91,6 +92,51 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
 
     if (!user.firstName || !user.lastName) {
       const profile = await fetchCurrentUser(identifier);
+      if (profile) {
+        user = profile;
+      }
+    }
+
+    return { user, token, refreshToken };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const requestPhoneOtpLogin = async (phone: string): Promise<{ success: boolean }> => {
+  try {
+    await apiClient.post("/auth/otp-login/", toOtpLoginPayload(phone));
+    return { success: true };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+export const loginWithPhoneOtp = async (
+  phone: string,
+  otp: string,
+): Promise<AuthResponse> => {
+  try {
+    const payload = toVerifyOtpPayload("phone", otp, phone);
+    const { data } = await apiClient.post<Record<string, unknown>>(
+      "/auth/verify-otp/",
+      payload,
+    );
+
+    const bodyError = extractApiErrorFromData(data);
+    if (bodyError) throw new Error(bodyError);
+
+    const token = extractToken(data);
+    if (!token) {
+      throw new Error("OTP verified but no login token was returned. Please contact support.");
+    }
+
+    const refreshToken = extractRefreshToken(data);
+    const responseUser = data.user as Record<string, unknown> | undefined;
+    let user = mapApiUser(responseUser ?? data, formatPhoneForApi(phone));
+
+    if (!user.firstName || !user.lastName) {
+      const profile = await fetchCurrentUser();
       if (profile) {
         user = profile;
       }
