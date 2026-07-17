@@ -459,6 +459,10 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-17
+
+- **Event registration — Physical session ids:** Fixed a bug where selecting multiple days as **Physical** only populated `session_ids` for the last day in the registration payload. Selecting a second day no longer cancels the first day’s in-flight session fetch; missing sessions are loaded again at submit via `resolveRegistrationSessionsByDay()` in `src/lib/registration-sessions.ts`.
+
 ### 2026-07-16
 
 - **Login — phone OTP option:** The sign-in page now has two login methods: **Email** (password) and **Phone OTP**. The phone flow keeps a small **Verify** button for OTP sending via `POST /auth/otp-login/`, shows OTP input inline, displays a visible `+91` phone prefix, and sends only the 10-digit mobile number in API payloads.

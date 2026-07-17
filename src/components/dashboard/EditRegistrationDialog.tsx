@@ -31,6 +31,10 @@ import {
   getSharedAttendanceModeOptions,
   normalizeAttendanceMode,
 } from "@/lib/registration-options";
+import {
+  resolveRegistrationSessionsByDay,
+  syncPhysicalDaySessions,
+} from "@/lib/registration-sessions";
 import { SessionScrollRow } from "@/components/shared/SessionScrollRow";
 import { cn } from "@/lib/utils";
 import {
@@ -246,7 +250,6 @@ export function EditRegistrationDialog({
     }
 
     const dayIds = selectedDayIds ?? [];
-    let cancelled = false;
 
     for (const id of fetchedScheduleDayIdsRef.current) {
       if (!dayIds.includes(id)) {
@@ -265,26 +268,20 @@ export function EditRegistrationDialog({
 
       void getScheduleItemsDropdown(dayId)
         .then((items) => {
-          if (cancelled) return;
           setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: items }));
         })
         .catch((err) => {
-          if (cancelled) return;
           fetchedScheduleDayIdsRef.current.delete(dayId);
+          setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: [] }));
           setScheduleErrorByDay((prev) => ({
             ...prev,
             [dayId]: err instanceof Error ? err.message : "Failed to load sessions",
           }));
         })
         .finally(() => {
-          if (cancelled) return;
           setScheduleLoadingByDay((prev) => ({ ...prev, [dayId]: false }));
         });
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, [open, isMultiSession, selectedDayIds]);
 
   const autoSelectAllSessionsForDay = useCallback(
@@ -327,24 +324,17 @@ export function EditRegistrationDialog({
     if (!open || !isMultiSession) return;
 
     const dayIds = selectedDayIds ?? [];
-    const attendanceMap = attendanceByDay ?? {};
+    const { sessionsByDay: nextSessionsByDay, changed } = syncPhysicalDaySessions(
+      dayIds,
+      attendanceByDay,
+      sessionsByDay,
+      scheduleItemsByDay,
+      scheduleLoadingByDay,
+    );
 
-    for (const dayId of dayIds) {
-      const mode = attendanceMap[dayId] ?? "physical";
-      if (mode !== "physical") continue;
-
-      const dayItems = scheduleItemsByDay[dayId] ?? [];
-      if (dayItems.length === 0 || scheduleLoadingByDay[dayId]) continue;
-
-      const selectedForDay = sessionsByDay?.[dayId] ?? [];
-      const allIds = dayItems.map((item) => item.id);
-      const alreadyAllSelected =
-        allIds.length === selectedForDay.length &&
-        allIds.every((id) => selectedForDay.includes(id));
-
-      if (!alreadyAllSelected) {
-        autoSelectAllSessionsForDay(dayId, dayItems);
-      }
+    if (changed) {
+      setValue("sessionsByDay", nextSessionsByDay, { shouldValidate: true });
+      setSessionSelectionError(null);
     }
   }, [
     open,
@@ -354,7 +344,7 @@ export function EditRegistrationDialog({
     sessionsByDay,
     scheduleItemsByDay,
     scheduleLoadingByDay,
-    autoSelectAllSessionsForDay,
+    setValue,
   ]);
 
   const toggleDay = (dayId: string) => {
@@ -449,9 +439,24 @@ export function EditRegistrationDialog({
     }
 
     try {
+      let submitValues = values;
+      if (isMultiSession) {
+        const { sessionsByDay: syncedSessions, scheduleItemsByDay: loadedScheduleItems } =
+          await resolveRegistrationSessionsByDay(
+            values.selectedDayIds ?? [],
+            values.attendanceByDay,
+            values.sessionsByDay,
+            scheduleItemsByDay,
+          );
+
+        setScheduleItemsByDay(loadedScheduleItems);
+        setValue("sessionsByDay", syncedSessions, { shouldValidate: true });
+        submitValues = { ...values, sessionsByDay: syncedSessions };
+      }
+
       await onSubmit(
         registration.id,
-        values,
+        submitValues,
         selectedEvent?.scheduleType ?? "WHOLE_DAY",
       );
       onOpenChange(false);
@@ -680,7 +685,7 @@ export function EditRegistrationDialog({
                                     }
                                   }}
                                   className={cn(
-                                    "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                    "min-w-[220px] max-w-[240px] shrink-0 snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                     isSelected
                                       ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                                       : "border-border bg-card hover:border-primary/40",

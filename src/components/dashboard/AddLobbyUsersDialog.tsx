@@ -44,6 +44,10 @@ import {
   getSharedAttendanceModeOptions,
   normalizeAttendanceMode,
 } from "@/lib/registration-options";
+import {
+  resolveRegistrationSessionsByDay,
+  syncPhysicalDaySessions,
+} from "@/lib/registration-sessions";
 import { sortEventDaysByDate } from "@/lib/icas-conference";
 import { getEventDays, getScheduleItemsDropdown } from "@/services/event.service";
 import { cn } from "@/lib/utils";
@@ -207,14 +211,13 @@ export function AddLobbyUsersDialog({
   useEffect(() => {
     if (!isMultiSession || wizardStep !== 2) {
       fetchedScheduleDayIdsRef.current = new Set();
-      setScheduleItemsByDay({});
-      setScheduleLoadingByDay({});
-      setScheduleErrorByDay({});
+      setScheduleItemsByDay((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+      setScheduleLoadingByDay((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+      setScheduleErrorByDay((prev) => (Object.keys(prev).length > 0 ? {} : prev));
       return;
     }
 
     const dayIds = selectedDayIds ?? [];
-    let cancelled = false;
 
     for (const id of fetchedScheduleDayIdsRef.current) {
       if (!dayIds.includes(id)) {
@@ -233,11 +236,9 @@ export function AddLobbyUsersDialog({
 
       void getScheduleItemsDropdown(dayId)
         .then((items) => {
-          if (cancelled) return;
           setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: items }));
         })
         .catch((err) => {
-          if (cancelled) return;
           fetchedScheduleDayIdsRef.current.delete(dayId);
           setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: [] }));
           setScheduleErrorByDay((prev) => ({
@@ -246,14 +247,9 @@ export function AddLobbyUsersDialog({
           }));
         })
         .finally(() => {
-          if (cancelled) return;
           setScheduleLoadingByDay((prev) => ({ ...prev, [dayId]: false }));
         });
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, [isMultiSession, wizardStep, selectedDayIds]);
 
   const autoSelectAllSessionsForDay = useCallback(
@@ -296,24 +292,17 @@ export function AddLobbyUsersDialog({
     if (!isMultiSession) return;
 
     const dayIds = selectedDayIds ?? [];
-    const attendanceMap = attendanceByDay ?? {};
+    const { sessionsByDay: nextSessionsByDay, changed } = syncPhysicalDaySessions(
+      dayIds,
+      attendanceByDay,
+      sessionsByDay,
+      scheduleItemsByDay,
+      scheduleLoadingByDay,
+    );
 
-    for (const dayId of dayIds) {
-      const mode = attendanceMap[dayId] ?? "physical";
-      if (mode !== "physical") continue;
-
-      const dayItems = scheduleItemsByDay[dayId] ?? [];
-      if (dayItems.length === 0 || scheduleLoadingByDay[dayId]) continue;
-
-      const selectedForDay = sessionsByDay?.[dayId] ?? [];
-      const allIds = dayItems.map((item) => item.id);
-      const alreadyAllSelected =
-        allIds.length === selectedForDay.length &&
-        allIds.every((id) => selectedForDay.includes(id));
-
-      if (!alreadyAllSelected) {
-        autoSelectAllSessionsForDay(dayId, dayItems);
-      }
+    if (changed) {
+      setValue("sessionsByDay", nextSessionsByDay, { shouldValidate: true });
+      setSessionSelectionError(null);
     }
   }, [
     isMultiSession,
@@ -322,7 +311,7 @@ export function AddLobbyUsersDialog({
     sessionsByDay,
     scheduleItemsByDay,
     scheduleLoadingByDay,
-    autoSelectAllSessionsForDay,
+    setValue,
   ]);
 
   const toggleDay = (dayId: string) => {
@@ -494,18 +483,33 @@ export function AddLobbyUsersDialog({
     );
     if (!valid) return;
 
+    let registrationValues = values;
+    if (isMultiSession) {
+      const { sessionsByDay: syncedSessions, scheduleItemsByDay: loadedScheduleItems } =
+        await resolveRegistrationSessionsByDay(
+          values.selectedDayIds ?? [],
+          values.attendanceByDay,
+          values.sessionsByDay,
+          scheduleItemsByDay,
+        );
+
+      setScheduleItemsByDay(loadedScheduleItems);
+      setValue("sessionsByDay", syncedSessions, { shouldValidate: true });
+      registrationValues = { ...values, sessionsByDay: syncedSessions };
+    }
+
     setSubmitStep("register");
 
     try {
       await onRegister(
         createdUserId,
         {
-          eventId: values.eventId,
-          selectedDayIds: values.selectedDayIds,
-          selectedSessionIds: values.selectedSessionIds ?? [],
-          sessionsByDay: values.sessionsByDay,
-          attendanceByDay: values.attendanceByDay,
-          attendanceMode: values.attendanceMode,
+          eventId: registrationValues.eventId,
+          selectedDayIds: registrationValues.selectedDayIds,
+          selectedSessionIds: registrationValues.selectedSessionIds ?? [],
+          sessionsByDay: registrationValues.sessionsByDay,
+          attendanceByDay: registrationValues.attendanceByDay,
+          attendanceMode: registrationValues.attendanceMode,
         },
         selectedEvent?.scheduleType ?? "WHOLE_DAY",
       );
@@ -909,7 +913,7 @@ export function AddLobbyUsersDialog({
                                         }
                                       }}
                                       className={cn(
-                                        "min-w-[220px] max-w-[240px] snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                        "min-w-[220px] max-w-[240px] shrink-0 snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                         isSelected
                                           ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                                           : "border-border bg-card hover:border-primary/40",

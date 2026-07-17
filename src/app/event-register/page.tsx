@@ -22,6 +22,10 @@ import {
   getSharedAttendanceModeOptions,
   normalizeAttendanceMode,
 } from "@/lib/registration-options";
+import {
+  resolveRegistrationSessionsByDay,
+  syncPhysicalDaySessions,
+} from "@/lib/registration-sessions";
 import { filterEventDaysForSelfRegistration } from "@/lib/icas-conference";
 import {
   buildParticipationDateOptionsFromEventDays,
@@ -378,14 +382,13 @@ function EventRegisterForm() {
   useEffect(() => {
     if (!isMultiSession) {
       fetchedScheduleDayIdsRef.current = new Set();
-      setScheduleItemsByDay({});
-      setScheduleLoadingByDay({});
-      setScheduleErrorByDay({});
+      setScheduleItemsByDay((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+      setScheduleLoadingByDay((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+      setScheduleErrorByDay((prev) => (Object.keys(prev).length > 0 ? {} : prev));
       return;
     }
 
     const selectedDayIds = values.selectedDayIds ?? [];
-    let cancelled = false;
 
     for (const id of fetchedScheduleDayIdsRef.current) {
       if (!selectedDayIds.includes(id)) {
@@ -404,11 +407,9 @@ function EventRegisterForm() {
 
       void getScheduleItemsDropdown(dayId)
         .then((items) => {
-          if (cancelled) return;
           setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: items }));
         })
         .catch((err) => {
-          if (cancelled) return;
           fetchedScheduleDayIdsRef.current.delete(dayId);
           setScheduleItemsByDay((prev) => ({ ...prev, [dayId]: [] }));
           setScheduleErrorByDay((prev) => ({
@@ -417,38 +418,26 @@ function EventRegisterForm() {
           }));
         })
         .finally(() => {
-          if (cancelled) return;
           setScheduleLoadingByDay((prev) => ({ ...prev, [dayId]: false }));
         });
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, [isMultiSession, values.selectedDayIds]);
 
   useEffect(() => {
     if (!isMultiSession) return;
 
     const selectedDayIds = values.selectedDayIds ?? [];
-    const attendanceByDay = values.attendanceByDay ?? {};
+    const { sessionsByDay: nextSessionsByDay, changed } = syncPhysicalDaySessions(
+      selectedDayIds,
+      values.attendanceByDay,
+      values.sessionsByDay,
+      scheduleItemsByDay,
+      scheduleLoadingByDay,
+    );
 
-    for (const dayId of selectedDayIds) {
-      const mode = attendanceByDay[dayId] ?? "physical";
-      if (mode !== "physical") continue;
-
-      const dayItems = scheduleItemsByDay[dayId] ?? [];
-      if (dayItems.length === 0 || scheduleLoadingByDay[dayId]) continue;
-
-      const selectedForDay = values.sessionsByDay?.[dayId] ?? [];
-      const allIds = dayItems.map((item) => item.id);
-      const alreadyAllSelected =
-        allIds.length === selectedForDay.length &&
-        allIds.every((id) => selectedForDay.includes(id));
-
-      if (!alreadyAllSelected) {
-        autoSelectAllSessionsForDay(dayId, dayItems);
-      }
+    if (changed) {
+      setValue("sessionsByDay", nextSessionsByDay, { shouldValidate: true });
+      setSessionSelectionError(null);
     }
   }, [
     isMultiSession,
@@ -457,7 +446,7 @@ function EventRegisterForm() {
     values.sessionsByDay,
     scheduleItemsByDay,
     scheduleLoadingByDay,
-    autoSelectAllSessionsForDay,
+    setValue,
   ]);
 
   const formatSessionTime = (value: string) => {
@@ -517,10 +506,26 @@ function EventRegisterForm() {
   const handleSubmit = async () => {
     if (!(await validateStep())) return;
 
-    const eventId = getValues().eventId;
+    let formValues = getValues();
+
+    if (isMultiSession) {
+      const { sessionsByDay: syncedSessions, scheduleItemsByDay: loadedScheduleItems } =
+        await resolveRegistrationSessionsByDay(
+          formValues.selectedDayIds ?? [],
+          formValues.attendanceByDay,
+          formValues.sessionsByDay,
+          scheduleItemsByDay,
+        );
+
+      setScheduleItemsByDay(loadedScheduleItems);
+      setValue("sessionsByDay", syncedSessions, { shouldValidate: true });
+      formValues = { ...formValues, sessionsByDay: syncedSessions };
+    }
+
+    const eventId = formValues.eventId;
 
     try {
-      await submitRegistration(getValues(), {
+      await submitRegistration(formValues, {
         userId: user?.id,
         scheduleType: selectedEvent?.scheduleType ?? "WHOLE_DAY",
       });
@@ -825,7 +830,7 @@ function EventRegisterForm() {
                                             }
                                           }}
                                           className={cn(
-                                            "w-[min(100%,22rem)] min-w-[20rem] max-w-[22rem] shrink-0 snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                            "w-[min(100%,22rem)] min-w-[18rem] max-w-[22rem] shrink-0 snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                             isSelected
                                               ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                                               : "border-border bg-card hover:border-primary/40",
