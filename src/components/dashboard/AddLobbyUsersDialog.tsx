@@ -50,6 +50,12 @@ import {
 } from "@/lib/registration-sessions";
 import { sortEventDaysByDate } from "@/lib/icas-conference";
 import { getEventDays, getScheduleItemsDropdown } from "@/services/event.service";
+import {
+  sessionCardClassName,
+  sessionCheckboxClassName,
+  sessionMetaClassName,
+  sessionTimeChipClassName,
+} from "@/lib/session-card-tones";
 import { cn } from "@/lib/utils";
 import type { EventDay, ScheduleItemRecord } from "@/services/event.service";
 import type { AttendanceMode, Event } from "@/types";
@@ -640,10 +646,14 @@ export function AddLobbyUsersDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="lobby-designation">Designation</Label>
+                <Label htmlFor="lobby-designation">
+                  Designation <RequiredMark />
+                </Label>
                 <Input
                   id="lobby-designation"
                   placeholder="e.g. Researcher, Student"
+                  required
+                  aria-required="true"
                   {...register("designation")}
                 />
                 {errors.designation && (
@@ -897,7 +907,7 @@ export function AddLobbyUsersDialog({
                               <p className="text-sm text-muted-foreground">No sessions available for this day.</p>
                             ) : (
                               <SessionScrollRow>
-                                {dayItems.map((item) => {
+                                {dayItems.map((item, index) => {
                                   const isSelected = selectedForDay.includes(item.id);
                                   return (
                                     <div
@@ -912,33 +922,36 @@ export function AddLobbyUsersDialog({
                                           toggleSessionForDay(dayId, item.id);
                                         }
                                       }}
-                                      className={cn(
-                                        "min-w-[220px] max-w-[240px] shrink-0 snap-start rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                        isSelected
-                                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                                          : "border-border bg-card hover:border-primary/40",
-                                      )}
+                                      className={sessionCardClassName(index, isSelected, "sm")}
                                     >
-                                      <div className="p-3 space-y-2">
+                                      <div className="p-3">
                                         <div className="flex items-start gap-2">
                                           <div
                                             aria-hidden
-                                            className={cn(
-                                              "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                              isSelected && "bg-primary text-primary-foreground",
-                                            )}
+                                            className={sessionCheckboxClassName(index, isSelected)}
                                           >
                                             {isSelected && <Check className="h-3 w-3" />}
                                           </div>
-                                          <p className="font-medium text-sm line-clamp-2 flex-1">{item.title}</p>
+                                          <div className="min-w-0 flex-1 space-y-2">
+                                            <p className="font-medium text-sm line-clamp-2 text-foreground">
+                                              {item.title}
+                                            </p>
+                                            <p className={sessionTimeChipClassName(index)}>
+                                              {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
+                                            </p>
+                                            {item.speakerName?.trim() && (
+                                              <p
+                                                className={cn(
+                                                  "text-xs inline-flex items-center gap-1",
+                                                  sessionMetaClassName(index),
+                                                )}
+                                              >
+                                                <Mic className="h-3 w-3" />
+                                                {item.speakerName.trim()}
+                                              </p>
+                                            )}
+                                          </div>
                                         </div>
-                                        <p className="text-xs text-muted-foreground pl-6">
-                                          {formatSessionTime(item.startTime)} - {formatSessionTime(item.endTime)}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground inline-flex items-center gap-1 pl-6">
-                                          <Mic className="h-3 w-3" />
-                                          {item.speakerName || "Speaker TBA"}
-                                        </p>
                                       </div>
                                     </div>
                                   );

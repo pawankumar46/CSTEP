@@ -213,8 +213,16 @@ function SignupForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="designation">Designation</Label>
-              <Input id="designation" placeholder="e.g. Researcher, Student" {...register("designation")} />
+              <Label htmlFor="designation">
+                Designation <RequiredMark />
+              </Label>
+              <Input
+                id="designation"
+                placeholder="e.g. Researcher, Student"
+                required
+                aria-required="true"
+                {...register("designation")}
+              />
               {errors.designation && (
                 <p className="text-xs text-destructive">{errors.designation.message}</p>
               )}

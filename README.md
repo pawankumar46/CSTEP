@@ -461,6 +461,9 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-17
 
+- **Event registration — compact attendance selector:** Step 3 places each selected date and its attendance-mode control in one responsive row, with a subtle reduced-motion-safe attention indicator and highlighted dropdown.
+- **Event registration — session card colors:** Session cards in Step 3 (and lobby Add/Edit registration) use rotating theme-friendly tones with stronger `border-2` outlines, light/dark gradients, time chips, and selected states via `src/lib/session-card-tones.ts`. Speaker line is hidden when no speaker name is provided (no “Speaker TBA”).
+- **Signup — designation required:** Designation is mandatory on `/signup` and lobby Add Users (Zod validation, required marker, HTML `required`); signup payloads no longer default empty designation to `"None"`.
 - **Event registration — Physical session ids:** Fixed a bug where selecting multiple days as **Physical** only populated `session_ids` for the last day in the registration payload. Selecting a second day no longer cancels the first day’s in-flight session fetch; missing sessions are loaded again at submit via `resolveRegistrationSessionsByDay()` in `src/lib/registration-sessions.ts`.
 
 ### 2026-07-16
