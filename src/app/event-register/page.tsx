@@ -699,44 +699,53 @@ function EventRegisterForm() {
                     ) : registrationEventDays.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No participation dates available for this event.</p>
                     ) : (
-                      <div className="flex flex-col gap-3">
-                        {registrationEventDays.map((day) => {
-                          const isSelected = values.selectedDayIds?.includes(day.id) ?? false;
-                          return (
-                            <div
-                              key={day.id}
-                              role="button"
-                              tabIndex={0}
-                              aria-pressed={isSelected}
-                              onClick={() => toggleDay(day.id)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  toggleDay(day.id);
-                                }
-                              }}
-                              className={cn(
-                                "rounded-xl border p-3 text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                isSelected
-                                  ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                                  : "border-border bg-card hover:border-primary/40",
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div
-                                  aria-hidden
-                                  className={cn(
-                                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                    isSelected && "bg-primary text-primary-foreground",
-                                  )}
-                                >
-                                  {isSelected && <Check className="h-3 w-3" />}
+                      <div className="space-y-3">
+                        <div
+                          className={cn(
+                            "grid gap-3",
+                            registrationEventDays.length <= 2
+                              ? "grid-cols-2"
+                              : "grid-cols-2 sm:grid-cols-3",
+                          )}
+                        >
+                          {registrationEventDays.map((day) => {
+                            const isSelected = values.selectedDayIds?.includes(day.id) ?? false;
+                            return (
+                              <div
+                                key={day.id}
+                                role="button"
+                                tabIndex={0}
+                                aria-pressed={isSelected}
+                                onClick={() => toggleDay(day.id)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    toggleDay(day.id);
+                                  }
+                                }}
+                                className={cn(
+                                  "rounded-xl border p-3 text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                  isSelected
+                                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                    : "border-border bg-card hover:border-primary/40",
+                                )}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div
+                                    aria-hidden
+                                    className={cn(
+                                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                      isSelected && "bg-primary text-primary-foreground",
+                                    )}
+                                  >
+                                    {isSelected && <Check className="h-3 w-3" />}
+                                  </div>
+                                  <p className="font-medium text-sm truncate">{getDayLabel(day)}</p>
                                 </div>
-                                <p className="font-medium text-sm">{getDayLabel(day)}</p>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                         <p className="text-[11px] text-muted-foreground">Tap to select multiple days</p>
                       </div>
                     )}

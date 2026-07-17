@@ -1,6 +1,6 @@
 /** Trim env values; blank strings are treated as unset. */
 function trimEnv(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
+  const trimmed = value?.replace(/^\uFEFF/, "").trim();
   return trimmed || undefined;
 }
 
@@ -43,7 +43,15 @@ export function getApiBaseUrl(): string {
       "NEXT_PUBLIC_API_URL is not set. Add it to .env.local (see .env.example).",
     );
   }
-  return normalizeBaseUrl(url);
+
+  const normalized = normalizeBaseUrl(url);
+  if (!/^https?:\/\//i.test(normalized)) {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL must be an absolute URL (e.g. https://cstep-django.vercel.app).",
+    );
+  }
+
+  return normalized;
 }
 
 /** Public frontend origin for absolute links (share, emails). */

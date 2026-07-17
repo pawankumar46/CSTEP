@@ -14,8 +14,22 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  // Always resolve from env at request time so login/signup never hit the page origin (localhost).
-  config.baseURL = getApiBaseUrl();
+  // Always resolve from env at request time so auth never hits the page origin (localhost).
+  const baseURL = getApiBaseUrl();
+  config.baseURL = baseURL;
+
+  // Absolute request URLs ignore baseURL — keep relative paths so Django host is used.
+  if (typeof config.url === "string" && /^https?:\/\//i.test(config.url)) {
+    try {
+      const requested = new URL(config.url);
+      const apiOrigin = new URL(baseURL).origin;
+      if (requested.origin !== apiOrigin) {
+        config.url = `${requested.pathname}${requested.search}`;
+      }
+    } catch {
+      // leave url as-is if parsing fails
+    }
+  }
 
   const token = getAccessToken();
   if (token) {
