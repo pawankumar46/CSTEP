@@ -721,38 +721,84 @@ function EventRegisterForm() {
                         >
                           {registrationEventDays.map((day) => {
                             const isSelected = values.selectedDayIds?.includes(day.id) ?? false;
+                            const dayAttendance = normalizeAttendanceMode(
+                              values.attendanceByDay?.[day.id],
+                              day.allowedAttendanceModes,
+                            );
+                            const dayAttendanceOptions = getAttendanceModeOptions(day.allowedAttendanceModes);
                             return (
-                              <div
-                                key={day.id}
-                                role="button"
-                                tabIndex={0}
-                                aria-pressed={isSelected}
-                                onClick={() => toggleDay(day.id)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    toggleDay(day.id);
-                                  }
-                                }}
-                                className={cn(
-                                  "rounded-xl border p-3 text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                  isSelected
-                                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                                    : "border-border bg-card hover:border-primary/40",
-                                )}
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div
-                                    aria-hidden
-                                    className={cn(
-                                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
-                                      isSelected && "bg-primary text-primary-foreground",
-                                    )}
-                                  >
-                                    {isSelected && <Check className="h-3 w-3" />}
+                              <div key={day.id} className="space-y-2">
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-pressed={isSelected}
+                                  onClick={() => toggleDay(day.id)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.preventDefault();
+                                      toggleDay(day.id);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "rounded-xl border p-3 text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                    isSelected
+                                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                      : "border-border bg-card hover:border-primary/40",
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div
+                                      aria-hidden
+                                      className={cn(
+                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                        isSelected && "bg-primary text-primary-foreground",
+                                      )}
+                                    >
+                                      {isSelected && <Check className="h-3 w-3" />}
+                                    </div>
+                                    <p className="font-medium text-sm truncate">{getDayLabel(day)}</p>
                                   </div>
-                                  <p className="font-medium text-sm truncate">{getDayLabel(day)}</p>
                                 </div>
+
+                                {isSelected && isMultiSession && (
+                                  <div
+                                    role="radiogroup"
+                                    aria-label={`Attendance mode for ${getDayLabel(day)}`}
+                                    className="inline-flex gap-1 rounded-md border bg-muted/50 p-0.5"
+                                  >
+                                    {dayAttendanceOptions.map((option) => {
+                                      const isActive = dayAttendance === option.value;
+                                      return (
+                                        <button
+                                          key={option.value}
+                                          type="button"
+                                          role="radio"
+                                          aria-checked={isActive}
+                                          onClick={() => setDayAttendance(day.id, option.value as AttendanceMode)}
+                                          className={cn(
+                                            "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                            isActive
+                                              ? "bg-primary text-primary-foreground shadow-sm"
+                                              : "text-muted-foreground hover:text-foreground",
+                                          )}
+                                        >
+                                          <span
+                                            aria-hidden
+                                            className={cn(
+                                              "flex h-3 w-3 items-center justify-center rounded-full border",
+                                              isActive ? "border-primary-foreground" : "border-muted-foreground",
+                                            )}
+                                          >
+                                            {isActive && (
+                                              <span className="h-1 w-1 rounded-full bg-primary-foreground" />
+                                            )}
+                                          </span>
+                                          {option.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -775,46 +821,16 @@ function EventRegisterForm() {
                           values.attendanceByDay?.[dayId],
                           day.allowedAttendanceModes,
                         );
-                        const dayAttendanceOptions = getAttendanceModeOptions(day.allowedAttendanceModes);
                         const loading = scheduleLoadingByDay[dayId];
                         const error = scheduleErrorByDay[dayId];
 
+                        if (dayAttendance === "physical") return null;
+
                         return (
                           <div key={dayId} className="space-y-4 rounded-xl border p-4 bg-card">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                              <h4 className="shrink-0 pb-0.5 text-sm font-semibold">
-                                {getDayLabel(day)}
-                              </h4>
-                              <div className="w-full space-y-1.5 sm:max-w-sm">
-                                <Label className="inline-flex items-center gap-2">
-                                  Attendance Mode
-                                  <span className="relative flex h-3.5 w-3.5" aria-hidden>
-                                    <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-70 motion-safe:animate-ping" />
-                                    <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.25)]" />
-                                  </span>
-                                </Label>
-                              <Select
-                                onValueChange={(value) => setDayAttendance(dayId, value as AttendanceMode)}
-                                value={dayAttendance}
-                              >
-                                  <SelectTrigger className="border-primary/60 shadow-sm transition-shadow hover:border-primary focus:ring-2 focus:ring-primary/30">
-                                    <SelectValue placeholder="Select attendance mode" />
-                                  </SelectTrigger>
-                                <SelectContent>
-                                  {dayAttendanceOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              </div>
-                            </div>
+                            <h4 className="text-sm font-semibold">{getDayLabel(day)}</h4>
 
-                            {dayAttendance === "physical" ? (
-                              <p className="text-sm text-muted-foreground">
-                                On-site attendance includes all sessions for this day.
-                              </p>
-                            ) : (
-                              <div className="space-y-2">
+                            <div className="space-y-2">
                                 <div className="flex items-center justify-between gap-2">
                                   <Label>Select Sessions</Label>
                                   {selectedForDay.length > 0 && (
@@ -848,7 +864,7 @@ function EventRegisterForm() {
                                           }}
                                           className={sessionCardClassName(index, isSelected, "md")}
                                         >
-                                          <div className="p-3.5">
+                                          <div className="p-3.5 md:p-2.5">
                                             <div className="flex items-start gap-2.5">
                                               <div
                                                 aria-hidden
@@ -856,7 +872,7 @@ function EventRegisterForm() {
                                               >
                                                 {isSelected && <Check className="h-3 w-3" />}
                                               </div>
-                                              <div className="min-w-0 flex-1 space-y-2">
+                                              <div className="min-w-0 flex-1 space-y-2 md:space-y-1.5">
                                                 <p className="font-medium text-sm leading-snug break-words text-foreground">
                                                   {item.title}
                                                 </p>
@@ -883,7 +899,6 @@ function EventRegisterForm() {
                                   </SessionScrollRow>
                                 )}
                               </div>
-                            )}
                           </div>
                         );
                       })}

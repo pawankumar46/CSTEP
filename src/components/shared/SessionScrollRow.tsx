@@ -64,29 +64,29 @@ export function SessionScrollRow({
         {children}
       </div>
 
-      <div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-3">
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-8 w-8 shrink-0 rounded-full"
+          className="h-10 w-10 shrink-0 rounded-full"
           onClick={() => scrollBy("left")}
           disabled={!canScrollLeft}
           aria-label="Scroll sessions left"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5" />
         </Button>
-        <p className="text-center text-[11px] text-muted-foreground">{hint}</p>
+        <p className="text-center text-sm text-muted-foreground">{hint}</p>
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-8 w-8 shrink-0 rounded-full"
+          className="h-10 w-10 shrink-0 rounded-full"
           onClick={() => scrollBy("right")}
           disabled={!canScrollRight}
           aria-label="Scroll sessions right"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
     </div>
