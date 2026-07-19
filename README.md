@@ -399,7 +399,7 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 
 ### 2. Lobby: add user (two-step wizard)
 
-1. **Signup** → `POST /auth/sign_up/` with `role: BASE_USER`, `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (`auth-mappers.toLobbySignupPayload` / `toSignupPayload`)
+1. **Signup** → `POST /auth/users/` with `role: BASE_USER`, `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (`auth-mappers.toLobbySignupPayload`)
 2. **Register for event** → `POST /registrations/registration/` with `user` id (`registration-mappers.toLobbyRegistrationApiPayload`)
 
 Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
@@ -458,6 +458,11 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-07-19
+
+- **Lobby — Add Users signup endpoint:** Step 1 of the moderator/event-admin "Add Users" wizard now creates the account via `POST /auth/users/` (was `/auth/sign_up/`); payload shape unchanged (`toLobbySignupPayload`). Step 2 (event registration) is unchanged.
+- **Event registration — Step 3 layout:** Physical/Virtual toggle now sits directly beneath each day chip; sessions cards render only for Virtual days with a date heading. Session cards are shorter on tablet/laptop (`md:p-2.5`) and the scroll controls in `SessionScrollRow` are larger.
 
 ### 2026-07-17
 

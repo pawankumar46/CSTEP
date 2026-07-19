@@ -56,7 +56,7 @@ export const signUpLobbyUser = async (
 ): Promise<{ success: boolean; userId: string }> => {
   try {
     const { data: response } = await apiClient.post<Record<string, unknown>>(
-      "/auth/sign_up/",
+      "/auth/users/",
       toLobbySignupPayload(data),
     );
     return {

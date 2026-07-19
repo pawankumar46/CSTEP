@@ -69,7 +69,7 @@ export function toSignupPayload(data: SignupCredentials) {
   };
 }
 
-/** Manage Lobby step 1 — matches POST /auth/sign_up/ admin payload */
+/** Manage Lobby step 1 — matches POST /auth/users/ admin payload */
 export function toLobbySignupPayload(data: SignupCredentials) {
   const { city, state } = resolveSignupCityState(data);
   const orgType = data.orgType ?? "INDEPENDENT";
