@@ -26,6 +26,18 @@ import type { UpcomingEvent } from "@/types";
 
 const HOME_HERO_IMAGE = "/imge2.jpg";
 
+function HeroImage({ eventName }: { eventName: string }) {
+  return (
+    <div className="relative size-64 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-100/60 to-background shadow-sm dark:from-sky-950/25 sm:size-72 lg:size-[min(28rem,calc(100vh-12rem))]">
+      <img
+        src={HOME_HERO_IMAGE}
+        alt={`${eventName} — ${APP_NAME}`}
+        className="absolute inset-0 h-full w-full object-contain object-center"
+      />
+    </div>
+  );
+}
+
 function UpcomingEventHeading({
   eventName,
   eventStart,
@@ -99,17 +111,11 @@ function HeroEventSlide({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:flex-row lg:items-center lg:justify-center lg:gap-8 xl:gap-10">
-      <div className="order-2 flex shrink-0 justify-center lg:order-1">
-        <div className="relative size-64 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-100/60 to-background shadow-sm dark:from-sky-950/25 sm:size-72 lg:size-[min(28rem,calc(100vh-12rem))]">
-          <img
-            src={HOME_HERO_IMAGE}
-            alt={`${event.name} — ${APP_NAME}`}
-            className="absolute inset-0 h-full w-full object-contain object-center"
-          />
-        </div>
+      <div className="hidden shrink-0 justify-center lg:flex">
+        <HeroImage eventName={event.name} />
       </div>
 
-      <div className="order-1 flex w-full min-w-0 max-w-xl flex-col justify-center gap-5 lg:order-2 lg:w-auto lg:max-w-lg xl:max-w-xl lg:gap-6">
+      <div className="flex w-full min-w-0 max-w-xl flex-col justify-center gap-5 lg:w-auto lg:max-w-lg xl:max-w-xl lg:gap-6">
         <UpcomingEventHeading eventName={event.name} eventStart={event.date} eventEnd={event.endDate} />
 
         {isAuthenticated && eventIsRegistered && (
@@ -117,6 +123,10 @@ function HeroEventSlide({
             You&apos;re registered for this event. Join the live stream when it begins.
           </p>
         )}
+
+        <div className="flex justify-center lg:hidden">
+          <HeroImage eventName={event.name} />
+        </div>
 
         <div className="space-y-4 lg:space-y-5">
           <Badge variant="secondary" className="w-fit gap-1.5">

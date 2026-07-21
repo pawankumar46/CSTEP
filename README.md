@@ -459,6 +459,10 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-21
+
+- **Home hero — mobile layout:** On small screens, the hero image now appears after the upcoming-event line (and registered notice) and **above** the CSTEP badge and conference title; desktop keeps image left of copy.
+
 ### 2026-07-19
 
 - **Lobby — Add Users signup endpoint:** Step 1 of the moderator/event-admin "Add Users" wizard now creates the account via `POST /auth/users/` (was `/auth/sign_up/`); payload shape unchanged (`toLobbySignupPayload`). Step 2 (event registration) is unchanged.
