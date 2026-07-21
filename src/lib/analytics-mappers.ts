@@ -1,9 +1,13 @@
+import { formatEventDayDateLabel } from "@/lib/participation-dates";
 import type {
   AnalyticsSummary,
   DashboardAnalytics,
   DistributionDataPoint,
   EventAnalytics,
   EventAnalyticsAssistance,
+  ParticipationTimeSession,
+  Registration,
+  RegistrationIntervalDay,
 } from "@/types";
 import { FOOD_PREFERENCES, TRANSLATION_LANGUAGES } from "@/lib/registration-options";
 import type { AnalyticsDistributionRow } from "@/lib/event-analytics-export";
@@ -52,15 +56,15 @@ export function mapApiDashboardAnalytics(raw: Record<string, unknown>): Dashboar
 
   return {
     events: {
-      total: Number(events.total ?? 0),
+      total: Number(events.total_count ?? events.total ?? 0),
       byStatus: mapCountRecord(events.by_status),
     },
     registrations: {
-      total: Number(registrations.total ?? 0),
+      total: Number(registrations.total_count ?? registrations.total ?? 0),
       byStatus: mapCountRecord(registrations.by_status),
     },
     users: {
-      total: Number(users.total ?? 0),
+      total: Number(users.total_count ?? users.total ?? 0),
       byRole: mapCountRecord(users.by_role),
     },
     topEventsByRegistrations: topEvents.map((item) => {
@@ -73,8 +77,8 @@ export function mapApiDashboardAnalytics(raw: Record<string, unknown>): Dashboar
       };
     }),
     viewers: {
-      totalSessions: Number(viewers.total_sessions ?? 0),
-      currentlyWatching: Number(viewers.currently_watching ?? 0),
+      totalSessions: Number(viewers.total_sessions_count ?? viewers.total_sessions ?? 0),
+      currentlyWatching: Number(viewers.currently_watching_count ?? viewers.currently_watching ?? 0),
     },
   };
 }
@@ -189,12 +193,56 @@ function mapAssistanceCategory(
   return result;
 }
 
+export function mapApiParticipationTimeSessions(raw: unknown): ParticipationTimeSession[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((item, index) => {
+    const row = item as Record<string, unknown>;
+    const loggedOut = row.logged_out_at;
+    return {
+      id: String(row.id ?? `participation-time-${index}`),
+      userName: String(row.user_name ?? "Guest"),
+      email: row.email ? String(row.email) : undefined,
+      loggedInAt: String(row.logged_in_at ?? ""),
+      loggedOutAt:
+        loggedOut == null || loggedOut === "" ? null : String(loggedOut),
+      durationSeconds: Number(row.duration_seconds ?? 0),
+    };
+  });
+}
+
+export function mapApiRegistrationIntervalsByDay(raw: unknown): RegistrationIntervalDay[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      const bucketsRaw = Array.isArray(row.buckets) ? row.buckets : [];
+      const buckets = bucketsRaw.map((bucketItem) => {
+        const b = bucketItem as Record<string, unknown>;
+        return {
+          bucketStart: String(b.bucket_start ?? b.start ?? ""),
+          count: Number(b.count ?? 0),
+        };
+      });
+
+      return {
+        date: String(row.date ?? ""),
+        intervalMinutes: Number(row.interval_minutes ?? 15),
+        buckets,
+      };
+    })
+    .filter((day) => day.date && day.buckets.length > 0);
+}
+
 export function mapApiEventAnalytics(raw: Record<string, unknown>): EventAnalytics {
   const event = (raw.event ?? {}) as Record<string, unknown>;
   const registrations = (raw.registrations ?? {}) as Record<string, unknown>;
   const assistance = (raw.assistance_requests ?? {}) as Record<string, unknown>;
   const streaming = (raw.streaming ?? {}) as Record<string, unknown>;
   const participationDates = Array.isArray(raw.participation_dates) ? raw.participation_dates : [];
+  const days = Array.isArray(raw.days) ? raw.days : [];
+  const sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
 
   return {
     event: {
@@ -203,7 +251,7 @@ export function mapApiEventAnalytics(raw: Record<string, unknown>): EventAnalyti
       status: String(event.status ?? ""),
     },
     registrations: {
-      total: Number(registrations.total ?? 0),
+      total: Number(registrations.total_count ?? registrations.total ?? 0),
       byStatus: mapCountRecord(registrations.by_status),
       byAttendanceMode: mapCountRecord(registrations.by_attendance_mode),
       byFoodPreference: mapCountRecord(registrations.by_food_preference),
@@ -216,6 +264,27 @@ export function mapApiEventAnalytics(raw: Record<string, unknown>): EventAnalyti
         count: Number(row.count ?? 0),
       };
     }),
+    days: days.map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        id: String(row.session__day__id ?? row.day_id ?? ""),
+        date: String(row.session__day__date ?? row.date ?? ""),
+        registrationsCount: Number(row.registrations_count ?? 0),
+        sessionsCount: Number(row.sessions_count ?? 0),
+        byAttendanceMode: row.by_attendance_mode
+          ? mapCountRecord(row.by_attendance_mode)
+          : undefined,
+      };
+    }),
+    sessions: sessions.map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        id: String(row.session__id ?? row.id ?? ""),
+        title: String(row.session__title ?? row.title ?? "Untitled Session"),
+        dayDate: String(row.session__day__date ?? row.date ?? ""),
+        registrationsCount: Number(row.registrations_count ?? 0),
+      };
+    }),
     assistanceRequests: {
       travel: mapAssistanceCategory(assistance.travel, "by_transport_mode"),
       medical: mapAssistanceCategory(assistance.medical),
@@ -223,16 +292,18 @@ export function mapApiEventAnalytics(raw: Record<string, unknown>): EventAnalyti
       accommodation: mapAssistanceCategory(assistance.accommodation),
     },
     streaming: {
-      broadcastSessions: Number(streaming.broadcast_sessions ?? 0),
+      broadcastSessions: Number(streaming.broadcast_sessions_count ?? streaming.broadcast_sessions ?? 0),
       primaryBroadcastActive: Boolean(streaming.primary_broadcast_active),
-      totalViewerSessions: Number(streaming.total_viewer_sessions ?? 0),
-      uniqueViewers: Number(streaming.unique_viewers ?? 0),
-      currentlyWatching: Number(streaming.currently_watching ?? 0),
+      totalViewerSessions: Number(streaming.total_viewer_sessions_count ?? streaming.total_viewer_sessions ?? 0),
+      uniqueViewers: Number(streaming.unique_viewers_count ?? streaming.unique_viewers ?? 0),
+      currentlyWatching: Number(streaming.currently_watching_count ?? streaming.currently_watching ?? 0),
       avgWatchDurationSeconds: Number(streaming.avg_watch_duration_seconds ?? 0),
       totalWatchTimeSeconds: Number(streaming.total_watch_time_seconds ?? 0),
-      peakConcurrentViewers: Number(streaming.peak_concurrent_viewers ?? 0),
-      logins: Number(streaming.logins ?? 0),
+      peakConcurrentViewers: Number(streaming.peak_concurrent_viewers_count ?? streaming.peak_concurrent_viewers ?? 0),
+      logins: Number(streaming.logins_count ?? streaming.logins ?? 0),
     },
+    participationTimeSessions: mapApiParticipationTimeSessions(raw.participation_time),
+    registrationIntervalsByDay: mapApiRegistrationIntervalsByDay(raw.registration_intervals_by_day),
   };
 }
 
@@ -280,6 +351,28 @@ export function buildLanguageDistribution(
   return buildDistributionFromRecord(byLanguage, LANGUAGE_LABELS);
 }
 
+export function registrationMatchesEventDate(
+  registration: Registration,
+  isoDate: string,
+): boolean {
+  if (registration.days?.some((day) => day.date === isoDate)) return true;
+  if (registration.sessionRegistrations?.some((session) => session.date === isoDate)) {
+    return true;
+  }
+  const formatted = formatEventDayDateLabel(isoDate);
+  const label = registration.participationDateLabel ?? "";
+  if (label.includes(isoDate) || label.includes(formatted)) return true;
+  return false;
+}
+
+export function filterRegistrationsByEventDate(
+  registrations: Registration[],
+  isoDate: string | null,
+): Registration[] {
+  if (!isoDate || isoDate === "all") return registrations;
+  return registrations.filter((registration) => registrationMatchesEventDate(registration, isoDate));
+}
+
 export function buildParticipationDateTrend(
   dates: { date: string; count: number }[],
 ): DistributionDataPoint[] {
@@ -297,12 +390,124 @@ export function buildParticipationDateTrend(
     }));
 }
 
+export function buildParticipationDatesFromEventDays(
+  days: { date: string; registrationsCount: number }[],
+): DistributionDataPoint[] {
+  return days
+    .filter((item) => item.registrationsCount > 0)
+    .map((item) => ({
+      name: item.date ? formatEventDayDateLabel(item.date) : "Unknown",
+      value: item.registrationsCount,
+    }));
+}
+
+export interface AttendanceDayModeTableRow {
+  isoDate: string;
+  dateLabel: string;
+  physical: number;
+  virtual: number;
+  total: number;
+}
+
+export function buildAttendanceDayModeRows(
+  days: {
+    date: string;
+    registrationsCount: number;
+    byAttendanceMode?: Record<string, number>;
+  }[],
+): AttendanceDayModeTableRow[] {
+  return [...days]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((day) => {
+      const physical = day.byAttendanceMode?.PHYSICAL ?? 0;
+      const virtual = day.byAttendanceMode?.VIRTUAL ?? 0;
+      const modeSum = physical + virtual;
+      const total = modeSum > 0 ? modeSum : day.registrationsCount;
+      return {
+        isoDate: day.date,
+        dateLabel: day.date ? formatEventDayDateLabel(day.date) : "Unknown",
+        physical,
+        virtual,
+        total,
+      };
+    });
+}
+
+export function buildDayTrend(
+  days: { date: string; registrationsCount: number }[],
+): DistributionDataPoint[] {
+  const formatter = new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+
+  return days.map((item) => ({
+    name: item.date ? formatter.format(new Date(item.date)) : "Unknown",
+    value: item.registrationsCount,
+  }));
+}
+
+export function buildSessionParticipationTrend(
+  days: { date: string; sessionsCount: number }[],
+): DistributionDataPoint[] {
+  const formatter = new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+
+  return days.map((item) => ({
+    name: item.date ? formatter.format(new Date(item.date)) : "Unknown",
+    value: item.sessionsCount,
+  }));
+}
+
+const INTERVAL_TIME_FORMATTER = new Intl.DateTimeFormat("en-IN", {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+export function formatRegistrationIntervalLabel(bucketStart: string): string {
+  if (!bucketStart) return "—";
+  const date = new Date(bucketStart);
+  if (Number.isNaN(date.getTime())) return bucketStart;
+  return INTERVAL_TIME_FORMATTER.format(date);
+}
+
+export function buildRegistrationIntervalTrend(
+  day: RegistrationIntervalDay | undefined,
+): DistributionDataPoint[] {
+  if (!day?.buckets.length) return [];
+
+  return day.buckets.map((bucket) => ({
+    name: formatRegistrationIntervalLabel(bucket.bucketStart),
+    value: bucket.count,
+  }));
+}
+
+export function formatRegistrationIntervalDayLabel(isoDate: string): string {
+  if (!isoDate) return "Unknown";
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(isoDate));
+}
+
 export function formatWatchDuration(seconds: number): string {
   if (seconds <= 0) return "0m";
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+export function formatParticipationDateTime(iso: string): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
 }
 
 export function buildDistributionTableRows(

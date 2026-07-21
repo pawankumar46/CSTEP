@@ -6,11 +6,25 @@ import {
   mapApiEventAnalytics,
 } from "@/lib/analytics-mappers";
 import { extractApiErrorMessage } from "@/lib/auth-mappers";
+import { readPublicEnv } from "@/lib/env";
 import { delay } from "@/lib/utils";
+import {
+  MOCK_ANALYTICS_DASHBOARD_RAW,
+  MOCK_ANALYTICS_EVENT_11_RAW,
+} from "@/mock/analytics-api-fixtures";
 import { mockAnalytics, mockAuditLogs, mockPermissions } from "@/mock/analytics";
 import type { AnalyticsData, AuditLog, DashboardAnalytics, EventAnalytics, Permission } from "@/types";
 
+function useAnalyticsMock(): boolean {
+  return readPublicEnv("NEXT_PUBLIC_ANALYTICS_USE_MOCK") === "true";
+}
+
 export const getDashboardAnalytics = async (): Promise<DashboardAnalytics> => {
+  if (useAnalyticsMock()) {
+    await delay(300);
+    return mapApiDashboardAnalytics(MOCK_ANALYTICS_DASHBOARD_RAW as unknown as Record<string, unknown>);
+  }
+
   try {
     const { data } = await apiClient.get<Record<string, unknown>>("/analytics/dashboard/");
     return mapApiDashboardAnalytics(data);
@@ -20,6 +34,15 @@ export const getDashboardAnalytics = async (): Promise<DashboardAnalytics> => {
 };
 
 export const getEventAnalytics = async (eventId: string): Promise<EventAnalytics> => {
+  if (useAnalyticsMock()) {
+    await delay(300);
+    const raw =
+      eventId === "11" || eventId === String(MOCK_ANALYTICS_EVENT_11_RAW.event.id)
+        ? MOCK_ANALYTICS_EVENT_11_RAW
+        : { ...MOCK_ANALYTICS_EVENT_11_RAW, event: { ...MOCK_ANALYTICS_EVENT_11_RAW.event, id: eventId } };
+    return mapApiEventAnalytics(raw as unknown as Record<string, unknown>);
+  }
+
   try {
     const { data } = await apiClient.get<Record<string, unknown>>(`/analytics/events/${eventId}/`);
     return mapApiEventAnalytics(data);

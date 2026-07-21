@@ -365,6 +365,41 @@ export interface EventAnalyticsParticipationDate {
   count: number;
 }
 
+export interface EventAnalyticsDay {
+  id: string;
+  date: string;
+  registrationsCount: number;
+  sessionsCount: number;
+  byAttendanceMode?: Record<string, number>;
+}
+
+export interface RegistrationIntervalBucket {
+  bucketStart: string;
+  count: number;
+}
+
+export interface RegistrationIntervalDay {
+  date: string;
+  intervalMinutes: number;
+  buckets: RegistrationIntervalBucket[];
+}
+
+export interface EventAnalyticsSession {
+  id: string;
+  title: string;
+  dayDate: string;
+  registrationsCount: number;
+}
+
+export interface ParticipationTimeSession {
+  id: string;
+  userName: string;
+  email?: string;
+  loggedInAt: string;
+  loggedOutAt: string | null;
+  durationSeconds: number;
+}
+
 export interface EventAnalytics {
   event: {
     id: string;
@@ -379,6 +414,8 @@ export interface EventAnalytics {
     byParticipationTime: Record<string, number>;
   };
   participationDates: EventAnalyticsParticipationDate[];
+  days: EventAnalyticsDay[];
+  sessions: EventAnalyticsSession[];
   assistanceRequests: {
     travel: EventAnalyticsAssistance;
     medical: EventAnalyticsAssistance;
@@ -396,6 +433,8 @@ export interface EventAnalytics {
     peakConcurrentViewers: number;
     logins: number;
   };
+  participationTimeSessions: ParticipationTimeSession[];
+  registrationIntervalsByDay: RegistrationIntervalDay[];
 }
 
 export interface TrendDataPoint {

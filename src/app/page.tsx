@@ -5,6 +5,7 @@ import { Calendar, GraduationCap, Layers, Mail, MapPin, Monitor, Wind, FileText,
 import { LandingNavbar } from "@/components/layout/LandingNavbar";
 import { LandingFooter } from "@/components/layout/LandingFooter";
 import { HeroSection } from "@/components/layout/HeroSection";
+import { ConferenceDocumentsSection } from "@/components/layout/ConferenceDocumentsSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useHomeEvent } from "@/hooks/useHomeEvent";
@@ -150,6 +151,8 @@ function AboutSection() {
             )}
           </div>
         </div>
+
+        <ConferenceDocumentsSection />
 
         <div id="contact" className="max-w-2xl mx-auto scroll-mt-24">
           <Card className="shadow-sm">

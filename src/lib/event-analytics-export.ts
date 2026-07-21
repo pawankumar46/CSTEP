@@ -21,3 +21,33 @@ export const ANALYTICS_METRIC_EXPORT_COLUMNS: ExportColumn<AnalyticsMetricRow>[]
   { header: "Metric", value: (row) => row.metric },
   { header: "Value", value: (row) => row.value },
 ];
+
+export interface AttendanceDayModeRow {
+  date: string;
+  physical: number;
+  virtual: number;
+  total: number;
+}
+
+export const ATTENDANCE_DAY_MODE_EXPORT_COLUMNS: ExportColumn<AttendanceDayModeRow>[] = [
+  { header: "Date", value: (row) => row.date },
+  { header: "Physical", value: (row) => row.physical },
+  { header: "Virtual", value: (row) => row.virtual },
+  { header: "Total", value: (row) => row.total },
+];
+
+export interface ParticipationTimeExportRow {
+  userName: string;
+  email: string;
+  loggedIn: string;
+  loggedOut: string;
+  duration: string;
+}
+
+export const PARTICIPATION_TIME_EXPORT_COLUMNS: ExportColumn<ParticipationTimeExportRow>[] = [
+  { header: "User", value: (row) => row.userName },
+  { header: "Email", value: (row) => row.email },
+  { header: "Logged in", value: (row) => row.loggedIn },
+  { header: "Logged out", value: (row) => row.loggedOut },
+  { header: "Duration", value: (row) => row.duration },
+];

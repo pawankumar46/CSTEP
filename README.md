@@ -97,6 +97,7 @@ Create `.env.local` from `.env.example`:
 | `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Google Drive file ID fallback |
 | `NEXT_PUBLIC_STREAM_LEFT_BANNER_URL` | Optional | Left banner image on streaming page |
 | `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right banner image on streaming page |
+| `NEXT_PUBLIC_ANALYTICS_USE_MOCK` | Optional | Set to `true` to load analytics overview from UI fixtures (no Django analytics API) |
 | `NEXT_PUBLIC_BRAND_LOGO_DARK_SRC` | Optional | Dark theme logo path |
 
 `next.config.ts` forwards these into the client bundle at build time. After changing any `NEXT_PUBLIC_*` variable in production, **redeploy** so the build picks them up.
@@ -107,7 +108,8 @@ Create `.env.local` from `.env.example`:
 
 ```
 c-step/
-├── public/                    # Static assets (logos, banner images)
+├── docs/                      # Source PDFs (Concept Note, Agenda); copies served from public/docs/
+├── public/                    # Static assets (logos, banner images, conference PDFs)
 ├── src/
 │   ├── app/                   # Next.js App Router pages & API routes
 │   │   ├── (auth)/            # login, signup, otp, forgot-password, reset-password
@@ -358,8 +360,20 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/analytics/dashboard/` | Platform dashboard analytics (role dashboards) |
-| `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview page) |
+| `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
+| `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
+
+**UI contract (share with backend):** Target request/response shapes for the redesigned overview are defined in `src/lib/analytics-api-contract.ts`. Reference JSON fixtures the UI is built against live in `src/mock/analytics-api-fixtures.ts`. Set `NEXT_PUBLIC_ANALYTICS_USE_MOCK=true` in `.env.local` to preview the overview without waiting for API changes.
+
+Notable fields the overview expects on **`GET /analytics/events/:id/`**:
+
+- Counts use `total_count` (not `total`) on nested objects.
+- `days[]`: `session__day__id`, `session__day__date`, `registrations_count`, `sessions_count`, and **`by_attendance_mode`** per day (for date filter + attendance breakdown).
+- `streaming`: `*_count` suffix keys (`broadcast_sessions_count`, `currently_watching_count`, etc.).
+- **`participation_time[]`** (Live Event Insights): `{ user_name, email?, logged_in_at, logged_out_at, duration_seconds }` per viewer session.
+- **`registration_intervals_by_day[]`** (Participation Trend): per event day, `interval_minutes` (15) and `buckets[]` with `bucket_start` (ISO) and `count` (registrations in that window).
+
+**Attendance Mode analytics** (`/dashboard/analytics/attendance-mode`) still uses `GET /registrations/registration/?event=&attendance_mode=` today; optional future query **`participation_date=YYYY-MM-DD`** is documented in `analytics-api-contract.ts`.
 
 #### Broadcast (via Next proxy) — `broadcast.service.ts`
 
@@ -461,7 +475,9 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-21
 
+- **Home — Concept Note & Event Agenda:** Below **About the Conference**, two cards open PDFs in a modal (inline viewer + **Close** and optional new tab). Files live in `docs/` and are served from `public/docs/` (`icas-2026-concept-note.pdf`, `icas-agenda.pdf`); paths in `src/lib/conference-documents.ts`.
 - **Home hero — mobile layout:** On small screens, the hero image now appears after the upcoming-event line (and registered notice) and **above** the CSTEP badge and conference title; desktop keeps image left of copy.
+- **Analytics overview:** `/dashboard/analytics` uses dashboard + event analytics APIs with collapsible **Trends**, **Registration Insights**, and **Live Event Insights**. Trend cards are compact; **Participation Trend** shows registrations per **15-minute** interval with a day selector (19/20/21 Aug in mock). **Participation time** table for login/logout/duration. **UI-only preview:** set `NEXT_PUBLIC_ANALYTICS_USE_MOCK=true` to use fixtures in `src/mock/analytics-api-fixtures.ts`; BE contract in `src/lib/analytics-api-contract.ts`.
 
 ### 2026-07-19
 

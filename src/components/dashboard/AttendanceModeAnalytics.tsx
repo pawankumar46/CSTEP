@@ -26,10 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { buildRegistrationStatusDistribution } from "@/lib/analytics-mappers";
+import { buildRegistrationStatusDistribution, filterRegistrationsByEventDate } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
 import { ATTENDANCE_MODE_EXPORT_COLUMNS } from "@/lib/registration-export";
-import { getAllEvents } from "@/services/event.service";
+import { formatEventDayDateLabel } from "@/lib/participation-dates";
+import { sortEventDaysByDate } from "@/lib/icas-conference";
+import { getAllEvents, getEventDays, type EventDay } from "@/services/event.service";
 import { getEventRegistrationsPage, getEventRegistrationsByAttendanceMode } from "@/services/registration.service";
 import type { AttendanceMode, Event, Registration, RegistrationStatus } from "@/types";
 
@@ -86,6 +88,9 @@ export function AttendanceModeAnalytics() {
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [attendanceMode, setAttendanceMode] = useState<AttendanceMode | null>(null);
+  const [participationDateFilter, setParticipationDateFilter] = useState<string>("all");
+  const [eventDays, setEventDays] = useState<EventDay[]>([]);
+  const [eventDaysLoading, setEventDaysLoading] = useState(false);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [summaryRegistrations, setSummaryRegistrations] = useState<Registration[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -133,13 +138,82 @@ export function AttendanceModeAnalytics() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedEventId) {
+      setEventDays([]);
+      setParticipationDateFilter("all");
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setEventDaysLoading(true);
+      try {
+        const days = await getEventDays(selectedEventId);
+        if (!cancelled) setEventDays(sortEventDaysByDate(days));
+      } catch {
+        if (!cancelled) setEventDays([]);
+      } finally {
+        if (!cancelled) setEventDaysLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEventId]);
+
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
     [events, selectedEventId],
   );
 
+  const filteredSummaryRegistrations = useMemo(
+    () =>
+      filterRegistrationsByEventDate(
+        summaryRegistrations,
+        participationDateFilter === "all" ? null : participationDateFilter,
+      ),
+    [summaryRegistrations, participationDateFilter],
+  );
+
+  const useClientTablePagination = participationDateFilter !== "all";
+
+  const clientTablePage = useMemo(() => {
+    if (!useClientTablePagination) return registrations;
+
+    const start = (page - 1) * TABLE_PAGE_SIZE;
+    return filteredSummaryRegistrations.slice(start, start + TABLE_PAGE_SIZE);
+  }, [
+    useClientTablePagination,
+    filteredSummaryRegistrations,
+    page,
+    registrations,
+  ]);
+
+  const clientTotalPages = useMemo(() => {
+    if (!useClientTablePagination) return totalPages;
+    return Math.max(1, Math.ceil(filteredSummaryRegistrations.length / TABLE_PAGE_SIZE));
+  }, [useClientTablePagination, filteredSummaryRegistrations.length, totalPages]);
+
+  const displayTotalCount = useClientTablePagination
+    ? filteredSummaryRegistrations.length
+    : totalCount;
+
+  const displayRegistrations = useClientTablePagination ? clientTablePage : registrations;
+
+  const displayHasNext = useClientTablePagination
+    ? page < clientTotalPages
+    : hasNext;
+
+  const displayHasPrevious = useClientTablePagination
+    ? page > 1
+    : hasPrevious;
+
   const loadTablePage = useCallback(async () => {
     if (!selectedEventId || !attendanceMode) return;
+    if (participationDateFilter !== "all") return;
 
     setLoading(true);
     setFetchError(null);
@@ -162,7 +236,7 @@ export function AttendanceModeAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, [selectedEventId, attendanceMode, page]);
+  }, [selectedEventId, attendanceMode, page, participationDateFilter]);
 
   const loadSummary = useCallback(async () => {
     if (!selectedEventId || !attendanceMode) return;
@@ -194,12 +268,19 @@ export function AttendanceModeAnalytics() {
 
   useEffect(() => {
     if (!selectedEventId || !attendanceMode) return;
+    if (participationDateFilter !== "all") return;
     loadTablePage();
-  }, [selectedEventId, attendanceMode, page, loadTablePage]);
+  }, [selectedEventId, attendanceMode, page, participationDateFilter, loadTablePage]);
+
+  useEffect(() => {
+    if (participationDateFilter === "all") return;
+    setPage(1);
+  }, [participationDateFilter]);
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
     setAttendanceMode(null);
+    setParticipationDateFilter("all");
     setPage(1);
     setRegistrations([]);
     setSummaryRegistrations([]);
@@ -209,11 +290,21 @@ export function AttendanceModeAnalytics() {
 
   const handleModeChange = (value: AttendanceMode) => {
     setAttendanceMode(value);
+    setParticipationDateFilter("all");
     setPage(1);
     setFetchError(null);
   };
 
-  const statusCounts = useMemo(() => countByStatus(summaryRegistrations), [summaryRegistrations]);
+  const handleDateFilterChange = (value: string) => {
+    setParticipationDateFilter(value);
+    setPage(1);
+    setFetchError(null);
+  };
+
+  const statusCounts = useMemo(
+    () => countByStatus(filteredSummaryRegistrations),
+    [filteredSummaryRegistrations],
+  );
   const statusChartData = useMemo(
     () =>
       buildRegistrationStatusDistribution({
@@ -295,7 +386,7 @@ export function AttendanceModeAnalytics() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>Select an event and attendance mode to load registrations.</CardDescription>
+          <CardDescription>Select an event, attendance mode, and optional date to load registrations.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {eventsError && (
@@ -304,7 +395,7 @@ export function AttendanceModeAnalytics() {
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="attendance-event">Step 1 — Event</Label>
               {eventsLoading ? (
@@ -359,6 +450,38 @@ export function AttendanceModeAnalytics() {
                 Loads registrations filtered by attendance mode from the API.
               </p>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="attendance-date">Step 3 — Participation date</Label>
+              <Select
+                value={participationDateFilter}
+                onValueChange={handleDateFilterChange}
+                disabled={!selectedEventId || !attendanceMode || eventDaysLoading}
+              >
+                <SelectTrigger id="attendance-date">
+                  <SelectValue
+                    placeholder={
+                      !attendanceMode
+                        ? "Select attendance mode first"
+                        : eventDaysLoading
+                          ? "Loading dates…"
+                          : "All dates"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All dates</SelectItem>
+                  {eventDays.map((day) => (
+                    <SelectItem key={day.id} value={day.date}>
+                      {formatEventDayDateLabel(day.date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Narrow results to delegates registered for a specific event day.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -397,6 +520,11 @@ export function AttendanceModeAnalytics() {
               <ModeIcon className="h-3 w-3" />
               {modeLabel}
             </Badge>
+            {participationDateFilter !== "all" && (
+              <Badge variant="secondary">
+                {formatEventDayDateLabel(participationDateFilter)}
+              </Badge>
+            )}
           </div>
 
           {fetchError && (
@@ -404,7 +532,7 @@ export function AttendanceModeAnalytics() {
           )}
 
           <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <StatCard title="Total Registrations" value={totalCount} icon={UserPlus} />
+            <StatCard title="Total Registrations" value={displayTotalCount} icon={UserPlus} />
             <StatCard title="Accepted" value={statusCounts.accepted ?? 0} icon={UserCheck} />
             <StatCard title="Pending" value={statusCounts.pending ?? 0} icon={Clock} />
             <StatCard title="On Hold" value={statusCounts.on_hold ?? 0} icon={Pause} />
@@ -454,39 +582,43 @@ export function AttendanceModeAnalytics() {
                     {modeLabel} Registrations
                   </CardTitle>
                   <CardDescription>
-                    {totalCount} registration{totalCount === 1 ? "" : "s"} for this event and mode.
+                    {displayTotalCount} registration{displayTotalCount === 1 ? "" : "s"} for this event
+                    {participationDateFilter !== "all"
+                      ? ` on ${formatEventDayDateLabel(participationDateFilter)}`
+                      : ""}{" "}
+                    and mode.
                   </CardDescription>
                 </div>
                 <ExportMenu
                   filename={exportFilename}
                   title={exportTitle}
                   columns={ATTENDANCE_MODE_EXPORT_COLUMNS}
-                  data={summaryRegistrations}
+                  data={filteredSummaryRegistrations}
                   disabled={summaryLoading}
                 />
               </div>
             </CardHeader>
             <CardContent className="px-4 pb-4 pt-0">
-              {loading && registrations.length === 0 && !fetchError ? (
+              {loading && displayRegistrations.length === 0 && !fetchError ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">Loading registrations…</p>
-              ) : registrations.length === 0 && !fetchError ? (
+              ) : displayRegistrations.length === 0 && !fetchError ? (
                 <EmptyState
                   icon={Users}
                   title="No registrations found"
-                  description={`No ${modeLabel.toLowerCase()} registrations for this event yet.`}
+                  description={`No ${modeLabel.toLowerCase()} registrations for this event${participationDateFilter !== "all" ? " on the selected date" : ""} yet.`}
                 />
               ) : (
                 <div className={loading ? "opacity-60 pointer-events-none" : undefined}>
                   <DataTable
                   columns={columns}
-                  data={registrations}
+                  data={displayRegistrations}
                   searchKey="userName"
                   searchPlaceholder="Search by name…"
                   serverPagination={{
                     page,
-                    totalPages,
-                    hasNext,
-                    hasPrevious,
+                    totalPages: clientTotalPages,
+                    hasNext: displayHasNext,
+                    hasPrevious: displayHasPrevious,
                     onPageChange: setPage,
                   }}
                 />

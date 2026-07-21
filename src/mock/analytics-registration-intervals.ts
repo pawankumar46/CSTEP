@@ -1,0 +1,106 @@
+import type { RegistrationIntervalDay } from "@/types";
+
+function bucket(isoDate: string, hour: number, minute: number, count: number) {
+  return {
+    bucketStart: `${isoDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00+05:30`,
+    count,
+  };
+}
+
+/** Demo 15-minute registration buckets for ICAS event days (until BE ships `registration_intervals_by_day`). */
+export const MOCK_REGISTRATION_INTERVALS_BY_DAY: RegistrationIntervalDay[] = [
+  {
+    date: "2026-08-19",
+    intervalMinutes: 15,
+    buckets: Array.from({ length: 36 }, (_, i) => {
+      const h = 9 + Math.floor(i / 4);
+      const m = (i % 4) * 15;
+      const count = h === 10 && m === 30 ? 1 : 0;
+      return bucket("2026-08-19", h, m, count);
+    }),
+  },
+  {
+    date: "2026-08-20",
+    intervalMinutes: 15,
+    buckets: [
+      bucket("2026-08-20", 9, 0, 1),
+      bucket("2026-08-20", 9, 15, 2),
+      bucket("2026-08-20", 9, 30, 3),
+      bucket("2026-08-20", 9, 45, 2),
+      bucket("2026-08-20", 10, 0, 4),
+      bucket("2026-08-20", 10, 15, 5),
+      bucket("2026-08-20", 10, 30, 3),
+      bucket("2026-08-20", 10, 45, 2),
+      bucket("2026-08-20", 11, 0, 2),
+      bucket("2026-08-20", 11, 15, 1),
+      bucket("2026-08-20", 11, 30, 0),
+      bucket("2026-08-20", 11, 45, 1),
+      bucket("2026-08-20", 12, 0, 0),
+      bucket("2026-08-20", 12, 15, 0),
+      bucket("2026-08-20", 12, 30, 0),
+      bucket("2026-08-20", 12, 45, 0),
+      bucket("2026-08-20", 13, 0, 1),
+      bucket("2026-08-20", 13, 15, 2),
+      bucket("2026-08-20", 13, 30, 2),
+      bucket("2026-08-20", 13, 45, 1),
+      bucket("2026-08-20", 14, 0, 3),
+      bucket("2026-08-20", 14, 15, 2),
+      bucket("2026-08-20", 14, 30, 1),
+      bucket("2026-08-20", 14, 45, 0),
+      bucket("2026-08-20", 15, 0, 1),
+      bucket("2026-08-20", 15, 15, 0),
+      bucket("2026-08-20", 15, 30, 0),
+      bucket("2026-08-20", 15, 45, 0),
+      bucket("2026-08-20", 16, 0, 0),
+      bucket("2026-08-20", 16, 15, 0),
+      bucket("2026-08-20", 16, 30, 0),
+      bucket("2026-08-20", 16, 45, 0),
+      bucket("2026-08-20", 17, 0, 0),
+      bucket("2026-08-20", 17, 15, 0),
+      bucket("2026-08-20", 17, 30, 0),
+      bucket("2026-08-20", 17, 45, 0),
+    ],
+  },
+  {
+    date: "2026-08-21",
+    intervalMinutes: 15,
+    buckets: [
+      bucket("2026-08-21", 9, 0, 0),
+      bucket("2026-08-21", 9, 15, 1),
+      bucket("2026-08-21", 9, 30, 2),
+      bucket("2026-08-21", 9, 45, 1),
+      bucket("2026-08-21", 10, 0, 3),
+      bucket("2026-08-21", 10, 15, 4),
+      bucket("2026-08-21", 10, 30, 3),
+      bucket("2026-08-21", 10, 45, 2),
+      bucket("2026-08-21", 11, 0, 2),
+      bucket("2026-08-21", 11, 15, 2),
+      bucket("2026-08-21", 11, 30, 1),
+      bucket("2026-08-21", 11, 45, 1),
+      bucket("2026-08-21", 12, 0, 0),
+      bucket("2026-08-21", 12, 15, 0),
+      bucket("2026-08-21", 12, 30, 0),
+      bucket("2026-08-21", 12, 45, 0),
+      bucket("2026-08-21", 13, 0, 1),
+      bucket("2026-08-21", 13, 15, 2),
+      bucket("2026-08-21", 13, 30, 2),
+      bucket("2026-08-21", 13, 45, 1),
+      bucket("2026-08-21", 14, 0, 2),
+      bucket("2026-08-21", 14, 15, 1),
+      bucket("2026-08-21", 14, 30, 1),
+      bucket("2026-08-21", 14, 45, 0),
+      bucket("2026-08-21", 15, 0, 0),
+      bucket("2026-08-21", 15, 15, 0),
+      bucket("2026-08-21", 15, 30, 0),
+      bucket("2026-08-21", 15, 45, 0),
+      bucket("2026-08-21", 16, 0, 0),
+      bucket("2026-08-21", 16, 15, 0),
+      bucket("2026-08-21", 16, 30, 0),
+      bucket("2026-08-21", 16, 45, 0),
+      bucket("2026-08-21", 17, 0, 0),
+      bucket("2026-08-21", 17, 15, 0),
+      bucket("2026-08-21", 17, 30, 0),
+      bucket("2026-08-21", 17, 45, 0),
+    ],
+  },
+];

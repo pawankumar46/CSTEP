@@ -28,6 +28,8 @@ export function readPublicEnv(name: string): string | undefined {
       return trimEnv(process.env.NEXT_PUBLIC_STREAM_LEFT_BANNER_URL);
     case "NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL":
       return trimEnv(process.env.NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL);
+    case "NEXT_PUBLIC_ANALYTICS_USE_MOCK":
+      return trimEnv(process.env.NEXT_PUBLIC_ANALYTICS_USE_MOCK);
     case "VERCEL_URL":
       return trimEnv(process.env.VERCEL_URL);
     default:
