@@ -231,6 +231,18 @@ function LoginForm() {
 
             <TabsContent value="phone" className="mt-0">
               <form onSubmit={handlePhoneSubmit(onVerifyPhoneOtp)} className="space-y-4">
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-200">
+                  <span className="font-semibold">International users:</span> Phone OTP is not
+                  supported outside India. Please use{" "}
+                  <button
+                    type="button"
+                    className="font-semibold text-primary underline underline-offset-2 hover:opacity-90"
+                    onClick={() => setMethod("email")}
+                  >
+                    Login
+                  </button>{" "}
+                  instead.
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone-login">Mobile Number</Label>
                   <div className="flex items-center rounded-md border border-input bg-transparent shadow-sm focus-within:ring-2 focus-within:ring-ring">

@@ -473,6 +473,10 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-22
+
+- **Login — Phone OTP note:** On the Phone OTP tab: “International users: Phone OTP is not supported outside India. Please use Email Registration/Login instead.”
+
 ### 2026-07-21
 
 - **Home — Concept Note & Event Agenda:** Below **About the Conference**, two cards open PDFs in a modal (inline viewer + **Close** and optional new tab). Files live in `docs/` and are served from `public/docs/` (`icas-2026-concept-note.pdf`, `icas-agenda.pdf`); paths in `src/lib/conference-documents.ts`.
