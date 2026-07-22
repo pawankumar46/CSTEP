@@ -34,7 +34,7 @@ import {
   type LobbyUserRegistrationFormValues,
   type LobbyUserSignupFormValues,
 } from "@/features/dashboard/admin-lobby-user.schema";
-import { SIGNUP_ORG_TYPES } from "@/features/auth/signup.schema";
+import { SIGNUP_GENDERS, SIGNUP_ORG_TYPES } from "@/features/auth/signup.schema";
 import {
   buildParticipationDateOptionsFromEventDays,
   formatEventDayDateLabel,
@@ -407,6 +407,7 @@ export function AddLobbyUsersDialog({
         "lastName",
         "phone",
         "email",
+        "gender",
         "designation",
         "orgType",
         "orgName",
@@ -431,6 +432,7 @@ export function AddLobbyUsersDialog({
         lastName: signupValues.lastName,
         phone: signupValues.phone,
         email: signupValues.email,
+        gender: signupValues.gender,
         designation: signupValues.designation,
         orgType: signupValues.orgType,
         orgName: signupValues.orgName,
@@ -643,6 +645,36 @@ export function AddLobbyUsersDialog({
                     <p className="text-xs text-destructive">{errors.email.message}</p>
                   )}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>
+                  Gender <RequiredMark />
+                </Label>
+                <Controller
+                  name="gender"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || undefined}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger id="lobby-gender">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SIGNUP_GENDERS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.gender && (
+                  <p className="text-xs text-destructive">{errors.gender.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">

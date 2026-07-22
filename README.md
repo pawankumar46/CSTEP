@@ -289,7 +289,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/sign_up/` | User registration (`role: BASE_USER`, `designation`, `org_type` ORGANISATION/INDEPENDENT, `org_name`, `motivation`, `city`, `state`, profile fields) |
+| `POST` | `/auth/sign_up/` | User registration (`role: BASE_USER`, `gender`, `designation`, `org_type` ORGANISATION/INDEPENDENT, `org_name`, `motivation`, `city`, `state`, profile fields) |
 | `POST` | `/auth/login/` | Login → access + refresh tokens |
 | `POST` | `/auth/verify-otp/` | OTP verification (`{ email, otp }` or `{ phone_number, otp }`) |
 | `POST` | `/auth/resend-otp/` | Resend OTP (`{ "email": "..." }` or `{ "phone_number": "..." }`) |
@@ -475,6 +475,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-22
 
+- **Signup — gender:** Public signup and Lobby Add Users collect required **Gender** (`MALE` / `FEMALE` / `OTHER`), sent as `gender` on `POST /auth/sign_up/` and `POST /auth/users/`.
 - **Login — Phone OTP note:** On the Phone OTP tab: “International users: Phone OTP is not supported outside India. Please use Email Registration/Login instead.”
 
 ### 2026-07-21

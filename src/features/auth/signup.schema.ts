@@ -7,6 +7,14 @@ export const SIGNUP_ORG_TYPES = [
 
 export type SignupOrgTypeValue = (typeof SIGNUP_ORG_TYPES)[number]["value"];
 
+export const SIGNUP_GENDERS = [
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
+export type SignupGenderValue = (typeof SIGNUP_GENDERS)[number]["value"];
+
 const requiredText = (message: string) =>
   z.string().trim().min(1, message);
 
@@ -47,6 +55,9 @@ export const signupBaseFields = {
     .string()
     .min(1, "Email is required")
     .email("Valid email is required"),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"], {
+    message: "Gender is required",
+  }),
   designation: requiredText("Designation is required"),
   orgType: signupOrgTypeEnum,
   orgName: z.string().trim().optional(),
@@ -92,6 +103,7 @@ export const EMPTY_PUBLIC_SIGNUP: PublicSignupFormValues = {
   lastName: "",
   phone: "",
   email: "",
+  gender: "" as PublicSignupFormValues["gender"],
   designation: "",
   orgType: "INDEPENDENT",
   orgName: "",

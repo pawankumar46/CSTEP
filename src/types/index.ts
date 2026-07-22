@@ -586,6 +586,7 @@ export interface SignupAddress {
 }
 
 export type SignupOrgType = "ORGANISATION" | "INDEPENDENT";
+export type SignupGender = "MALE" | "FEMALE" | "OTHER";
 
 export interface SignupCredentials {
   salutation: string;
@@ -594,6 +595,7 @@ export interface SignupCredentials {
   lastName: string;
   phone: string;
   email: string;
+  gender: SignupGender;
   designation: string;
   orgType: SignupOrgType;
   orgName?: string;

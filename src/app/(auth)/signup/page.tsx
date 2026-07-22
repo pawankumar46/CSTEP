@@ -19,6 +19,7 @@ import {
   EMPTY_PUBLIC_SIGNUP,
   publicSignupSchema,
   SIGNUP_ORG_TYPES,
+  SIGNUP_GENDERS,
   type PublicSignupFormValues,
 } from "@/features/auth/signup.schema";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -58,6 +59,7 @@ function SignupForm() {
         lastName: data.lastName,
         phone: data.phone,
         email: data.email,
+        gender: data.gender,
         designation: data.designation,
         orgType: data.orgType,
         orgName: data.orgName,
@@ -210,6 +212,36 @@ function SignupForm() {
                   <p className="text-xs text-destructive">{errors.email.message}</p>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                Gender <RequiredMark />
+              </Label>
+              <Controller
+                name="gender"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || undefined}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SIGNUP_GENDERS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.gender && (
+                <p className="text-xs text-destructive">{errors.gender.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
