@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { EventAnalyticsOverview } from "@/components/dashboard/EventAnalyticsOverview";
+import { AnalyticsUnderDevelopment } from "@/components/dashboard/AnalyticsUnderDevelopment";
 
 export default function AnalyticsPage() {
   return (
@@ -14,7 +14,7 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        <EventAnalyticsOverview />
+        <AnalyticsUnderDevelopment />
       </div>
     </RouteGuard>
   );

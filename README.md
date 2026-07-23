@@ -473,10 +473,14 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-07-23
+
+- **Analytics — under development:** Overview and Attendance Mode analytics pages show a placeholder (“Under development… will be available shortly”) instead of loading live API data.
+
 ### 2026-07-22
 
+- **Login — Phone OTP default:** Sign-in opens on **Phone OTP**; users can switch to **UserId/Password**. International users are directed to UserId/Password (OTP not supported outside India).
 - **Signup — gender:** Public signup and Lobby Add Users collect required **Gender** (`MALE` / `FEMALE` / `OTHER`), sent as `gender` on `POST /auth/sign_up/` and `POST /auth/users/`.
-- **Login — Phone OTP note:** On the Phone OTP tab: “International users: Phone OTP is not supported outside India. Please use Email Registration/Login instead.”
 
 ### 2026-07-21
 

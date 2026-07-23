@@ -23,7 +23,7 @@ import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
 const loginSchema = z.object({
-  identifier: z.string().min(1, "Email is required"),
+  identifier: z.string().min(1, "User ID is required"),
   password: z.string().min(1, "Password is required"),
   rememberMe: z.boolean().optional(),
 });
@@ -42,7 +42,7 @@ function LoginForm() {
   const redirectTo = searchParams.get("redirect");
   const verified = searchParams.get("verified") === "1";
   const prefilledEmail = searchParams.get("email") ?? "";
-  const [method, setMethod] = useState<LoginMethod>("email");
+  const [method, setMethod] = useState<LoginMethod>("phone");
   const [phoneOtp, setPhoneOtp] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [phoneMessage, setPhoneMessage] = useState<string | null>(null);
@@ -183,8 +183,8 @@ function LoginForm() {
             )}
 
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="email">Email</TabsTrigger>
               <TabsTrigger value="phone">Phone OTP</TabsTrigger>
+              <TabsTrigger value="email">UserId/Password</TabsTrigger>
             </TabsList>
 
             {(error || localError) && (
@@ -198,37 +198,6 @@ function LoginForm() {
               </div>
             )}
 
-            <TabsContent value="email" className="mt-0">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="identifier">Email</Label>
-                  <Input id="identifier" type="email" placeholder="you@example.com" {...register("identifier")} />
-                  {errors.identifier && <p className="text-xs text-destructive">{errors.identifier.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <PasswordInput id="password" placeholder="••••••••" {...register("password")} />
-                  {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="rememberMe"
-                      onCheckedChange={(checked) => setValue("rememberMe", !!checked)}
-                    />
-                    <Label htmlFor="rememberMe" className="text-sm font-normal">Remember me</Label>
-                  </div>
-                  <Link href="/forgot-password" className="text-sm text-primary hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {isLoading ? "Signing in..." : "Sign In"}
-                </Button>
-              </form>
-            </TabsContent>
-
             <TabsContent value="phone" className="mt-0">
               <form onSubmit={handlePhoneSubmit(onVerifyPhoneOtp)} className="space-y-4">
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-200">
@@ -239,7 +208,7 @@ function LoginForm() {
                     className="font-semibold text-primary underline underline-offset-2 hover:opacity-90"
                     onClick={() => setMethod("email")}
                   >
-                    Login
+                    UserId/Password
                   </button>{" "}
                   instead.
                 </div>
@@ -278,6 +247,37 @@ function LoginForm() {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={isLoading || phoneOtp.length !== 6}>
+                  {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isLoading ? "Signing in..." : "Sign In"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="email" className="mt-0">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="identifier">User ID</Label>
+                  <Input id="identifier" type="email" placeholder="you@example.com" {...register("identifier")} />
+                  {errors.identifier && <p className="text-xs text-destructive">{errors.identifier.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <PasswordInput id="password" placeholder="••••••••" {...register("password")} />
+                  {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="rememberMe"
+                      onCheckedChange={(checked) => setValue("rememberMe", !!checked)}
+                    />
+                    <Label htmlFor="rememberMe" className="text-sm font-normal">Remember me</Label>
+                  </div>
+                  <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>

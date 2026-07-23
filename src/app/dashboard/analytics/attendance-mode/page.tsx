@@ -1,7 +1,7 @@
 "use client";
 
-import { AttendanceModeAnalytics } from "@/components/dashboard/AttendanceModeAnalytics";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { AnalyticsUnderDevelopment } from "@/components/dashboard/AnalyticsUnderDevelopment";
 
 export default function AttendanceModeAnalyticsPage() {
   return (
@@ -14,7 +14,7 @@ export default function AttendanceModeAnalyticsPage() {
           </p>
         </div>
 
-        <AttendanceModeAnalytics />
+        <AnalyticsUnderDevelopment />
       </div>
     </RouteGuard>
   );
