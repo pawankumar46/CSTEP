@@ -11,5 +11,6 @@ export const assistanceStatusVariant: Record<
 };
 
 export function formatAssistanceStatus(status: AssistanceRequestStatus): string {
+  if (status === "on_hold") return "Hold";
   return status.replace("_", " ");
 }

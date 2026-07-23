@@ -294,7 +294,11 @@ export function VideoPlayer({
       ref={containerRef}
       className={cn(
         "relative w-full bg-black overflow-hidden group transition-all duration-300 ease-in-out",
-        fill ? "h-full min-h-0" : viewMode === "theater" ? THEATER_PLAYER_CLASS : "aspect-video rounded-xl",
+        fill
+          ? "absolute inset-0 h-full w-full min-h-0"
+          : viewMode === "theater"
+            ? THEATER_PLAYER_CLASS
+            : "aspect-video min-h-[12.5rem] rounded-xl",
         className,
       )}
     >
@@ -309,7 +313,7 @@ export function VideoPlayer({
             ref={videoRef}
             key={`${source?.type}-${playbackUrl}-${reloadKey}`}
             src={isHlsStream ? undefined : playbackUrl}
-            className="absolute inset-0 h-full w-full object-cover bg-black"
+            className="absolute inset-0 h-full w-full object-contain bg-black"
             autoPlay
             playsInline
             controls={false}
@@ -433,10 +437,11 @@ export function VideoPlayer({
         <div
           className={cn(
             "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",
-            playbackError ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity",
+            playbackError
+              ? "opacity-100"
+              : "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:transition-opacity",
           )}
-        >
-          <div className="flex items-center justify-between gap-4">
+        >          <div className="flex items-center justify-between gap-4">
             <p className="text-white text-sm font-medium truncate">{title}</p>
             <div className="flex items-center gap-1 shrink-0">
               {usesVideo && !playbackError && (

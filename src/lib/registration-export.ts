@@ -1,7 +1,14 @@
 import type { ExportColumn } from "@/lib/export-utils";
 import { formatParticipationDateDisplay } from "@/lib/registration-mappers";
 import { getRegistrationOptionLabel } from "@/lib/registration-options";
-import type { Registration, AccommodationAssistanceRow, MedicalAssistanceRow, TranslationAssistanceRow, TravelAssistanceRow } from "@/types";
+import type {
+  Registration,
+  AccommodationAssistanceRow,
+  AttendanceModeUserRow,
+  MedicalAssistanceRow,
+  TranslationAssistanceRow,
+  TravelAssistanceRow,
+} from "@/types";
 
 function formatParticipationTime(value: Registration["participationTime"]): string {
   return value === "full_day" ? "Full Day" : "Half Day";
@@ -33,6 +40,24 @@ export const ATTENDANCE_MODE_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
     value: (row) => row.participationDateLabel ?? row.participationDate,
   },
   { header: "Participation Time", value: (row) => formatParticipationTime(row.participationTime) },
+  { header: "Status", value: (row) => formatStatus(row.status) },
+];
+
+export const ATTENDANCE_MODE_USERS_EXPORT_COLUMNS: ExportColumn<AttendanceModeUserRow>[] = [
+  { header: "User Name", value: (row) => row.userName },
+  { header: "Phone", value: (row) => row.phone },
+  { header: "Email", value: (row) => row.email },
+  { header: "Designation", value: (row) => row.designation },
+  { header: "Organization", value: (row) => row.orgName },
+  { header: "City", value: (row) => row.city },
+  { header: "State", value: (row) => row.state },
+  {
+    header: "Days",
+    value: (row) =>
+      row.days
+        .map((day) => `${day.date} (${day.attendanceMode === "virtual" ? "Virtual" : "Physical"})`)
+        .join("; "),
+  },
   { header: "Status", value: (row) => formatStatus(row.status) },
 ];
 

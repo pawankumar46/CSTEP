@@ -65,7 +65,7 @@ export function ModeratorDashboard() {
         <StatCard title="Event Participants" value={summary.eventParticipants} icon={UserPlus} />
         <StatCard title="Accepted" value={summary.accepted} icon={UserCheck} />
         <StatCard title="Pending" value={summary.pending} icon={Clock} />
-        <StatCard title="On Hold" value={summary.onHold} icon={Pause} />
+        <StatCard title="Hold" value={summary.onHold} icon={Pause} />
         <StatCard title="Rejected" value={summary.rejected} icon={UserX} />
       </div>
 

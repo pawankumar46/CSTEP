@@ -7,7 +7,25 @@ import type {
   EventAnalyticsAssistance,
   ParticipationTimeSession,
   Registration,
+  RegistrationCounts,
+  RegistrationInsights,
+  RegistrationIntervalBucket,
   RegistrationIntervalDay,
+  RegistrationTrend,
+  RegistrationAttendanceInsights,
+  RegistrationDemographics,
+  StreamingSummary,
+  StreamingParticipationMode,
+  StreamingParticipationTrend,
+  DemographicShareRow,
+  AttendanceModeInsightName,
+  AttendanceModeInsightSlice,
+  AttendanceModeByDateInsight,
+  AttendanceMode,
+  AttendanceModeUserDay,
+  AttendanceModeUserRow,
+  AttendanceModeUsersPage,
+  RegistrationStatus,
 } from "@/types";
 import { FOOD_PREFERENCES, TRANSLATION_LANGUAGES } from "@/lib/registration-options";
 import type { AnalyticsDistributionRow } from "@/lib/event-analytics-export";
@@ -15,7 +33,7 @@ import type { AnalyticsDistributionRow } from "@/lib/event-analytics-export";
 const REGISTRATION_STATUS_CHART: { key: string; name: string; color: string }[] = [
   { key: "ACCEPTED", name: "Accepted", color: "#22c55e" },
   { key: "PENDING", name: "Pending", color: "#3b82f6" },
-  { key: "HELD", name: "On Hold", color: "#f59e0b" },
+  { key: "HOLD", name: "Hold", color: "#f59e0b" },
   { key: "REJECTED", name: "Rejected", color: "#ef4444" },
 ];
 
@@ -91,7 +109,7 @@ export function buildSummaryFromDashboard(dashboard: DashboardAnalytics): Analyt
     eventParticipants: dashboard.registrations.total,
     accepted: byStatus.ACCEPTED ?? 0,
     rejected: byStatus.REJECTED ?? 0,
-    onHold: byStatus.HELD ?? 0,
+    onHold: byStatus.HOLD ?? 0,
     pending: byStatus.PENDING ?? 0,
   };
 }
@@ -100,7 +118,7 @@ export function buildStatusDistribution(summary: AnalyticsSummary): Distribution
   return [
     { name: "Accepted", value: summary.accepted, color: "#22c55e" },
     { name: "Rejected", value: summary.rejected, color: "#ef4444" },
-    { name: "On Hold", value: summary.onHold, color: "#f59e0b" },
+    { name: "Hold", value: summary.onHold, color: "#f59e0b" },
     { name: "Pending", value: summary.pending, color: "#3b82f6" },
   ].filter((item) => item.value > 0);
 }
@@ -235,6 +253,438 @@ export function mapApiRegistrationIntervalsByDay(raw: unknown): RegistrationInte
     .filter((day) => day.date && day.buckets.length > 0);
 }
 
+export function mapApiRegistrationInsights(raw: unknown): RegistrationInsights {
+  const insights = (raw ?? {}) as Record<string, unknown>;
+  const byDayRaw = Array.isArray(insights.by_day_last_7) ? insights.by_day_last_7 : [];
+
+  return {
+    byDayLast7: byDayRaw.map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        date: String(row.date ?? ""),
+        count: Number(row.count ?? 0),
+      };
+    }).filter((row) => row.date),
+    byAttendanceMode: mapCountRecord(insights.by_attendance_mode),
+    byState: mapCountRecord(insights.by_state),
+    byGender: mapCountRecord(insights.by_gender),
+    byDesignation: mapCountRecord(insights.by_designation),
+  };
+}
+
+export function mapApiRegistrationCounts(raw: unknown): RegistrationCounts {
+  const nested =
+    raw && typeof raw === "object" && "data" in (raw as object)
+      ? (raw as { data: unknown }).data
+      : raw;
+  const row = (nested ?? {}) as Record<string, unknown>;
+  return {
+    total: Number(row.total ?? 0),
+    accepted: Number(row.accepted ?? 0),
+    pending: Number(row.pending ?? 0),
+    onHold: Number(row.on_hold ?? row.held ?? row.hold ?? 0),
+    rejected: Number(row.rejected ?? 0),
+  };
+}
+
+export function mapApiRegistrationTrend(raw: unknown): RegistrationTrend {
+  const nested =
+    raw && typeof raw === "object" && "data" in (raw as object) && !("results" in (raw as object))
+      ? (raw as { data: unknown }).data
+      : raw;
+  const row = (nested ?? {}) as Record<string, unknown>;
+  const resultsRaw = Array.isArray(row.results) ? row.results : [];
+
+  return {
+    granularity: String(row.granularity ?? "daily"),
+    results: resultsRaw
+      .map((item) => {
+        const point = item as Record<string, unknown>;
+        const rawDate = String(point.date ?? "");
+        return {
+          date: rawDate.slice(0, 10) || rawDate,
+          count: Number(point.count ?? 0),
+        };
+      })
+      .filter((point) => point.date),
+  };
+}
+
+const ATTENDANCE_MODE_API_ALIASES: Record<string, AttendanceModeInsightName> = {
+  "physical (on-site)": "Physical",
+  physical: "Physical",
+  "virtual (online)": "Virtual",
+  virtual: "Virtual",
+  "mixed (physical + virtual)": "Mixed",
+  mixed: "Mixed",
+};
+
+function normalizeAttendanceModeName(raw: string): AttendanceModeInsightName | null {
+  const key = raw.trim().toLowerCase();
+  if (key === "total" || key === "hybrid" || key.includes("recorded")) return null;
+  return ATTENDANCE_MODE_API_ALIASES[key] ?? null;
+}
+
+export function mapApiRegistrationAttendanceInsights(raw: unknown): RegistrationAttendanceInsights {
+  const nested =
+    raw && typeof raw === "object" && "data" in (raw as object) && !("attendance_mode" in (raw as object))
+      ? (raw as { data: unknown }).data
+      : raw;
+  const row = (nested ?? {}) as Record<string, unknown>;
+  const modeRows = Array.isArray(row.attendance_mode) ? row.attendance_mode : [];
+  const byDateRows = Array.isArray(row.attendance_mode_by_date) ? row.attendance_mode_by_date : [];
+
+  const attendanceMode: AttendanceModeInsightSlice[] = [];
+  for (const item of modeRows) {
+    const modeRow = item as Record<string, unknown>;
+    const name = normalizeAttendanceModeName(String(modeRow.mode ?? ""));
+    if (!name) continue;
+    attendanceMode.push({
+      name,
+      count: Number(modeRow.count ?? 0),
+      share: modeRow.share != null ? Number(modeRow.share) : undefined,
+    });
+  }
+
+  const order: AttendanceModeInsightName[] = ["Physical", "Virtual", "Mixed"];
+  attendanceMode.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
+
+  const attendanceModeByDate: AttendanceModeByDateInsight[] = byDateRows.map((item) => {
+    const day = item as Record<string, unknown>;
+    let physical = 0;
+    let virtual = 0;
+    let mixed = 0;
+
+    for (const [key, value] of Object.entries(day)) {
+      if (key === "date" || key === "total") continue;
+      const name = normalizeAttendanceModeName(key);
+      const count = Number(value ?? 0);
+      if (name === "Physical") physical = count;
+      if (name === "Virtual") virtual = count;
+      if (name === "Mixed") mixed = count;
+    }
+
+    return {
+      date: String(day.date ?? "").slice(0, 10),
+      total: Number(day.total ?? physical + virtual + mixed),
+      physical,
+      virtual,
+      mixed,
+    };
+  }).filter((day) => day.date);
+
+  return { attendanceMode, attendanceModeByDate };
+}
+
+export function buildAttendanceModeSlicesChart(
+  slices: AttendanceModeInsightSlice[],
+): DistributionDataPoint[] {
+  const colors: Record<AttendanceModeInsightName, string> = {
+    Physical: "#0ea5e9",
+    Virtual: "#8b5cf6",
+    Mixed: "#f59e0b",
+  };
+
+  return slices
+    .filter((item) => item.count > 0)
+    .map((item) => ({
+      name: item.name,
+      value: item.count,
+      color: colors[item.name],
+    }));
+}
+
+export function buildAttendanceModeByDateChart(
+  day: AttendanceModeByDateInsight | undefined,
+): DistributionDataPoint[] {
+  if (!day) return [];
+  return buildAttendanceModeSlicesChart([
+    { name: "Physical", count: day.physical },
+    { name: "Virtual", count: day.virtual },
+    { name: "Mixed", count: day.mixed },
+  ]);
+}
+
+function mapDemographicShareRows(raw: unknown): DemographicShareRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        label: String(row.label ?? "").trim(),
+        count: Number(row.count ?? 0),
+        share: row.share != null ? Number(row.share) : undefined,
+      };
+    })
+    .filter((row) => row.label);
+}
+
+export function mapApiRegistrationDemographics(raw: unknown): RegistrationDemographics {
+  const nested =
+    raw && typeof raw === "object" && "data" in (raw as object) && !("by_gender" in (raw as object))
+      ? (raw as { data: unknown }).data
+      : raw;
+  const row = (nested ?? {}) as Record<string, unknown>;
+  return {
+    total: Number(row.total ?? 0),
+    byGender: mapDemographicShareRows(row.by_gender),
+    byDesignation: mapDemographicShareRows(row.by_designation),
+    byState: mapDemographicShareRows(row.by_state),
+  };
+}
+
+export function mapApiStreamingSummary(raw: unknown): StreamingSummary {
+  const nested =
+    raw && typeof raw === "object" && "data" in (raw as object) && !("currently_watching" in (raw as object))
+      ? (raw as { data: unknown }).data
+      : raw;
+  const row = (nested ?? {}) as Record<string, unknown>;
+  const avgSeconds = Number(row.avg_watch_time_seconds ?? 0);
+  const totalSeconds = Number(row.total_watch_time_seconds ?? 0);
+  return {
+    currentlyWatching: Number(row.currently_watching ?? 0),
+    uniqueViewers: Number(row.unique_viewers ?? 0),
+    broadcastSessions: Number(row.broadcast_sessions ?? 0),
+    peakConcurrentViewers: Number(row.peak_concurrent_viewers ?? 0),
+    avgWatchTimeSeconds: avgSeconds,
+    avgWatchTimeDisplay: String(row.avg_watch_time_display ?? formatWatchDuration(avgSeconds)),
+    totalWatchTimeSeconds: totalSeconds,
+    totalWatchTimeDisplay: String(row.total_watch_time_display ?? formatWatchDuration(totalSeconds)),
+    liveBroadcast: Boolean(row.live_broadcast),
+  };
+}
+
+function normalizeParticipationMode(raw: unknown): StreamingParticipationMode {
+  const value = String(raw ?? "all").trim().toLowerCase();
+  if (value === "physical") return "physical";
+  if (value === "virtual") return "virtual";
+  return "all";
+}
+
+function mapParticipationTrendBuckets(raw: unknown): RegistrationIntervalBucket[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        bucketStart: String(
+          row.bucket_start ?? row.start ?? row.timestamp ?? row.time ?? row.datetime ?? "",
+        ),
+        count: Number(row.count ?? row.value ?? 0),
+      };
+    })
+    .filter((bucket) => bucket.bucketStart);
+}
+
+/** Maps `{ mode, results }` from GET /analytics/streaming/participation-trend/. */
+export function mapApiStreamingParticipationTrend(
+  raw: unknown,
+  fallbacks?: {
+    date?: string;
+    mode?: StreamingParticipationMode;
+    intervalMinutes?: number;
+  },
+): StreamingParticipationTrend {
+  const nested =
+    raw && typeof raw === "object" && "data" in (raw as object) && !("results" in (raw as object))
+      ? (raw as { data: unknown }).data
+      : raw;
+  const row = (nested ?? {}) as Record<string, unknown>;
+  // API shape: { mode, results: [{ bucket_start, count }, ...] }
+  const bucketsRaw = Array.isArray(row.results)
+    ? row.results
+    : Array.isArray(row.buckets)
+      ? row.buckets
+      : [];
+  const buckets = mapParticipationTrendBuckets(bucketsRaw);
+  const dateFromBuckets = buckets[0]?.bucketStart?.slice(0, 10);
+
+  return {
+    date: String(row.date ?? fallbacks?.date ?? dateFromBuckets ?? "").slice(0, 10),
+    mode: normalizeParticipationMode(row.mode ?? fallbacks?.mode),
+    intervalMinutes: Number(row.interval_minutes ?? fallbacks?.intervalMinutes ?? 15),
+    buckets,
+  };
+}
+
+function formatAttendanceUserName(user: Record<string, unknown>): string {
+  const parts = [
+    user.salutation,
+    user.first_name,
+    user.middle_name,
+    user.last_name,
+  ]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean);
+  return parts.join(" ") || "Unknown";
+}
+
+function mapAttendanceUserStatus(value: unknown): RegistrationStatus {
+  const normalized = String(value ?? "PENDING").toUpperCase();
+  if (normalized === "ACCEPTED") return "accepted";
+  if (normalized === "REJECTED") return "rejected";
+  if (normalized === "HOLD" || normalized === "ON_HOLD" || normalized === "HELD") return "on_hold";
+  return "pending";
+}
+
+function mapAttendanceUserDay(raw: unknown): AttendanceModeUserDay | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const mode = String(row.attendance_mode ?? "").toUpperCase();
+  if (mode !== "PHYSICAL" && mode !== "VIRTUAL") return null;
+  const date = String(row.date ?? "").slice(0, 10);
+  if (!date) return null;
+  return {
+    id: String(row.id ?? `${date}-${mode}`),
+    date,
+    attendanceMode: mode === "VIRTUAL" ? "virtual" : "physical",
+  };
+}
+
+export function mapApiAttendanceModeUserRow(raw: unknown): AttendanceModeUserRow {
+  const row = (raw ?? {}) as Record<string, unknown>;
+  const user =
+    row.user && typeof row.user === "object"
+      ? (row.user as Record<string, unknown>)
+      : {};
+  const days = Array.isArray(row.days)
+    ? row.days.map(mapAttendanceUserDay).filter((day): day is AttendanceModeUserDay => day != null)
+    : [];
+
+  return {
+    id: String(row.id ?? ""),
+    userName: formatAttendanceUserName(user),
+    phone: String(user.phone_number ?? ""),
+    email: String(user.email ?? ""),
+    designation: String(user.designation ?? ""),
+    orgName: String(user.org_name ?? ""),
+    city: String(user.city ?? ""),
+    state: String(user.state ?? ""),
+    eventName: String(row.event_name ?? ""),
+    status: mapAttendanceUserStatus(row.status),
+    days,
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+export function mapApiAttendanceModeUsersPage(
+  raw: unknown,
+  fallbacks?: { page?: number; pageSize?: number },
+): AttendanceModeUsersPage {
+  const pageSize = fallbacks?.pageSize ?? 10;
+  if (Array.isArray(raw)) {
+    const rows = raw.map(mapApiAttendanceModeUserRow);
+    return {
+      rows,
+      page: 1,
+      pageSize,
+      total: rows.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+    };
+  }
+
+  const row = (raw ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(row.results) ? row.results : [];
+  const rows = results.map(mapApiAttendanceModeUserRow);
+  const total = Number(row.count ?? rows.length);
+  const totalPages = Number(row.total_pages ?? Math.max(1, Math.ceil(total / pageSize)));
+  const page = Number(row.current_page ?? fallbacks?.page ?? 1);
+
+  return {
+    rows,
+    page,
+    pageSize,
+    total,
+    totalPages,
+    hasNext: Boolean(row.next) || page < totalPages,
+    hasPrevious: Boolean(row.previous) || page > 1,
+  };
+}
+
+export function formatAttendanceModeUserDays(days: AttendanceModeUserDay[]): string {
+  if (days.length === 0) return "—";
+  return days
+    .map((day) => {
+      const label = formatEventDayDateLabel(day.date);
+      const mode = day.attendanceMode === "virtual" ? "Virtual" : "Physical";
+      return `${label} (${mode})`;
+    })
+    .join(", ");
+}
+
+export function buildDemographicDonutChart(
+  rows: DemographicShareRow[],
+): DistributionDataPoint[] {
+  const colors = ["#3b82f6", "#ec4899", "#94a3b8", "#22c55e", "#f59e0b", "#a855f7"];
+  return rows
+    .filter((row) => row.count > 0)
+    .map((row, index) => {
+      const lower = row.label.toLowerCase();
+      let color = colors[index % colors.length];
+      if (lower === "male") color = "#3b82f6";
+      else if (lower === "female") color = "#ec4899";
+      else if (lower.includes("prefer") || lower.includes("not")) color = "#94a3b8";
+      else if (lower === "other") color = "#a855f7";
+      return { name: row.label, value: row.count, color };
+    });
+}
+
+export function buildDemographicBarChart(
+  rows: DemographicShareRow[],
+  topN = 8,
+): DistributionDataPoint[] {
+  const sorted = [...rows]
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  if (sorted.length === 0) return [];
+
+  const top = sorted.slice(0, topN);
+  const othersValue = sorted.slice(topN).reduce((sum, row) => sum + row.count, 0);
+  const palette = ["#3b82f6", "#0ea5e9", "#06b6d4", "#14b8a6", "#22c55e", "#84cc16", "#f59e0b", "#a855f7"];
+
+  const points = top.map((row, index) => ({
+    name: row.label,
+    value: row.count,
+    color: palette[index % palette.length],
+  }));
+
+  if (othersValue > 0) {
+    points.push({ name: "Others", value: othersValue, color: "#94a3b8" });
+  }
+
+  return points;
+}
+
+/** All demographic rows (no “Others” bucket), sorted by count descending. */
+export function buildDemographicBarChartAll(
+  rows: DemographicShareRow[],
+): DistributionDataPoint[] {
+  const sorted = [...rows]
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  const palette = ["#3b82f6", "#0ea5e9", "#06b6d4", "#14b8a6", "#22c55e", "#84cc16", "#f59e0b", "#a855f7"];
+
+  return sorted.map((row, index) => ({
+    name: row.label,
+    value: row.count,
+    color: palette[index % palette.length],
+  }));
+}
+
+function emptyRegistrationInsights(): RegistrationInsights {
+  return {
+    byDayLast7: [],
+    byAttendanceMode: {},
+    byState: {},
+    byGender: {},
+    byDesignation: {},
+  };
+}
+
 export function mapApiEventAnalytics(raw: Record<string, unknown>): EventAnalytics {
   const event = (raw.event ?? {}) as Record<string, unknown>;
   const registrations = (raw.registrations ?? {}) as Record<string, unknown>;
@@ -304,6 +754,9 @@ export function mapApiEventAnalytics(raw: Record<string, unknown>): EventAnalyti
     },
     participationTimeSessions: mapApiParticipationTimeSessions(raw.participation_time),
     registrationIntervalsByDay: mapApiRegistrationIntervalsByDay(raw.registration_intervals_by_day),
+    registrationInsights: raw.registration_insights
+      ? mapApiRegistrationInsights(raw.registration_insights)
+      : emptyRegistrationInsights(),
   };
 }
 
@@ -487,6 +940,172 @@ export function buildRegistrationIntervalTrend(
 export function formatRegistrationIntervalDayLabel(isoDate: string): string {
   if (!isoDate) return "Unknown";
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(isoDate));
+}
+
+function toLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export type RegistrationTrendGranularity = "daily" | "weekly" | "monthly";
+
+export function buildRollingDayRegistrationTrend(
+  days: { date: string; count: number }[],
+  referenceDate: Date = new Date(),
+): DistributionDataPoint[] {
+  const dayFormatter = new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+  const countByDate = new Map(days.map((item) => [item.date, item.count]));
+  const today = new Date(referenceDate);
+  today.setHours(12, 0, 0, 0);
+  const todayIso = toLocalIsoDate(today);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayIso = toLocalIsoDate(yesterday);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const iso = toLocalIsoDate(date);
+    let name = dayFormatter.format(date);
+    if (iso === todayIso) name = "Today";
+    else if (iso === yesterdayIso) name = "Yesterday";
+    return {
+      name,
+      value: countByDate.get(iso) ?? 0,
+    };
+  });
+}
+
+function parseTrendDate(isoDate: string): Date | null {
+  const dateOnly = isoDate.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+    const date = new Date(`${dateOnly}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const parsed = new Date(isoDate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatTrendBucketLabel(
+  isoDate: string,
+  granularity: RegistrationTrendGranularity,
+): string {
+  const date = parseTrendDate(isoDate);
+  if (!date) return isoDate.slice(0, 10) || isoDate;
+
+  if (granularity === "monthly") {
+    return new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric" }).format(date);
+  }
+  if (granularity === "weekly") {
+    return `Week of ${new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date)}`;
+  }
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
+}
+
+/** Build chart points for daily (last 7 days) or weekly/monthly API buckets. */
+export function buildRegistrationTrendChart(
+  results: { date: string; count: number }[],
+  granularity: RegistrationTrendGranularity,
+  referenceDate: Date = new Date(),
+): DistributionDataPoint[] {
+  if (granularity === "daily") {
+    return buildRollingDayRegistrationTrend(results, referenceDate);
+  }
+
+  const limit = granularity === "weekly" ? 8 : 6;
+  const sorted = [...results]
+    .filter((item) => item.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const slice = sorted.slice(-limit);
+
+  return slice.map((item) => ({
+    name: formatTrendBucketLabel(item.date, granularity),
+    value: item.count,
+  }));
+}
+
+const ATTENDANCE_MODE_CHART_LABELS: Record<string, string> = {
+  PHYSICAL: "Physical",
+  VIRTUAL: "Virtual",
+};
+
+const GENDER_CHART_LABELS: Record<string, string> = {
+  MALE: "Male",
+  FEMALE: "Female",
+  OTHER: "Other",
+};
+
+const INSIGHT_CHART_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444", "#06b6d4", "#84cc16"];
+
+export function buildAttendanceModeInsightChart(
+  byMode: Record<string, number>,
+): DistributionDataPoint[] {
+  return (["PHYSICAL", "VIRTUAL"] as const)
+    .map((key, index) => ({
+      name: ATTENDANCE_MODE_CHART_LABELS[key],
+      value: byMode[key] ?? 0,
+      color: INSIGHT_CHART_COLORS[index],
+    }))
+    .filter((item) => item.value > 0);
+}
+
+export function buildGenderInsightChart(
+  byGender: Record<string, number>,
+): DistributionDataPoint[] {
+  return (["MALE", "FEMALE", "OTHER"] as const)
+    .map((key, index) => ({
+      name: GENDER_CHART_LABELS[key],
+      value: byGender[key] ?? 0,
+      color: INSIGHT_CHART_COLORS[index],
+    }))
+    .filter((item) => item.value > 0);
+}
+
+export function buildStateInsightChart(
+  byState: Record<string, number>,
+  topN = 5,
+): DistributionDataPoint[] {
+  const sorted = Object.entries(byState)
+    .map(([name, value]) => ({ name, value: Number(value) || 0 }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  if (sorted.length === 0) return [];
+
+  const top = sorted.slice(0, topN);
+  const othersValue = sorted.slice(topN).reduce((sum, item) => sum + item.value, 0);
+  const rows = top.map((item, index) => ({
+    ...item,
+    color: INSIGHT_CHART_COLORS[index % INSIGHT_CHART_COLORS.length],
+  }));
+
+  if (othersValue > 0) {
+    rows.push({
+      name: "Others",
+      value: othersValue,
+      color: "#94a3b8",
+    });
+  }
+
+  return rows;
+}
+
+export function buildDesignationInsightChart(
+  byDesignation: Record<string, number>,
+): DistributionDataPoint[] {
+  return Object.entries(byDesignation)
+    .map(([name, value], index) => ({
+      name,
+      value: Number(value) || 0,
+      color: INSIGHT_CHART_COLORS[index % INSIGHT_CHART_COLORS.length],
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
 }
 
 export function formatWatchDuration(seconds: number): string {

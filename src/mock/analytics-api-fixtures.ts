@@ -3,6 +3,7 @@ import type {
   ApiAnalyticsEventResponse,
 } from "@/lib/analytics-api-contract";
 import { MOCK_REGISTRATION_INTERVALS_BY_DAY } from "@/mock/analytics-registration-intervals";
+import { MOCK_REGISTRATION_INSIGHTS } from "@/mock/analytics-registration-insights";
 
 /** UI demo / BE reference — matches Analytics Overview screens. */
 export const MOCK_ANALYTICS_DASHBOARD_RAW: ApiAnalyticsDashboardResponse = {
@@ -21,7 +22,7 @@ export const MOCK_ANALYTICS_DASHBOARD_RAW: ApiAnalyticsDashboardResponse = {
     by_status: {
       PENDING: 0,
       ACCEPTED: 32,
-      HELD: 0,
+      HOLD: 0,
       REJECTED: 0,
     },
   },
@@ -59,7 +60,7 @@ export const MOCK_ANALYTICS_EVENT_11_RAW: ApiAnalyticsEventResponse = {
     by_status: {
       PENDING: 0,
       ACCEPTED: 32,
-      HELD: 0,
+      HOLD: 0,
       REJECTED: 0,
     },
     by_attendance_mode: {
@@ -130,4 +131,5 @@ export const MOCK_ANALYTICS_EVENT_11_RAW: ApiAnalyticsEventResponse = {
       count: b.count,
     })),
   })),
+  registration_insights: MOCK_REGISTRATION_INSIGHTS,
 };

@@ -97,7 +97,6 @@ Create `.env.local` from `.env.example`:
 | `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Google Drive file ID fallback |
 | `NEXT_PUBLIC_STREAM_LEFT_BANNER_URL` | Optional | Left banner image on streaming page |
 | `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right banner image on streaming page |
-| `NEXT_PUBLIC_ANALYTICS_USE_MOCK` | Optional | Set to `true` to load analytics overview from UI fixtures (no Django analytics API) |
 | `NEXT_PUBLIC_BRAND_LOGO_DARK_SRC` | Optional | Dark theme logo path |
 
 `next.config.ts` forwards these into the client bundle at build time. After changing any `NEXT_PUBLIC_*` variable in production, **redeploy** so the build picks them up.
@@ -360,10 +359,17 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET` | `/analytics/registrations/counts/` | Overview registration status cards (`event_id` query). Response: `total`, `accepted`, `pending`, `on_hold`, `rejected` (`undecided_mode` ignored in UI) |
+| `GET` | `/analytics/registrations/trend/` | Registrations-by-day chart (`event_id`, `granularity=daily\|weekly\|monthly`). Response: `{ granularity, results: [{ date, count }] }` |
+| `GET` | `/analytics/registrations/insights/` | Attendance donut (`event_id`). Uses `attendance_mode` + `attendance_mode_by_date`; UI shows Physical / Virtual / Mixed only |
+| `GET` | `/analytics/registrations/demographics/` | Gender / state / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_designation` |
+| `GET` | `/analytics/streaming/summary/` | Live Event Insights streaming cards + details (`event_id`). Response: `currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time fields, `live_broadcast` |
+| `GET` | `/analytics/streaming/participation-trend/` | Participation Trend chart (`event_id`, `mode=all\|physical\|virtual`, `interval_minutes=15`, optional `date=YYYY-MM-DD`). Response: `{ mode, results: [{ bucket_start, count }] }` (empty `results` when no activity) |
+| `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`). Paginated `{ count, total_pages, current_page, results[] }` |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
-**UI contract (share with backend):** Target request/response shapes for the redesigned overview are defined in `src/lib/analytics-api-contract.ts`. Reference JSON fixtures the UI is built against live in `src/mock/analytics-api-fixtures.ts`. Set `NEXT_PUBLIC_ANALYTICS_USE_MOCK=true` in `.env.local` to preview the overview without waiting for API changes.
+**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **Attendance Mode users** call live Django endpoints. Participation Time still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
 
 Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 
@@ -372,8 +378,12 @@ Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 - `streaming`: `*_count` suffix keys (`broadcast_sessions_count`, `currently_watching_count`, etc.).
 - **`participation_time[]`** (Live Event Insights): `{ user_name, email?, logged_in_at, logged_out_at, duration_seconds }` per viewer session.
 - **`registration_intervals_by_day[]`** (Participation Trend): per event day, `interval_minutes` (15) and `buckets[]` with `bucket_start` (ISO) and `count` (registrations in that window).
+- **`registration_insights`**: `by_day_last_7[{ date, count }]`, `by_attendance_mode`, `by_state`, `by_gender`, `by_designation` for Registration Insights charts.
 
-**Attendance Mode analytics** (`/dashboard/analytics/attendance-mode`) still uses `GET /registrations/registration/?event=&attendance_mode=` today; optional future query **`participation_date=YYYY-MM-DD`** is documented in `analytics-api-contract.ts`.
+**Attendance Mode analytics** (`/dashboard/analytics/attendance-mode`) uses `GET /analytics/registrations/users/` with:
+- `event_id`
+- optional `days__day__date` (`2026-08-19` / `2026-08-20` / `2026-08-21`)
+- optional `days__attendance_mode` (`PHYSICAL` / `VIRTUAL`; omitted for All)
 
 #### Broadcast (via Next proxy) — `broadcast.service.ts`
 
@@ -396,7 +406,7 @@ App UI statuses map to Django enums in `src/lib/registration-mappers.ts`:
 | `pending` | `PENDING` |
 | `accepted` | `ACCEPTED` |
 | `rejected` | `REJECTED` |
-| `on_hold` | `HELD` |
+| `on_hold` | `HOLD` |
 
 Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject** (single row and bulk).
 
@@ -475,7 +485,21 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-23
 
-- **Analytics — under development:** Overview and Attendance Mode analytics pages show a placeholder (“Under development… will be available shortly”) instead of loading live API data.
+- **Streaming — mobile player:** Fixed `/streaming` player collapsing to zero height on small screens (banner grid + absolute video). Player shell always keeps a 16:9 frame with a mobile min-height; side banners stay desktop-only.
+- **Analytics — attendance mode API:** Attendance Mode page loads `GET /analytics/registrations/users/` with filters `days__day__date` (19/20/21 Aug) and `days__attendance_mode` (`PHYSICAL` / `VIRTUAL`; All omits the param). Replaces the under-development placeholder. Summary filter cards removed. Export supports **page** and **all** (fetches every page).
+- **Analytics — participation trend API:** **Participation Trend** uses `GET /analytics/streaming/participation-trend/` with `mode=all|physical|virtual`, fixed `interval_minutes=15`, and a day selector (`date`). Maps `{ mode, results }`; empty `results` shows an empty state. Day list always includes today.
+- **Analytics — streaming summary API:** Live Event Insights cards + **Streaming Details** use `GET /analytics/streaming/summary/?event_id=` (`currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time display strings, `live_broadcast`). Viewer Sessions / Logins rows removed (not in API).
+- **Analytics — demographics scroll:** State and designation bar charts list every category (no “Others” bucket) inside a vertically scrollable area so long tails remain visible.
+- **Analytics — live data visibility fix:** Registration cards + **Registration Insights** no longer wait on mock event analytics. Overview prefers event **id 11** (or highest `registeredCount`), shows **Event ID** badge, and uses live API payloads even when counts/charts are empty (no silent mock override).
+- **Analytics — demographics API:** Gender, state, and designation charts use `GET /analytics/registrations/demographics/?event_id=` (`by_gender`, `by_state`, `by_designation`). State and designation bars show all labels with vertical scroll when the list is long.
+- **Analytics — attendance insights API:** **How people will attend** uses `GET /analytics/registrations/insights/?event_id=` (`attendance_mode` + `attendance_mode_by_date`). Shows **Physical / Virtual / Mixed** only, with an **All days** / event-day filter.
+- **Analytics — registration trend API:** **Registrations by day** uses `GET /analytics/registrations/trend/?event_id=&granularity=` with a **Daily / Weekly / Monthly** toggle.
+- **Analytics — registration counts API:** Overview **Registrations** cards load from `GET /analytics/registrations/counts/?event_id=` (`total` → “Total registered for event”, plus Accepted / Pending / Hold / Rejected). `undecided_mode` is ignored.
+- **Analytics — Registration Insights polish:** Charts use plain-language titles, people counts/% legends, labeled bars, and clearer donuts so non-technical users can read them easily.
+- **Analytics — trends:** Removed **Registration Trend**. **Participation Trend** (15-min intervals) now lives under **Live Event Insights**.
+- **Analytics — hybrid overview:** Registration cards/insights call live Django analytics APIs; streaming summary + participation trend are live. Participation Time still uses fixtures.
+- **Analytics — Registration Insights charts:** Overview **Registration Insights** shows day-wise (last 7 days with Today/Yesterday), attendance-mode donut, scrollable state/designation bars (all categories), gender donut. Fixture fallback: `src/mock/analytics-registration-insights.ts`.
+- **Status — Hold:** Bulk and single hold actions send API status `HOLD`. UI labels use **Hold**.
 
 ### 2026-07-22
 
@@ -486,7 +510,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 - **Home — Concept Note & Event Agenda:** Below **About the Conference**, two cards open PDFs in a modal (inline viewer + **Close** and optional new tab). Files live in `docs/` and are served from `public/docs/` (`icas-2026-concept-note.pdf`, `icas-agenda.pdf`); paths in `src/lib/conference-documents.ts`.
 - **Home hero — mobile layout:** On small screens, the hero image now appears after the upcoming-event line (and registered notice) and **above** the CSTEP badge and conference title; desktop keeps image left of copy.
-- **Analytics overview:** `/dashboard/analytics` uses dashboard + event analytics APIs with collapsible **Trends**, **Registration Insights**, and **Live Event Insights**. Trend cards are compact; **Participation Trend** shows registrations per **15-minute** interval with a day selector (19/20/21 Aug in mock). **Participation time** table for login/logout/duration. **UI-only preview:** set `NEXT_PUBLIC_ANALYTICS_USE_MOCK=true` to use fixtures in `src/mock/analytics-api-fixtures.ts`; BE contract in `src/lib/analytics-api-contract.ts`.
+- **Analytics overview:** `/dashboard/analytics` is **UI-only** (fixtures in `src/mock/analytics-api-fixtures.ts`; contract in `src/lib/analytics-api-contract.ts`). Collapsible **Trends**, **Registration Insights**, and **Live Event Insights**. Compact trend cards; Participation Trend uses 15-minute intervals with a day selector.
 
 ### 2026-07-19
 

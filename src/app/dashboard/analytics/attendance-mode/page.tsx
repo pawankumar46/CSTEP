@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { AnalyticsUnderDevelopment } from "@/components/dashboard/AnalyticsUnderDevelopment";
+import { AttendanceModeAnalytics } from "@/components/dashboard/AttendanceModeAnalytics";
 
 export default function AttendanceModeAnalyticsPage() {
   return (
@@ -10,11 +10,12 @@ export default function AttendanceModeAnalyticsPage() {
         <div>
           <h1 className="text-2xl font-bold">Attendance Mode Analytics</h1>
           <p className="text-sm text-muted-foreground">
-            Select an event, attendance mode, and optional participation date to view virtual or physical insights.
+            Select an event, attendance mode, and optional participation date to view virtual or
+            physical insights.
           </p>
         </div>
 
-        <AnalyticsUnderDevelopment />
+        <AttendanceModeAnalytics />
       </div>
     </RouteGuard>
   );

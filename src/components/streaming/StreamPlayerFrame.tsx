@@ -12,8 +12,12 @@ interface StreamPlayerFrameProps extends VideoPlayerProps {
   className?: string;
 }
 
-const BANNER_COLUMN_CLASS =
-  "hidden md:block w-full h-auto object-contain bg-sky-50 dark:bg-slate-900";
+/** Keeps a visible 16:9 box on mobile even when the video is position:absolute. */
+const PLAYER_SHELL_CLASS =
+  "relative w-full min-w-0 overflow-hidden bg-black aspect-video min-h-[12.5rem] sm:min-h-[15rem]";
+
+const BANNER_CLASS =
+  "hidden md:block h-full w-24 shrink-0 object-contain bg-sky-50 dark:bg-slate-900 lg:w-32 xl:w-36";
 
 export function StreamPlayerFrame({
   leftBannerUrl,
@@ -29,23 +33,27 @@ export function StreamPlayerFrame({
 
   if (!showBanners) {
     return (
-      <VideoPlayer
-        {...playerProps}
-        viewMode={viewMode}
+      <div
         className={cn(
-          "w-full rounded-xl transition-all duration-300 ease-in-out",
-          isTheater ? THEATER_PLAYER_CLASS : "aspect-video",
+          "w-full overflow-hidden rounded-xl",
+          isTheater ? THEATER_PLAYER_CLASS : PLAYER_SHELL_CLASS,
           className,
         )}
-      />
+      >
+        <VideoPlayer
+          {...playerProps}
+          viewMode={viewMode}
+          fill
+          className="absolute inset-0 rounded-none"
+        />
+      </div>
     );
   }
 
   return (
     <div
       className={cn(
-        "grid w-full items-stretch overflow-hidden rounded-xl transition-all duration-300 ease-in-out",
-        "md:grid-cols-[6rem_1fr_6rem] lg:grid-cols-[8rem_1fr_8rem] xl:grid-cols-[9rem_1fr_9rem]",
+        "flex w-full items-stretch overflow-hidden rounded-xl",
         className,
       )}
     >
@@ -53,27 +61,28 @@ export function StreamPlayerFrame({
         <img
           src={leftBannerUrl}
           alt={leftBannerAlt}
-          className={BANNER_COLUMN_CLASS}
+          className={BANNER_CLASS}
           aria-hidden
         />
-      ) : (
-        <div className="hidden md:block" />
-      )}
+      ) : null}
 
-      <div className="relative min-w-0 aspect-video min-h-0 bg-black">
-        <VideoPlayer {...playerProps} viewMode={viewMode} fill className="absolute inset-0 rounded-none" />
+      <div className={cn(PLAYER_SHELL_CLASS, "flex-1")}>
+        <VideoPlayer
+          {...playerProps}
+          viewMode={viewMode}
+          fill
+          className="absolute inset-0 rounded-none"
+        />
       </div>
 
       {rightBannerUrl ? (
         <img
           src={rightBannerUrl}
           alt={rightBannerAlt}
-          className={BANNER_COLUMN_CLASS}
+          className={BANNER_CLASS}
           aria-hidden
         />
-      ) : (
-        <div className="hidden md:block" />
-      )}
+      ) : null}
     </div>
   );
 }

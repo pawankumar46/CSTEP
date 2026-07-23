@@ -55,7 +55,8 @@ export function ParticipationTimeTable({
         <div className="space-y-1">
           <CardTitle className="text-sm font-semibold">Participation time</CardTitle>
           <CardDescription>
-            When viewers joined the live stream, how long they watched, and when they left.
+            When viewers joined the live stream, how long they watched, and when they left. <br/>
+            Note: This table contains sample data for demonstration purposes only.
             {usingPlaceholder && " Showing sample data until the API is available."}
           </CardDescription>
         </div>

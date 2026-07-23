@@ -400,6 +400,127 @@ export interface ParticipationTimeSession {
   durationSeconds: number;
 }
 
+export interface RegistrationInsights {
+  byDayLast7: { date: string; count: number }[];
+  byAttendanceMode: Record<string, number>;
+  byState: Record<string, number>;
+  byGender: Record<string, number>;
+  byDesignation: Record<string, number>;
+}
+
+/** GET /analytics/registrations/counts/ — Overview registration status cards. */
+export interface RegistrationCounts {
+  total: number;
+  accepted: number;
+  pending: number;
+  onHold: number;
+  rejected: number;
+}
+
+/** GET /analytics/registrations/trend/ — Registrations by day chart. */
+export interface RegistrationTrendPoint {
+  date: string;
+  count: number;
+}
+
+export interface RegistrationTrend {
+  granularity: string;
+  results: RegistrationTrendPoint[];
+}
+
+export type AttendanceModeInsightName = "Physical" | "Virtual" | "Mixed";
+
+export interface AttendanceModeInsightSlice {
+  name: AttendanceModeInsightName;
+  count: number;
+  share?: number;
+}
+
+export interface AttendanceModeByDateInsight {
+  date: string;
+  total: number;
+  physical: number;
+  virtual: number;
+  mixed: number;
+}
+
+/** Subset of GET /analytics/registrations/insights/ used by Overview. */
+export interface RegistrationAttendanceInsights {
+  attendanceMode: AttendanceModeInsightSlice[];
+  attendanceModeByDate: AttendanceModeByDateInsight[];
+}
+
+export interface DemographicShareRow {
+  label: string;
+  count: number;
+  share?: number;
+}
+
+/** Subset of GET /analytics/registrations/demographics/ used by Overview. */
+export interface RegistrationDemographics {
+  total: number;
+  byGender: DemographicShareRow[];
+  byDesignation: DemographicShareRow[];
+  byState: DemographicShareRow[];
+}
+
+/** GET /analytics/streaming/summary/?event_id= — Live Event Insights streaming cards. */
+export interface StreamingSummary {
+  currentlyWatching: number;
+  uniqueViewers: number;
+  broadcastSessions: number;
+  peakConcurrentViewers: number;
+  avgWatchTimeSeconds: number;
+  avgWatchTimeDisplay: string;
+  totalWatchTimeSeconds: number;
+  totalWatchTimeDisplay: string;
+  liveBroadcast: boolean;
+}
+
+/** GET /analytics/streaming/participation-trend/ — mode filter. */
+export type StreamingParticipationMode = "all" | "physical" | "virtual";
+
+/** GET /analytics/streaming/participation-trend/?event_id=&mode=&interval_minutes= */
+export interface StreamingParticipationTrend {
+  date: string;
+  mode: StreamingParticipationMode;
+  intervalMinutes: number;
+  buckets: RegistrationIntervalBucket[];
+}
+
+/** Day row from GET /analytics/registrations/users/ */
+export interface AttendanceModeUserDay {
+  id: string;
+  date: string;
+  attendanceMode: AttendanceMode;
+}
+
+/** Row from GET /analytics/registrations/users/ */
+export interface AttendanceModeUserRow {
+  id: string;
+  userName: string;
+  phone: string;
+  email: string;
+  designation: string;
+  orgName: string;
+  city: string;
+  state: string;
+  eventName: string;
+  status: RegistrationStatus;
+  days: AttendanceModeUserDay[];
+  createdAt: string;
+}
+
+export interface AttendanceModeUsersPage {
+  rows: AttendanceModeUserRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
 export interface EventAnalytics {
   event: {
     id: string;
@@ -435,6 +556,7 @@ export interface EventAnalytics {
   };
   participationTimeSessions: ParticipationTimeSession[];
   registrationIntervalsByDay: RegistrationIntervalDay[];
+  registrationInsights: RegistrationInsights;
 }
 
 export interface TrendDataPoint {

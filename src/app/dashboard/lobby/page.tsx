@@ -241,7 +241,7 @@ function LobbyContent() {
         header: "Status",
         cell: ({ row }) => (
           <Badge variant={statusVariant[row.original.status]} className="capitalize">
-            {row.original.status.replace("_", " ")}
+            {row.original.status === "on_hold" ? "Hold" : row.original.status.replace("_", " ")}
           </Badge>
         ),
       },
@@ -451,7 +451,7 @@ function LobbyContent() {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="accepted">Accepted</SelectItem>
-                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="on_hold">Hold</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>

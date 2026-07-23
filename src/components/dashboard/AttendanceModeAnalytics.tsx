@@ -2,20 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import {
-  PieChart, Pie, Cell,
-  Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
-import {
-  BarChart3, MapPin, Monitor, Users, UserCheck, UserX, UserPlus, Pause, Clock,
-} from "lucide-react";
+import { MapPin, Monitor, Users } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
-import { ChartCard } from "@/components/shared/ChartCard";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { StatCard } from "@/components/shared/StatCard";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
-import { SessionRegistrationsDialog } from "@/components/dashboard/SessionRegistrationsDialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -26,60 +17,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { buildRegistrationStatusDistribution, filterRegistrationsByEventDate } from "@/lib/analytics-mappers";
+import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
-import { ATTENDANCE_MODE_EXPORT_COLUMNS } from "@/lib/registration-export";
-import { formatEventDayDateLabel } from "@/lib/participation-dates";
-import { sortEventDaysByDate } from "@/lib/icas-conference";
-import { getAllEvents, getEventDays, type EventDay } from "@/services/event.service";
-import { getEventRegistrationsPage, getEventRegistrationsByAttendanceMode } from "@/services/registration.service";
-import type { AttendanceMode, Event, Registration, RegistrationStatus } from "@/types";
+import { ATTENDANCE_MODE_USERS_EXPORT_COLUMNS } from "@/lib/registration-export";
+import { getAllAttendanceModeUsers, getAttendanceModeUsers } from "@/services/analytics.service";
+import { getAllEvents } from "@/services/event.service";
+import type {
+  AttendanceMode,
+  AttendanceModeUserRow,
+  Event,
+  RegistrationStatus,
+} from "@/types";
 
-const ATTENDANCE_MODE_OPTIONS: {
-  value: AttendanceMode;
-  label: string;
-  icon: typeof Monitor;
-}[] = [
-  { value: "virtual", label: "Virtual", icon: Monitor },
-  { value: "physical", label: "Physical", icon: MapPin },
+const TABLE_PAGE_SIZE = 10;
+
+const EVENT_DAY_OPTIONS = ["2026-08-19", "2026-08-20", "2026-08-21"] as const;
+
+const MODE_OPTIONS: { value: "all" | AttendanceMode; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "physical", label: "Physical" },
+  { value: "virtual", label: "Virtual" },
 ];
 
-const STATUS_VARIANT: Record<RegistrationStatus, "default" | "secondary" | "success" | "warning" | "destructive"> = {
+const STATUS_VARIANT: Record<
+  RegistrationStatus,
+  "default" | "secondary" | "success" | "warning" | "destructive"
+> = {
   pending: "warning",
   accepted: "success",
   rejected: "destructive",
   on_hold: "secondary",
 };
 
-const COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
-const TOOLTIP_STYLE = {
-  fontSize: 12,
-  borderRadius: 8,
-  border: "1px solid hsl(var(--border))",
-  background: "hsl(var(--card))",
-  color: "hsl(var(--card-foreground))",
-};
-
-const TABLE_PAGE_SIZE = 10;
-
-function ChartContainer({ height, children }: { height: number; children: React.ReactNode }) {
-  return (
-    <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        {children}
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function countByStatus(registrations: Registration[]) {
-  return registrations.reduce(
-    (acc, row) => {
-      acc[row.status] = (acc[row.status] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<RegistrationStatus, number>,
-  );
+function pickDefaultEvent(events: Event[]): Event | null {
+  if (events.length === 0) return null;
+  return events.find((event) => event.id === "11") ?? events[0];
 }
 
 export function AttendanceModeAnalytics() {
@@ -87,43 +59,33 @@ export function AttendanceModeAnalytics() {
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [attendanceMode, setAttendanceMode] = useState<AttendanceMode | null>(null);
-  const [participationDateFilter, setParticipationDateFilter] = useState<string>("all");
-  const [eventDays, setEventDays] = useState<EventDay[]>([]);
-  const [eventDaysLoading, setEventDaysLoading] = useState(false);
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [summaryRegistrations, setSummaryRegistrations] = useState<Registration[]>([]);
+  const [dayDate, setDayDate] = useState<string>("all");
+  const [attendanceMode, setAttendanceMode] = useState<"all" | AttendanceMode>("all");
+  const [rows, setRows] = useState<AttendanceModeUserRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
-  const [sessionsRegistration, setSessionsRegistration] = useState<
-    Pick<Registration, "id" | "userName" | "email"> | null
-  >(null);
 
-  const openSessionsDialog = useCallback((registration: Registration) => {
-    setSessionsRegistration({
-      id: registration.id,
-      userName: registration.userName,
-      email: registration.email,
-    });
-    setSessionsDialogOpen(true);
-  }, []);
+  const selectedEvent = useMemo(
+    () => events.find((event) => event.id === selectedEventId) ?? null,
+    [events, selectedEventId],
+  );
 
   useEffect(() => {
     let cancelled = false;
-
-    (async () => {
+    void (async () => {
       setEventsLoading(true);
       setEventsError(null);
       try {
         const list = await getAllEvents();
-        if (!cancelled) setEvents(list);
+        if (cancelled) return;
+        setEvents(list);
+        const preferred = pickDefaultEvent(list);
+        if (preferred) setSelectedEventId(preferred.id);
       } catch (err) {
         if (!cancelled) {
           setEventsError(err instanceof Error ? err.message : "Failed to load events");
@@ -132,261 +94,142 @@ export function AttendanceModeAnalytics() {
         if (!cancelled) setEventsLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
   }, []);
 
-  useEffect(() => {
-    if (!selectedEventId) {
-      setEventDays([]);
-      setParticipationDateFilter("all");
-      return;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      setEventDaysLoading(true);
-      try {
-        const days = await getEventDays(selectedEventId);
-        if (!cancelled) setEventDays(sortEventDaysByDate(days));
-      } catch {
-        if (!cancelled) setEventDays([]);
-      } finally {
-        if (!cancelled) setEventDaysLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedEventId]);
-
-  const selectedEvent = useMemo(
-    () => events.find((event) => event.id === selectedEventId) ?? null,
-    [events, selectedEventId],
-  );
-
-  const filteredSummaryRegistrations = useMemo(
-    () =>
-      filterRegistrationsByEventDate(
-        summaryRegistrations,
-        participationDateFilter === "all" ? null : participationDateFilter,
-      ),
-    [summaryRegistrations, participationDateFilter],
-  );
-
-  const useClientTablePagination = participationDateFilter !== "all";
-
-  const clientTablePage = useMemo(() => {
-    if (!useClientTablePagination) return registrations;
-
-    const start = (page - 1) * TABLE_PAGE_SIZE;
-    return filteredSummaryRegistrations.slice(start, start + TABLE_PAGE_SIZE);
-  }, [
-    useClientTablePagination,
-    filteredSummaryRegistrations,
-    page,
-    registrations,
-  ]);
-
-  const clientTotalPages = useMemo(() => {
-    if (!useClientTablePagination) return totalPages;
-    return Math.max(1, Math.ceil(filteredSummaryRegistrations.length / TABLE_PAGE_SIZE));
-  }, [useClientTablePagination, filteredSummaryRegistrations.length, totalPages]);
-
-  const displayTotalCount = useClientTablePagination
-    ? filteredSummaryRegistrations.length
-    : totalCount;
-
-  const displayRegistrations = useClientTablePagination ? clientTablePage : registrations;
-
-  const displayHasNext = useClientTablePagination
-    ? page < clientTotalPages
-    : hasNext;
-
-  const displayHasPrevious = useClientTablePagination
-    ? page > 1
-    : hasPrevious;
-
-  const loadTablePage = useCallback(async () => {
-    if (!selectedEventId || !attendanceMode) return;
-    if (participationDateFilter !== "all") return;
+  const loadPage = useCallback(async () => {
+    if (!selectedEventId) return;
 
     setLoading(true);
     setFetchError(null);
-
     try {
-      const result = await getEventRegistrationsPage({
+      const result = await getAttendanceModeUsers({
         eventId: selectedEventId,
-        attendanceMode,
+        dayDate: dayDate === "all" ? undefined : dayDate,
+        attendanceMode: attendanceMode === "all" ? undefined : attendanceMode,
         page,
         pageSize: TABLE_PAGE_SIZE,
       });
-      setRegistrations(result.registrations);
+      setRows(result.rows);
       setTotalCount(result.total);
       setTotalPages(result.totalPages);
       setHasNext(result.hasNext);
       setHasPrevious(result.hasPrevious);
     } catch (err) {
-      setRegistrations([]);
-      setFetchError(err instanceof Error ? err.message : "Failed to load registrations");
+      setRows([]);
+      setTotalCount(0);
+      setTotalPages(1);
+      setHasNext(false);
+      setHasPrevious(false);
+      setFetchError(err instanceof Error ? err.message : "Failed to load attendance mode users");
     } finally {
       setLoading(false);
     }
-  }, [selectedEventId, attendanceMode, page, participationDateFilter]);
-
-  const loadSummary = useCallback(async () => {
-    if (!selectedEventId || !attendanceMode) return;
-
-    setSummaryLoading(true);
-
-    try {
-      const result = await getEventRegistrationsByAttendanceMode(selectedEventId, attendanceMode);
-      setSummaryRegistrations(result.registrations);
-      setTotalCount(result.total);
-    } catch (err) {
-      setSummaryRegistrations([]);
-      setFetchError(err instanceof Error ? err.message : "Failed to load registration summary");
-    } finally {
-      setSummaryLoading(false);
-    }
-  }, [selectedEventId, attendanceMode]);
+  }, [selectedEventId, dayDate, attendanceMode, page]);
 
   useEffect(() => {
-    if (!selectedEventId || !attendanceMode) {
-      setRegistrations([]);
-      setSummaryRegistrations([]);
+    if (!selectedEventId) {
+      setRows([]);
       setTotalCount(0);
       setFetchError(null);
       return;
     }
-    loadSummary();
-  }, [selectedEventId, attendanceMode, loadSummary]);
-
-  useEffect(() => {
-    if (!selectedEventId || !attendanceMode) return;
-    if (participationDateFilter !== "all") return;
-    loadTablePage();
-  }, [selectedEventId, attendanceMode, page, participationDateFilter, loadTablePage]);
-
-  useEffect(() => {
-    if (participationDateFilter === "all") return;
-    setPage(1);
-  }, [participationDateFilter]);
+    void loadPage();
+  }, [selectedEventId, loadPage]);
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
-    setAttendanceMode(null);
-    setParticipationDateFilter("all");
     setPage(1);
-    setRegistrations([]);
-    setSummaryRegistrations([]);
-    setTotalCount(0);
-    setFetchError(null);
   };
 
-  const handleModeChange = (value: AttendanceMode) => {
-    setAttendanceMode(value);
-    setParticipationDateFilter("all");
+  const handleDayChange = (value: string) => {
+    setDayDate(value);
     setPage(1);
-    setFetchError(null);
   };
 
-  const handleDateFilterChange = (value: string) => {
-    setParticipationDateFilter(value);
+  const handleModeChange = (value: string) => {
+    setAttendanceMode(value as "all" | AttendanceMode);
     setPage(1);
-    setFetchError(null);
   };
 
-  const statusCounts = useMemo(
-    () => countByStatus(filteredSummaryRegistrations),
-    [filteredSummaryRegistrations],
-  );
-  const statusChartData = useMemo(
-    () =>
-      buildRegistrationStatusDistribution({
-        ACCEPTED: statusCounts.accepted ?? 0,
-        PENDING: statusCounts.pending ?? 0,
-        HELD: statusCounts.on_hold ?? 0,
-        REJECTED: statusCounts.rejected ?? 0,
-      }),
-    [statusCounts],
-  );
-
-  const columns = useMemo<ColumnDef<Registration>[]>(
+  const columns = useMemo<ColumnDef<AttendanceModeUserRow>[]>(
     () => [
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "phone", header: "Phone" },
       { accessorKey: "email", header: "Email" },
+      { accessorKey: "designation", header: "Designation" },
       {
-        accessorKey: "registeredSessionsCount",
-        header: "Sessions",
-        cell: ({ row }) => {
-          const count = row.original.registeredSessionsCount ?? 0;
-          if (count === 0) {
-            return <span className="tabular-nums">{count}</span>;
-          }
-          return (
-            <button
-              type="button"
-              className="tabular-nums font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-              onClick={() => openSessionsDialog(row.original)}
-              aria-label={`View ${count} sessions for ${row.original.userName}`}
-            >
-              {count}
-            </button>
-          );
-        },
+        accessorKey: "orgName",
+        header: "Organization",
+        cell: ({ row }) => row.original.orgName || "—",
       },
       {
-        accessorKey: "participationDate",
-        header: "Participation Dates",
-        cell: ({ row }) => row.original.participationDateLabel ?? row.original.participationDate,
-      },
-      {
-        accessorKey: "participationTime",
-        header: "Participation Time",
-        cell: ({ row }) => (row.original.participationTime === "full_day" ? "Full Day" : "Half Day"),
+        id: "days",
+        header: "Days & mode",
+        cell: ({ row }) => (
+          <div className="flex max-w-[16rem] flex-wrap gap-1">
+            {row.original.days.length === 0 ? (
+              <span className="text-muted-foreground">—</span>
+            ) : (
+              row.original.days.map((day) => (
+                <Badge key={day.id} variant="outline" className="font-normal">
+                  {formatRegistrationIntervalDayLabel(day.date)} ·{" "}
+                  {day.attendanceMode === "virtual" ? "Virtual" : "Physical"}
+                </Badge>
+              ))
+            )}
+          </div>
+        ),
       },
       {
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => (
           <Badge variant={STATUS_VARIANT[row.original.status]} className="capitalize">
-            {row.original.status.replace("_", " ")}
+            {row.original.status === "on_hold" ? "Hold" : row.original.status.replace("_", " ")}
           </Badge>
         ),
       },
     ],
-    [openSessionsDialog],
+    [],
   );
 
-  const modeLabel = attendanceMode === "virtual" ? "Virtual" : "Physical";
-  const ModeIcon = attendanceMode === "virtual" ? Monitor : MapPin;
+  const modeLabel =
+    attendanceMode === "all"
+      ? "All modes"
+      : attendanceMode === "virtual"
+        ? "Virtual"
+        : "Physical";
+  const dayLabel =
+    dayDate === "all" ? "All days" : formatRegistrationIntervalDayLabel(dayDate);
 
   const exportFilename = slugifyFilename(
-    `${modeLabel.toLowerCase()}-registrations-${selectedEvent?.name ?? "event"}`,
+    `attendance-mode-${modeLabel}-${dayLabel}-${selectedEvent?.name ?? "event"}`,
   );
   const exportTitle = selectedEvent
-    ? `${modeLabel} Registrations — ${selectedEvent.name}`
-    : `${modeLabel} Registrations`;
+    ? `Attendance Mode — ${selectedEvent.name} (${modeLabel}, ${dayLabel})`
+    : `Attendance Mode (${modeLabel}, ${dayLabel})`;
+
+  const fetchAllForExport = useCallback(async () => {
+    if (!selectedEventId) return [];
+    return getAllAttendanceModeUsers({
+      eventId: selectedEventId,
+      dayDate: dayDate === "all" ? undefined : dayDate,
+      attendanceMode: attendanceMode === "all" ? undefined : attendanceMode,
+    });
+  }, [selectedEventId, dayDate, attendanceMode]);
 
   return (
     <div className="space-y-4">
-      <SessionRegistrationsDialog
-        open={sessionsDialogOpen}
-        onOpenChange={setSessionsDialogOpen}
-        registration={sessionsRegistration}
-        canManage={false}
-      />
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>Select an event, attendance mode, and optional date to load registrations.</CardDescription>
+          <CardDescription>
+            Filter by event day and attendance mode. Choosing All for mode omits the mode query
+            param.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {eventsError && (
@@ -397,7 +240,7 @@ export function AttendanceModeAnalytics() {
 
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="attendance-event">Step 1 — Event</Label>
+              <Label htmlFor="attendance-event">Event</Label>
               {eventsLoading ? (
                 <p className="text-sm text-muted-foreground">Loading events…</p>
               ) : events.length === 0 ? (
@@ -419,214 +262,124 @@ export function AttendanceModeAnalytics() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="attendance-mode">Step 2 — Attendance mode</Label>
+              <Label htmlFor="attendance-day">Participation day</Label>
               <Select
-                value={attendanceMode ?? ""}
-                onValueChange={(value) => handleModeChange(value as AttendanceMode)}
+                value={dayDate}
+                onValueChange={handleDayChange}
                 disabled={!selectedEventId}
               >
-                <SelectTrigger id="attendance-mode">
-                  <SelectValue
-                    placeholder={
-                      selectedEventId ? "Choose virtual or physical" : "Select an event first"
-                    }
-                  />
+                <SelectTrigger id="attendance-day">
+                  <SelectValue placeholder="Choose a day" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ATTENDANCE_MODE_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    return (
-                      <SelectItem key={option.value} value={option.value}>
-                        <span className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
-                          {option.label}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Loads registrations filtered by attendance mode from the API.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="attendance-date">Step 3 — Participation date</Label>
-              <Select
-                value={participationDateFilter}
-                onValueChange={handleDateFilterChange}
-                disabled={!selectedEventId || !attendanceMode || eventDaysLoading}
-              >
-                <SelectTrigger id="attendance-date">
-                  <SelectValue
-                    placeholder={
-                      !attendanceMode
-                        ? "Select attendance mode first"
-                        : eventDaysLoading
-                          ? "Loading dates…"
-                          : "All dates"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All dates</SelectItem>
-                  {eventDays.map((day) => (
-                    <SelectItem key={day.id} value={day.date}>
-                      {formatEventDayDateLabel(day.date)}
+                  <SelectItem value="all">All days</SelectItem>
+                  {EVENT_DAY_OPTIONS.map((date) => (
+                    <SelectItem key={date} value={date}>
+                      {formatRegistrationIntervalDayLabel(date)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Narrow results to delegates registered for a specific event day.
-              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="attendance-mode">Attendance mode</Label>
+              <Select
+                value={attendanceMode}
+                onValueChange={handleModeChange}
+                disabled={!selectedEventId}
+              >
+                <SelectTrigger id="attendance-mode">
+                  <SelectValue placeholder="Choose mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <span className="flex items-center gap-2">
+                        {option.value === "physical" ? (
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                        ) : option.value === "virtual" ? (
+                          <Monitor className="h-4 w-4 text-muted-foreground" />
+                        ) : null}
+                        {option.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {!selectedEventId && !eventsLoading && events.length > 0 && (
-        <Card>
-          <CardContent className="p-0">
-            <EmptyState
-              icon={BarChart3}
-              title="Select an event"
-              description="Choose an event above to view attendance mode analytics."
-            />
-          </CardContent>
-        </Card>
+      {fetchError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+          <p className="text-sm text-destructive">{fetchError}</p>
+        </div>
       )}
 
-      {selectedEventId && !attendanceMode && (
+      {!selectedEventId && !eventsLoading && (
         <Card>
           <CardContent className="p-0">
             <EmptyState
               icon={Users}
-              title="Select an attendance mode"
-              description="Choose virtual or physical to load registrations for this event."
+              title="Select an event"
+              description="Choose an event to load attendance mode registrations."
             />
           </CardContent>
         </Card>
       )}
 
-      {selectedEvent && attendanceMode && summaryLoading && <DashboardSkeleton />}
+      {selectedEventId && loading && rows.length === 0 && <DashboardSkeleton />}
 
-      {selectedEvent && attendanceMode && !summaryLoading && (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{selectedEvent.name}</Badge>
-            <Badge variant="outline" className="gap-1">
-              <ModeIcon className="h-3 w-3" />
-              {modeLabel}
-            </Badge>
-            {participationDateFilter !== "all" && (
-              <Badge variant="secondary">
-                {formatEventDayDateLabel(participationDateFilter)}
-              </Badge>
+      {selectedEventId && (!loading || rows.length > 0) && (
+        <Card>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="text-base">Registrations</CardTitle>
+              <CardDescription>
+                {totalCount} result{totalCount === 1 ? "" : "s"}
+              </CardDescription>
+            </div>
+            <ExportMenu
+              data={rows}
+              columns={ATTENDANCE_MODE_USERS_EXPORT_COLUMNS}
+              filename={exportFilename}
+              title={exportTitle}
+              disabled={rows.length === 0}
+              fetchAllData={fetchAllForExport}
+              allFilename={`${exportFilename}-all`}
+              allTitle={`${exportTitle} — All`}
+            />
+          </CardHeader>
+          <CardContent>
+            {rows.length === 0 && !loading ? (
+              <EmptyState
+                icon={Users}
+                title="No registrations found"
+                description="Try another day or attendance mode."
+              />
+            ) : rows.length > 0 ? (
+              <DataTable
+                columns={columns}
+                data={rows}
+                searchKey="userName"
+                searchPlaceholder="Search by name…"
+                pageSize={TABLE_PAGE_SIZE}
+                serverPagination={{
+                  page,
+                  totalPages,
+                  hasNext,
+                  hasPrevious,
+                  onPageChange: setPage,
+                }}
+              />
+            ) : null}
+            {loading && rows.length > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">Refreshing…</p>
             )}
-          </div>
-
-          {fetchError && (
-            <p className="text-sm text-destructive">{fetchError}</p>
-          )}
-
-          <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <StatCard title="Total Registrations" value={displayTotalCount} icon={UserPlus} />
-            <StatCard title="Accepted" value={statusCounts.accepted ?? 0} icon={UserCheck} />
-            <StatCard title="Pending" value={statusCounts.pending ?? 0} icon={Clock} />
-            <StatCard title="On Hold" value={statusCounts.on_hold ?? 0} icon={Pause} />
-            <StatCard title="Rejected" value={statusCounts.rejected ?? 0} icon={UserX} />
-          </div>
-
-          <ChartCard title="Registration Status" description="Status breakdown for all matching registrations.">
-            <ChartContainer height={180}>
-              {statusChartData.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  No registrations found
-                </div>
-              ) : (
-                <PieChart>
-                  <Pie
-                    data={statusChartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="46%"
-                    innerRadius={38}
-                    outerRadius={58}
-                    paddingAngle={2}
-                    strokeWidth={0}
-                  >
-                    {statusChartData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color || COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
-                  <Legend
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
-                  />
-                </PieChart>
-              )}
-            </ChartContainer>
-          </ChartCard>
-
-          <Card className="shadow-sm">
-            <CardHeader className="py-3 px-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <CardTitle className="text-sm font-medium">
-                    {modeLabel} Registrations
-                  </CardTitle>
-                  <CardDescription>
-                    {displayTotalCount} registration{displayTotalCount === 1 ? "" : "s"} for this event
-                    {participationDateFilter !== "all"
-                      ? ` on ${formatEventDayDateLabel(participationDateFilter)}`
-                      : ""}{" "}
-                    and mode.
-                  </CardDescription>
-                </div>
-                <ExportMenu
-                  filename={exportFilename}
-                  title={exportTitle}
-                  columns={ATTENDANCE_MODE_EXPORT_COLUMNS}
-                  data={filteredSummaryRegistrations}
-                  disabled={summaryLoading}
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0">
-              {loading && displayRegistrations.length === 0 && !fetchError ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">Loading registrations…</p>
-              ) : displayRegistrations.length === 0 && !fetchError ? (
-                <EmptyState
-                  icon={Users}
-                  title="No registrations found"
-                  description={`No ${modeLabel.toLowerCase()} registrations for this event${participationDateFilter !== "all" ? " on the selected date" : ""} yet.`}
-                />
-              ) : (
-                <div className={loading ? "opacity-60 pointer-events-none" : undefined}>
-                  <DataTable
-                  columns={columns}
-                  data={displayRegistrations}
-                  searchKey="userName"
-                  searchPlaceholder="Search by name…"
-                  serverPagination={{
-                    page,
-                    totalPages: clientTotalPages,
-                    hasNext: displayHasNext,
-                    hasPrevious: displayHasPrevious,
-                    onPageChange: setPage,
-                  }}
-                />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

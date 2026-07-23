@@ -93,7 +93,7 @@ function mapApiStatus(value: unknown): RegistrationStatus {
   const normalized = String(value ?? "PENDING").toUpperCase();
   if (normalized === "ACCEPTED") return "accepted";
   if (normalized === "REJECTED") return "rejected";
-  if (normalized === "HELD" || normalized === "ON_HELD") return "on_hold";
+  if (normalized === "HOLD" || normalized === "ON_HOLD") return "on_hold";
   return "pending";
 }
 
@@ -102,7 +102,7 @@ function mapApiRequestStatus(value: unknown): AssistanceRequestStatus {
   const normalized = String(value).toUpperCase();
   if (normalized === "ACCEPTED" || normalized === "APPROVED") return "accepted";
   if (normalized === "REJECTED") return "rejected";
-  if (normalized === "HELD" || normalized === "ON_HELD") return "on_hold";
+  if (normalized === "HOLD" || normalized === "ON_HOLD") return "on_hold";
   return "pending";
 }
 
@@ -111,7 +111,7 @@ export function mapAppStatusToApiStatus(status: RegistrationStatus): string {
     pending: "PENDING",
     accepted: "ACCEPTED",
     rejected: "REJECTED",
-    on_hold: "HELD",
+    on_hold: "HOLD",
   };
   return map[status];
 }
