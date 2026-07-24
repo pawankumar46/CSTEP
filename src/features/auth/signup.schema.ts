@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_COUNTRY_CODE, maxPhoneDigitsForCountry } from "@/lib/country-codes";
 
 export const SIGNUP_ORG_TYPES = [
   { value: "ORGANISATION", label: "Institution or Organisation" },
@@ -47,10 +48,14 @@ export const signupBaseFields = {
   firstName: requiredText("First name is required"),
   middleName: z.string().optional(),
   lastName: requiredText("Last name is required"),
+  countryCode: z
+    .string()
+    .min(1, "Country code is required")
+    .regex(/^\+\d{1,4}$/, "Select a valid country code"),
   phone: z
     .string()
     .min(1, "Phone number is required")
-    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
+    .regex(/^\d+$/, "Phone number must contain digits only"),
   email: z
     .string()
     .min(1, "Email is required")
@@ -88,6 +93,18 @@ export function refineSignupForm(
       path: ["orgName"],
     });
   }
+
+  const maxDigits = maxPhoneDigitsForCountry(data.countryCode);
+  if (data.phone.length !== maxDigits) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        data.countryCode === DEFAULT_COUNTRY_CODE
+          ? "Phone number must be exactly 10 digits"
+          : `Phone number must be exactly ${maxDigits} digits for ${data.countryCode}`,
+      path: ["phone"],
+    });
+  }
 }
 
 export const publicSignupSchema = z
@@ -101,6 +118,7 @@ export const EMPTY_PUBLIC_SIGNUP: PublicSignupFormValues = {
   firstName: "",
   middleName: "",
   lastName: "",
+  countryCode: DEFAULT_COUNTRY_CODE,
   phone: "",
   email: "",
   gender: "" as PublicSignupFormValues["gender"],

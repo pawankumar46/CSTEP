@@ -715,6 +715,8 @@ export interface SignupCredentials {
   firstName: string;
   middleName?: string;
   lastName: string;
+  /** E.164-style dial code, e.g. "+91" — sent as API `country_code`. */
+  countryCode: string;
   phone: string;
   email: string;
   gender: SignupGender;

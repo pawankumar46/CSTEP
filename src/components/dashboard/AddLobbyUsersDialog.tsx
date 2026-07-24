@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SessionScrollRow } from "@/components/shared/SessionScrollRow";
+import { PhoneWithCountryCode } from "@/components/auth/PhoneWithCountryCode";
 import {
   addLobbyUserSchema,
   EMPTY_ADD_LOBBY_USER,
@@ -125,6 +126,8 @@ export function AddLobbyUsersDialog({
 
   const selectedEventId = watch("eventId");
   const orgType = watch("orgType");
+  const countryCode = watch("countryCode");
+  const phone = watch("phone");
   const selectedDayIds = watch("selectedDayIds");
   const sessionsByDay = watch("sessionsByDay");
   const attendanceByDay = watch("attendanceByDay");
@@ -405,6 +408,7 @@ export function AddLobbyUsersDialog({
         "firstName",
         "middleName",
         "lastName",
+        "countryCode",
         "phone",
         "email",
         "gender",
@@ -430,6 +434,7 @@ export function AddLobbyUsersDialog({
         firstName: signupValues.firstName,
         middleName: signupValues.middleName,
         lastName: signupValues.lastName,
+        countryCode: signupValues.countryCode,
         phone: signupValues.phone,
         email: signupValues.email,
         gender: signupValues.gender,
@@ -606,27 +611,23 @@ export function AddLobbyUsersDialog({
                   <Label htmlFor="lobby-phone">
                     Phone Number <RequiredMark />
                   </Label>
-                  <Controller
-                    name="phone"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        id="lobby-phone"
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={10}
-                        placeholder="9999999999"
-                        required
-                        aria-required="true"
-                        value={field.value}
-                        onChange={(event) =>
-                          field.onChange(event.target.value.replace(/\D/g, "").slice(0, 10))
-                        }
-                      />
-                    )}
+                  <PhoneWithCountryCode
+                    id="lobby-phone"
+                    countryCode={countryCode}
+                    phone={phone}
+                    onCountryCodeChange={(code) =>
+                      setValue("countryCode", code, { shouldValidate: true, shouldDirty: true })
+                    }
+                    onPhoneChange={(value) =>
+                      setValue("phone", value, { shouldValidate: true, shouldDirty: true })
+                    }
+                    required
+                    phonePlaceholder="9999999999"
                   />
-                  {errors.phone && (
-                    <p className="text-xs text-destructive">{errors.phone.message}</p>
+                  {(errors.phone || errors.countryCode) && (
+                    <p className="text-xs text-destructive">
+                      {errors.phone?.message ?? errors.countryCode?.message}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-2">

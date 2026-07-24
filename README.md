@@ -107,6 +107,7 @@ Create `.env.local` from `.env.example`:
 
 ```
 c-step/
+├── .cursor/rules/             # Agent rules (architecture, coding standards, UI/UX, docs)
 ├── docs/                      # Source PDFs (Concept Note, Agenda); copies served from public/docs/
 ├── public/                    # Static assets (logos, banner images, conference PDFs)
 ├── src/
@@ -134,7 +135,7 @@ c-step/
 │   │   ├── layout.tsx         # Root layout
 │   │   └── page.tsx           # Landing / home
 │   ├── components/
-│   │   ├── auth/              # Auth guards
+│   │   ├── auth/              # Auth guards, PhoneWithCountryCode
 │   │   ├── dashboard/         # Admin dialogs, event cards, lobby & analytics UI
 │   │   │   ├── AttendanceModeAnalytics.tsx
 │   │   │   ├── EventSelectCard.tsx
@@ -154,6 +155,7 @@ c-step/
 │   ├── lib/                   # Utilities, mappers, env, API client
 │   │   ├── api-client.ts      # Axios instance + JWT interceptors
 │   │   ├── auth-mappers.ts    # Auth request/response mapping
+│   │   ├── country-codes.ts   # Dial codes for signup phone (`country_code`)
 │   │   ├── registration-mappers.ts
 │   │   ├── event-support-mappers.ts
 │   │   ├── event-mappers.ts
@@ -177,6 +179,59 @@ c-step/
 
 ## Architecture
 
+Agent-oriented architecture guide (layers, domains, Mermaid diagrams, where to put new code): **`.cursor/rules/application-architecture.mdc`** (always applied with coding-standards / UI rules).
+
+**How to describe it:** not a single product monolith — it is a **client–server** system (Next.js UI + Django API). The frontend is a **modular monolith** (one app, layered modules). Not microservices / micro-frontends. See the rule’s “How to explain this” section for elevator pitches.
+
+### System context
+
+```mermaid
+flowchart LR
+  subgraph Clients
+    Browser[Browser / Mobile web]
+  end
+
+  subgraph CSTEP_FE["CSTEP Next.js frontend"]
+    AppRouter[App Router pages]
+    Stores[Zustand stores]
+    Services[Services]
+    Proxies["Next.js /api proxies"]
+  end
+
+  subgraph Backend
+    Django[Django REST API]
+    Drive[Google Drive / HLS sources]
+  end
+
+  Browser --> AppRouter
+  AppRouter --> Stores
+  Stores --> Services
+  Services -->|apiClient Bearer JWT| Django
+  Services -->|fetch /api/...| Proxies
+  Proxies -->|forward auth| Django
+  Proxies --> Drive
+```
+
+### Frontend layers
+
+```mermaid
+flowchart TB
+  Pages["src/app — Pages & layouts"]
+  Features["src/features — Dashboards & Zod"]
+  Components["src/components — UI"]
+  Store["src/store — Zustand"]
+  Services["src/services — HTTP"]
+  Lib["src/lib — mappers / env / session"]
+  Types["src/types"]
+
+  Pages --> Features
+  Pages --> Components
+  Pages --> Store
+  Store --> Services
+  Services --> Lib
+  Lib --> Types
+```
+
 ### Data flow
 
 ```
@@ -187,10 +242,30 @@ Page / Component
             → fetch("/api/...")  → Next.js route → Django / external
 ```
 
+```mermaid
+sequenceDiagram
+  participant UI as Page
+  participant Store as Zustand
+  participant Svc as Service
+  participant Map as Mapper
+  participant API as Django
+
+  UI->>Store: action
+  Store->>Svc: await call
+  Svc->>API: HTTP
+  API-->>Svc: snake_case JSON
+  Svc->>Map: mapApi*
+  Map-->>Svc: app type
+  Svc-->>Store: data
+  Store-->>UI: state
+```
+
 - **Pages** (`src/app/`) are route entry points; most dashboard logic lives in page components or `features/dashboard/`.
 - **Services** (`src/services/`) encapsulate HTTP calls and error handling. UI should not call `apiClient` directly except in rare cases.
 - **Mappers** (`src/lib/*-mappers.ts`) convert between Django snake_case / enum values and app-friendly types.
 - **Stores** (`src/store/`) hold UI state, cached lists, loading flags, and orchestrate service calls.
+
+More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/application-architecture.mdc`.
 
 ### Zustand stores
 
@@ -288,7 +363,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/sign_up/` | User registration (`role: BASE_USER`, `gender`, `designation`, `org_type` ORGANISATION/INDEPENDENT, `org_name`, `motivation`, `city`, `state`, profile fields) |
+| `POST` | `/auth/sign_up/` | User registration (`role: BASE_USER`, `country_code` e.g. `+91`, `phone_number`, `gender`, `designation`, `org_type` ORGANISATION/INDEPENDENT, `org_name`, `motivation`, `city`, `state`, profile fields) |
 | `POST` | `/auth/login/` | Login → access + refresh tokens |
 | `POST` | `/auth/verify-otp/` | OTP verification (`{ email, otp }` or `{ phone_number, otp }`) |
 | `POST` | `/auth/resend-otp/` | Resend OTP (`{ "email": "..." }` or `{ "phone_number": "..." }`) |
@@ -299,6 +374,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/auth/me/` | Current user profile |
 | `PATCH` | `/auth/me/` | Update profile name (`salutation`, `first_name`, `middle_name`, `last_name`) |
 | `GET` | `/auth/users/` | Paginated user list (admin) |
+| `POST` | `/auth/users/` | Create user (lobby Add Users; same profile fields as signup including `country_code`) |
 | `DELETE` | `/auth/users/:id/` | Delete user |
 
 #### Events — `event.service.ts`
@@ -416,14 +492,15 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 
 ### 1. User registration
 
-1. Sign up → `POST /auth/sign_up/`
-2. Login → `POST /auth/login/`
-3. Event register → `POST /registrations/registration/`
-4. Optional profile support → `POST /registrations/request-*`
+1. Sign up → `POST /auth/sign_up/` (includes `country_code` + `phone_number`)
+2. **+91 (India):** Verify mobile OTP → `POST /auth/verify-otp/` (signs the user in)
+3. **Other country codes:** Skip OTP; auto-login → `POST /auth/login/` with the new email/password
+4. Event register → `POST /registrations/registration/` (base users land on `/event-register` when not yet registered)
+5. Optional profile support → `POST /registrations/request-*`
 
 ### 2. Lobby: add user (two-step wizard)
 
-1. **Signup** → `POST /auth/users/` with `role: BASE_USER`, `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (`auth-mappers.toLobbySignupPayload`)
+1. **Signup** → `POST /auth/users/` with `role: BASE_USER`, `country_code`, `phone_number`, `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (`auth-mappers.toLobbySignupPayload`)
 2. **Register for event** → `POST /registrations/registration/` with `user` id (`registration-mappers.toLobbyRegistrationApiPayload`)
 
 Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
@@ -482,6 +559,12 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-07-24
+
+- **Signup — skip OTP for non-India:** After account creation, only **+91** users go to mobile OTP (`/otp`). Other country codes auto-sign in with the new password and continue to event registration (`resolvePostAuthDestination`).
+- **Signup — country code:** Public `/signup` and Lobby Add Users phone fields include a country dial-code selector (`PhoneWithCountryCode`). Payloads send `country_code` (e.g. `+91`) with national `phone_number` via `toSignupPayload` / `toLobbySignupPayload`. Digit length follows the selected country (`src/lib/country-codes.ts`). Gender is still collected and sent.
+- **Docs — application architecture rule:** Added `.cursor/rules/application-architecture.mdc` (always-on) with layers, domains, data flow, Mermaid diagrams, “how to explain this” (client–server + modular monolith FE), and where to add new work. README Architecture section embeds key diagrams and links to the full set.
 
 ### 2026-07-23
 

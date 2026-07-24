@@ -12,6 +12,11 @@ export function formatPhoneForApi(phone: string): string {
   return digits;
 }
 
+/** Signup / create-user: send national number digits as entered (country_code is separate). */
+export function formatSignupPhoneForApi(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
 export function toVerifyOtpPayload(method: "phone" | "email", otp: string, contact: string) {
   if (method === "phone") {
     return { phone_number: formatPhoneForApi(contact), otp };
@@ -57,7 +62,8 @@ export function toSignupPayload(data: SignupCredentials) {
     middle_name: data.middleName ?? "",
     last_name: data.lastName,
     role: "BASE_USER",
-    phone_number: formatPhoneForApi(data.phone),
+    country_code: data.countryCode || "+91",
+    phone_number: formatSignupPhoneForApi(data.phone),
     email: normalizeAuthIdentifier(data.email),
     gender: data.gender,
     designation: data.designation.trim(),
@@ -81,7 +87,8 @@ export function toLobbySignupPayload(data: SignupCredentials) {
     middle_name: data.middleName ?? "",
     last_name: data.lastName,
     role: "BASE_USER",
-    phone_number: formatPhoneForApi(data.phone),
+    country_code: data.countryCode || "+91",
+    phone_number: formatSignupPhoneForApi(data.phone),
     email: normalizeAuthIdentifier(data.email),
     gender: data.gender,
     designation: (data.designation ?? "").trim(),

@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { PhoneWithCountryCode } from "@/components/auth/PhoneWithCountryCode";
 import {
   EMPTY_PUBLIC_SIGNUP,
   publicSignupSchema,
@@ -23,6 +24,8 @@ import {
   type PublicSignupFormValues,
 } from "@/features/auth/signup.schema";
 import { useAuthStore } from "@/store/useAuthStore";
+import { requiresSignupPhoneOtp } from "@/lib/country-codes";
+import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
@@ -34,18 +37,22 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
-  const { signUp, isLoading, error, clearError } = useAuthStore();
+  const { signUp, login, isLoading, error, clearError } = useAuthStore();
 
   const {
     register,
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<PublicSignupFormValues>({
     resolver: zodResolver(publicSignupSchema),
     defaultValues: { ...EMPTY_PUBLIC_SIGNUP },
   });
+
+  const countryCode = watch("countryCode");
+  const phone = watch("phone");
 
   const orgType = watch("orgType");
 
@@ -57,6 +64,7 @@ function SignupForm() {
         firstName: data.firstName,
         middleName: data.middleName,
         lastName: data.lastName,
+        countryCode: data.countryCode,
         phone: data.phone,
         email: data.email,
         gender: data.gender,
@@ -68,12 +76,26 @@ function SignupForm() {
         state: data.state,
         password: data.password,
       });
-      const params = new URLSearchParams({
-        email: data.email.trim().toLowerCase(),
-        phone: data.phone.trim(),
+
+      if (requiresSignupPhoneOtp(data.countryCode)) {
+        const params = new URLSearchParams({
+          email: data.email.trim().toLowerCase(),
+          phone: data.phone.trim(),
+        });
+        if (redirectTo) params.set("redirect", redirectTo);
+        router.push(`${ROUTES.otp}?${params.toString()}`);
+        return;
+      }
+
+      await login({
+        identifier: data.email.trim().toLowerCase(),
+        password: data.password,
       });
-      if (redirectTo) params.set("redirect", redirectTo);
-      router.push(`${ROUTES.otp}?${params.toString()}`);
+      const user = useAuthStore.getState().user;
+      const destination = user
+        ? await resolvePostAuthDestination(user.id, user.role, redirectTo)
+        : ROUTES.eventRegister;
+      router.replace(destination);
     } catch {
       // error handled in store
     }
@@ -173,27 +195,23 @@ function SignupForm() {
                 <Label htmlFor="phone">
                   Phone Number <RequiredMark />
                 </Label>
-                <Controller
-                  name="phone"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      id="phone"
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="9999999999"
-                      required
-                      aria-required="true"
-                      value={field.value}
-                      onChange={(e) =>
-                        field.onChange(e.target.value.replace(/\D/g, "").slice(0, 10))
-                      }
-                    />
-                  )}
+                <PhoneWithCountryCode
+                  id="phone"
+                  countryCode={countryCode}
+                  phone={phone}
+                  onCountryCodeChange={(code) =>
+                    setValue("countryCode", code, { shouldValidate: true, shouldDirty: true })
+                  }
+                  onPhoneChange={(value) =>
+                    setValue("phone", value, { shouldValidate: true, shouldDirty: true })
+                  }
+                  required
+                  phonePlaceholder="9999999999"
                 />
-                {errors.phone && (
-                  <p className="text-xs text-destructive">{errors.phone.message}</p>
+                {(errors.phone || errors.countryCode) && (
+                  <p className="text-xs text-destructive">
+                    {errors.phone?.message ?? errors.countryCode?.message}
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
