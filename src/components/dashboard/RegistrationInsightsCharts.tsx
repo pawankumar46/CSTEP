@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CalendarDays, MapPin, Monitor, UserRound, Briefcase } from "lucide-react";
+import { CalendarDays, Globe2, MapPin, MessageSquareText, Monitor, UserRound, Briefcase } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildAttendanceModeByDateChart,
@@ -23,6 +23,8 @@ import {
   buildDemographicBarChartAll,
   buildDemographicDonutChart,
   buildDesignationInsightChart,
+  buildFeedbackByDayChart,
+  buildFeedbackBySessionChart,
   buildGenderInsightChart,
   buildRegistrationTrendChart,
   buildStateInsightChart,
@@ -40,6 +42,7 @@ import {
 import { cn } from "@/lib/utils";
 import type {
   DistributionDataPoint,
+  EventFeedbackAnalytics,
   RegistrationAttendanceInsights,
   RegistrationDemographics,
   RegistrationInsights,
@@ -141,7 +144,7 @@ function LegendList({
       {data.map((item, index) => {
         const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
         return (
-          <li key={item.name} className="flex items-center justify-between gap-3 text-sm">
+          <li key={`${item.name}-${index}`} className="flex items-center justify-between gap-3 text-sm">
             <span className="flex min-w-0 items-center gap-2">
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -181,6 +184,36 @@ function PeopleTooltip({
   );
 }
 
+function FeedbackCountTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: {
+    value?: number;
+    name?: string;
+    payload?: { name?: string; secondaryValue?: number };
+  }[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const count = Number(payload[0]?.value ?? 0);
+  const avg = Number(payload[0]?.payload?.secondaryValue ?? 0);
+  const name = label || payload[0]?.payload?.name || payload[0]?.name || "";
+  return (
+    <div style={TOOLTIP_STYLE} className="px-3 py-2">
+      <p className="font-medium">{name}</p>
+      <p className="text-muted-foreground">
+        {count} response{count === 1 ? "" : "s"}
+      </p>
+      {avg > 0 ? (
+        <p className="text-xs text-muted-foreground">Avg rating {avg.toFixed(1)}</p>
+      ) : null}
+    </div>
+  );
+}
+
 const SCROLLABLE_BAR_ROW_HEIGHT = 36;
 
 function ScrollableDemographicBarChart({
@@ -189,12 +222,18 @@ function ScrollableDemographicBarChart({
   tickFontSize = 12,
   maxViewportHeight = 240,
   defaultBarFill,
+  allowDecimals = false,
+  tooltip = "people",
+  domainMax,
 }: {
   data: DistributionDataPoint[];
   yAxisWidth: number;
   tickFontSize?: number;
   maxViewportHeight?: number;
   defaultBarFill?: string;
+  allowDecimals?: boolean;
+  tooltip?: "people" | "feedback";
+  domainMax?: number;
 }) {
   const chartHeight = Math.max(data.length * SCROLLABLE_BAR_ROW_HEIGHT + 8, 120);
 
@@ -211,7 +250,12 @@ function ScrollableDemographicBarChart({
             margin={{ top: 4, right: 36, left: 4, bottom: 4 }}
           >
             <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted/50" />
-            <XAxis type="number" hide allowDecimals={false} />
+            <XAxis
+              type="number"
+              hide
+              allowDecimals={allowDecimals}
+              domain={domainMax != null ? [0, domainMax] : undefined}
+            />
             <YAxis
               type="category"
               dataKey="name"
@@ -220,7 +264,10 @@ function ScrollableDemographicBarChart({
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<PeopleTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.35)" }} />
+            <Tooltip
+              content={tooltip === "feedback" ? <FeedbackCountTooltip /> : <PeopleTooltip />}
+              cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
+            />
             <Bar
               dataKey="value"
               fill={defaultBarFill ?? COLORS.designation}
@@ -228,8 +275,11 @@ function ScrollableDemographicBarChart({
               maxBarSize={18}
               background={{ fill: "hsl(var(--muted) / 0.35)", radius: 8 }}
             >
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={entry.color ?? defaultBarFill ?? COLORS.designation} />
+              {data.map((entry, index) => (
+                <Cell
+                  key={`${entry.name}-${index}`}
+                  fill={entry.color ?? defaultBarFill ?? COLORS.designation}
+                />
               ))}
               <LabelList
                 dataKey="value"
@@ -271,7 +321,7 @@ function DonutWithLegend({
               strokeWidth={0}
             >
               {data.map((entry, index) => (
-                <Cell key={entry.name} fill={colors[index % colors.length]} />
+                <Cell key={`${entry.name}-${index}`} fill={colors[index % colors.length]} />
               ))}
             </Pie>
             <Tooltip content={<PeopleTooltip />} />
@@ -304,6 +354,9 @@ interface RegistrationInsightsChartsProps {
   demographics?: RegistrationDemographics | null;
   demographicsLoading?: boolean;
   demographicsError?: string | null;
+  eventFeedback?: EventFeedbackAnalytics | null;
+  eventFeedbackLoading?: boolean;
+  eventFeedbackError?: string | null;
 }
 
 export function RegistrationInsightsCharts({
@@ -321,6 +374,9 @@ export function RegistrationInsightsCharts({
   demographics,
   demographicsLoading,
   demographicsError,
+  eventFeedback,
+  eventFeedbackLoading,
+  eventFeedbackError,
 }: RegistrationInsightsChartsProps) {
   const byState = useMemo(() => {
     if (demographics) {
@@ -328,6 +384,13 @@ export function RegistrationInsightsCharts({
     }
     return buildStateInsightChart(insights.byState);
   }, [demographics, insights.byState]);
+
+  const byCountry = useMemo(() => {
+    if (demographics) {
+      return buildDemographicBarChartAll(demographics.byCountry);
+    }
+    return [];
+  }, [demographics]);
 
   const byGender = useMemo(() => {
     if (demographics) {
@@ -342,6 +405,16 @@ export function RegistrationInsightsCharts({
     }
     return buildDesignationInsightChart(insights.byDesignation);
   }, [demographics, insights.byDesignation]);
+
+  const feedbackByDay = useMemo(
+    () => (eventFeedback ? buildFeedbackByDayChart(eventFeedback.byDay) : []),
+    [eventFeedback],
+  );
+
+  const feedbackBySession = useMemo(
+    () => (eventFeedback ? buildFeedbackBySessionChart(eventFeedback.bySession) : []),
+    [eventFeedback],
+  );
 
   const dayTrend = useMemo(() => {
     // Prefer live trend payload whenever it was fetched (even if all zeros).
@@ -420,7 +493,7 @@ export function RegistrationInsightsCharts({
                 <span className="text-2xl font-semibold tabular-nums">{dayTotal}</span>
                 <span className="ml-2 text-muted-foreground">{TREND_TOTAL_LABELS[trendGranularity]}</span>
               </p>
-              <div className={cn("w-full", trendGranularity === "daily" ? "h-[150px]" : "h-[180px]")}>
+              <div className={cn("w-full", trendGranularity === "daily" ? "h-[150px]" : "h-[200px]")}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={dayTrend}
@@ -428,19 +501,22 @@ export function RegistrationInsightsCharts({
                       top: 18,
                       right: 8,
                       left: -18,
-                      bottom: trendGranularity === "weekly" ? 28 : 0,
+                      bottom: trendGranularity === "weekly" ? 36 : 0,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/50" />
                     <XAxis
                       dataKey="name"
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      tick={{
+                        fontSize: trendGranularity === "weekly" ? 10 : 11,
+                        fill: "hsl(var(--muted-foreground))",
+                      }}
                       axisLine={false}
                       tickLine={false}
                       interval={0}
-                      angle={trendGranularity === "weekly" ? -20 : 0}
-                      textAnchor={trendGranularity === "weekly" ? "end" : "middle"}
-                      height={trendGranularity === "weekly" ? 48 : 30}
+                      angle={0}
+                      textAnchor="middle"
+                      height={trendGranularity === "weekly" ? 56 : 30}
                     />
                     <YAxis hide allowDecimals={false} />
                     <Tooltip content={<PeopleTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.35)" }} />
@@ -513,7 +589,7 @@ export function RegistrationInsightsCharts({
 
         <InsightCard
           icon={MapPin}
-          title="Where people are from"
+          title="Registered Users from India by State"
           description="All states by registration count. Scroll to see the full list."
         >
           {demographicsLoading ? (
@@ -525,6 +601,26 @@ export function RegistrationInsightsCharts({
           ) : (
             <ScrollableDemographicBarChart
               data={byState}
+              yAxisWidth={92}
+              maxViewportHeight={240}
+            />
+          )}
+        </InsightCard>
+
+        <InsightCard
+          icon={Globe2}
+          title="Registered Users by Country"
+          description="Registrations by country. Scroll if the list is long."
+        >
+          {demographicsLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Loading country data…</p>
+          ) : demographicsError ? (
+            <p className="py-8 text-center text-sm text-destructive">{demographicsError}</p>
+          ) : byCountry.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No country data yet.</p>
+          ) : (
+            <ScrollableDemographicBarChart
+              data={byCountry}
               yAxisWidth={92}
               maxViewportHeight={240}
             />
@@ -548,6 +644,51 @@ export function RegistrationInsightsCharts({
               yAxisWidth={128}
               tickFontSize={11}
               maxViewportHeight={280}
+            />
+          )}
+        </InsightCard>
+
+        <InsightCard
+          icon={CalendarDays}
+          title="Feedback by day"
+          description="Total feedback responses for each event day (with date)."
+        >
+          {eventFeedbackLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Loading feedback…</p>
+          ) : eventFeedbackError ? (
+            <p className="py-8 text-center text-sm text-destructive">{eventFeedbackError}</p>
+          ) : feedbackByDay.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No feedback by day yet.</p>
+          ) : (
+            <ScrollableDemographicBarChart
+              data={feedbackByDay}
+              yAxisWidth={110}
+              maxViewportHeight={200}
+              tooltip="feedback"
+              defaultBarFill="#3b82f6"
+            />
+          )}
+        </InsightCard>
+
+        <InsightCard
+          icon={MessageSquareText}
+          title="Feedback by sessions"
+          description="Total feedback responses per session. Scroll to see every session."
+        >
+          {eventFeedbackLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Loading feedback…</p>
+          ) : eventFeedbackError ? (
+            <p className="py-8 text-center text-sm text-destructive">{eventFeedbackError}</p>
+          ) : feedbackBySession.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No session feedback yet.</p>
+          ) : (
+            <ScrollableDemographicBarChart
+              data={feedbackBySession}
+              yAxisWidth={140}
+              tickFontSize={11}
+              maxViewportHeight={280}
+              tooltip="feedback"
+              defaultBarFill="#a855f7"
             />
           )}
         </InsightCard>

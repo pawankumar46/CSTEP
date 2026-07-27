@@ -142,12 +142,13 @@ export const getEventRegistrationsByAttendanceMode = async (
   return { registrations: allRegistrations, total };
 };
 
+/** Live: GET /registrations/registration/my/ — signed-in user's registrations. */
 export const getRegistrations = async (): Promise<Registration[]> => {
   try {
-    const { data } = await apiClient.get<unknown>("/registrations/");
+    const { data } = await apiClient.get<unknown>("/registrations/registration/my/");
     return extractRegistrationList(data).map((raw) => mapApiRegistrationToRegistration(raw));
-  } catch {
-    return [...registrations];
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
   }
 };
 

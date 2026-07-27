@@ -28,6 +28,7 @@ import { RegistrationInsightsCharts } from "@/components/dashboard/RegistrationI
 import { ChartCard } from "@/components/shared/ChartCard";
 import { ChartFilterGroup } from "@/components/shared/ChartFilterGroup";
 import { StatCard } from "@/components/shared/StatCard";
+import { isIcasEventName } from "@/lib/icas-conference";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
@@ -173,6 +174,11 @@ export function EventAnalyticsOverview() {
     registrationDemographicsError,
     fetchRegistrationDemographics,
     clearRegistrationDemographics,
+    eventFeedbackAnalytics,
+    eventFeedbackAnalyticsLoading,
+    eventFeedbackAnalyticsError,
+    fetchEventFeedbackAnalytics,
+    clearEventFeedbackAnalytics,
     streamingSummary,
     streamingSummaryLoading,
     streamingSummaryError,
@@ -227,6 +233,7 @@ export function EventAnalyticsOverview() {
       clearRegistrationTrend();
       clearRegistrationAttendanceInsights();
       clearRegistrationDemographics();
+      clearEventFeedbackAnalytics();
       clearStreamingSummary();
       clearStreamingParticipationTrend();
       return;
@@ -235,6 +242,7 @@ export function EventAnalyticsOverview() {
     fetchRegistrationCounts(selectedEventId);
     fetchRegistrationAttendanceInsights(selectedEventId);
     fetchRegistrationDemographics(selectedEventId);
+    fetchEventFeedbackAnalytics(selectedEventId);
     fetchStreamingSummary(selectedEventId);
   }, [
     selectedEventId,
@@ -247,6 +255,8 @@ export function EventAnalyticsOverview() {
     clearRegistrationAttendanceInsights,
     fetchRegistrationDemographics,
     clearRegistrationDemographics,
+    fetchEventFeedbackAnalytics,
+    clearEventFeedbackAnalytics,
     fetchStreamingSummary,
     clearStreamingSummary,
     clearStreamingParticipationTrend,
@@ -356,10 +366,12 @@ export function EventAnalyticsOverview() {
       || Boolean(registrationTrend)
       || Boolean(registrationAttendanceInsights)
       || Boolean(registrationDemographics)
+      || Boolean(eventFeedbackAnalytics)
       || registrationCountsLoading
       || registrationTrendLoading
       || registrationAttendanceLoading
       || registrationDemographicsLoading
+      || eventFeedbackAnalyticsLoading
     );
   const initialEventLoading =
     Boolean(selectedEventId)
@@ -386,18 +398,20 @@ export function EventAnalyticsOverview() {
       )}
 
       {(eventTitle || selectedTopEvent || selectedEventId) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-semibold">{eventTitle ?? `Event ${selectedEventId}`}</h2>
-          {selectedEventId && (
-            <Badge variant="outline">Event ID {selectedEventId}</Badge>
-          )}
-          {eventStatus && (
-            <Badge variant="outline" className="capitalize">
-              {String(eventStatus).toLowerCase()}
-            </Badge>
-          )}
-          {selectedEvent?.registeredCount != null && selectedEvent.registeredCount > 0 && (
-            <Badge variant="secondary">{selectedEvent.registeredCount} registrations</Badge>
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold">{eventTitle ?? `Event ${selectedEventId}`}</h2>
+            {eventStatus && (
+              <Badge variant="outline" className="capitalize">
+                {String(eventStatus).toLowerCase()}
+              </Badge>
+            )}
+            {selectedEvent?.registeredCount != null && selectedEvent.registeredCount > 0 && (
+              <Badge variant="secondary">{selectedEvent.registeredCount} registrations</Badge>
+            )}
+          </div>
+          {eventTitle && isIcasEventName(eventTitle) && (
+            <p className="text-sm text-muted-foreground">India Clean Air Summit</p>
           )}
         </div>
       )}
@@ -418,6 +432,9 @@ export function EventAnalyticsOverview() {
       )}
       {registrationDemographicsError && (
         <p className="text-sm text-destructive">{registrationDemographicsError}</p>
+      )}
+      {eventFeedbackAnalyticsError && (
+        <p className="text-sm text-destructive">{eventFeedbackAnalyticsError}</p>
       )}
       {streamingSummaryError && (
         <p className="text-sm text-destructive">{streamingSummaryError}</p>
@@ -477,6 +494,9 @@ export function EventAnalyticsOverview() {
               demographics={registrationDemographics}
               demographicsLoading={registrationDemographicsLoading}
               demographicsError={registrationDemographicsError}
+              eventFeedback={eventFeedbackAnalytics}
+              eventFeedbackLoading={eventFeedbackAnalyticsLoading}
+              eventFeedbackError={eventFeedbackAnalyticsError}
             />
           </AnalyticsCollapsibleSection>
         </div>

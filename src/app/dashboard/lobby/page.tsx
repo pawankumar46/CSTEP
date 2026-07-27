@@ -21,8 +21,11 @@ import { useLobbyStore } from "@/store/useLobbyStore";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { slugifyFilename } from "@/lib/export-utils";
 import {
+  ATTENDANCE_MODE_EXPORT_DAY_DATES,
   LOBBY_EXPORT_COLUMNS,
+  lobbyAttendanceModeForDate,
 } from "@/lib/registration-export";
+import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import { getRegistrationOptionLabel } from "@/lib/registration-options";
 import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
 import type { Registration, RegistrationStatus, UserRole } from "@/types";
@@ -204,18 +207,21 @@ function LobbyContent() {
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "phone", header: "Phone Number" },
       { accessorKey: "email", header: "Email" },
-      {
-        accessorKey: "participationDateLabel",
-        header: "Dates",
-        cell: ({ row }) => (
-          <span className="text-sm">
-            {row.original.participationDateLabel
-              ?? (row.original.registeredDaysCount != null
-                ? `${row.original.registeredDaysCount} day(s)`
-                : "—")}
-          </span>
-        ),
-      },
+      ...ATTENDANCE_MODE_EXPORT_DAY_DATES.map((date) => ({
+        id: `day-${date}`,
+        header: formatRegistrationIntervalDayLabel(date),
+        cell: ({ row }: { row: { original: Registration } }) => {
+          const mode = lobbyAttendanceModeForDate(row.original, date);
+          if (mode === "—") {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <Badge variant="outline" className="font-normal">
+              {mode}
+            </Badge>
+          );
+        },
+      })),
       {
         accessorKey: "registeredSessionsCount",
         header: "Sessions",

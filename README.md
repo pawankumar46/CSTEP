@@ -135,7 +135,7 @@ c-step/
 │   │   ├── layout.tsx         # Root layout
 │   │   └── page.tsx           # Landing / home
 │   ├── components/
-│   │   ├── auth/              # Auth guards, PhoneWithCountryCode
+│   │   ├── auth/              # Auth guards, PhoneWithCountryCode, SignupLocationFields
 │   │   ├── dashboard/         # Admin dialogs, event cards, lobby & analytics UI
 │   │   │   ├── AttendanceModeAnalytics.tsx
 │   │   │   ├── EventSelectCard.tsx
@@ -156,6 +156,7 @@ c-step/
 │   │   ├── api-client.ts      # Axios instance + JWT interceptors
 │   │   ├── auth-mappers.ts    # Auth request/response mapping
 │   │   ├── country-codes.ts   # Dial codes for signup phone (`country_code`)
+│   │   ├── india-states.ts    # Indian states/UTs + default country for +91 signup
 │   │   ├── registration-mappers.ts
 │   │   ├── event-support-mappers.ts
 │   │   ├── event-mappers.ts
@@ -278,7 +279,7 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 | `useEventSupportStore` | Profile event-support form state |
 | `useUserStore` | User management (super admin) |
 | `useAnalyticsStore` | Dashboard analytics |
-| `useFeedbackStore` | Feedback (mock-backed) |
+| `useFeedbackStore` | Feedback (`GET`/`POST /events/feedback/`) |
 | `useRecordingStore` | Recordings (mock-backed) |
 | `useHomeDataStore` | Home page upcoming events (registration flag + per-event summary) |
 
@@ -301,6 +302,7 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 | `/login`, `/signup`, `/otp` | Authentication |
 | `/event-register` | Multi-step event registration |
 | `/profile` | Delegate profile & assistance requests |
+| `/my-registrations` | Signed-in user’s event registrations (`GET /registrations/registration/my/`) |
 | `/feedback` | Multi-day session feedback (all authenticated users) |
 | `/streaming` | Live stream (guarded by registration + event phase) |
 | `/dashboard` | Role-based dashboard home |
@@ -363,7 +365,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/sign_up/` | User registration (`role: BASE_USER`, `country_code` e.g. `+91`, `phone_number`, `gender`, `designation`, `org_type` ORGANISATION/INDEPENDENT, `org_name`, `motivation`, `city`, `state`, profile fields) |
+| `POST` | `/auth/sign_up/` | User registration (`role: BASE_USER`, `country_code` e.g. `+91`, `phone_number`, `gender`, `designation`, `org_type` ORGANISATION/INDEPENDENT, `org_name`, `motivation`, `city`, `state`, `country`, profile fields). For non-`+91`, `state` is sent empty and `country` is free text. |
 | `POST` | `/auth/login/` | Login → access + refresh tokens |
 | `POST` | `/auth/verify-otp/` | OTP verification (`{ email, otp }` or `{ phone_number, otp }`) |
 | `POST` | `/auth/resend-otp/` | Resend OTP (`{ "email": "..." }` or `{ "phone_number": "..." }`) |
@@ -374,7 +376,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/auth/me/` | Current user profile |
 | `PATCH` | `/auth/me/` | Update profile name (`salutation`, `first_name`, `middle_name`, `last_name`) |
 | `GET` | `/auth/users/` | Paginated user list (admin) |
-| `POST` | `/auth/users/` | Create user (lobby Add Users; same profile fields as signup including `country_code`) |
+| `POST` | `/auth/users/` | Create user (lobby Add Users; same profile fields as signup including `country_code`, `city`, `state`, `country`) |
 | `DELETE` | `/auth/users/:id/` | Delete user |
 
 #### Events — `event.service.ts`
@@ -389,12 +391,17 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/events/event/` | Create event |
 | `PATCH` | `/events/event/:id/` | Update event |
 | `DELETE` | `/events/event/:id/` | Delete event |
+| `GET` | `/events/event-days/dropdown/?event=` | Event day options (feedback tabs, attendance-mode edit); `{ id, day_number, date, label, allowed_attendance_modes }` |
+| `GET` | `/events/schedule-items/?day=` | Schedule items for a day (feedback session list; paginated `results[]`) |
+| `GET` | `/events/feedback/?event=` | Paginated feedback (`results[]`: `event_title`, `event_day_date`, `schedule_item_title`, `user_full_name`, rating, comment, …) |
+| `POST` | `/events/feedback/` | Create session feedback `{ event, event_date, schedule_item, rating, comment }` |
 
 #### Registrations — `registration.service.ts`, `lobby.service.ts`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/registrations/` | User's registrations |
+| `GET` | `/registrations/registration/my/` | Signed-in user’s registrations (array: `registration_dates[{ date, mode }]`, `registered_sessions_count`, `status`, …) |
+| `GET` | `/registrations/` | Legacy / alternate registrations list |
 | `POST` | `/registrations/registration/` | Create registration. **WHOLE_DAY:** `{ event, day_ids, attendance_mode }`. **MULTI_SESSION:** `{ event, sessions: [{ day, attendance_mode: PHYSICAL \| VIRTUAL, session_ids }] }` |
 | `PUT` | `/registrations/registration/:id/` | Update registration |
 | `PATCH` | `/registrations/registration/bulk-status/` | Bulk status: `{ ids, status }` |
@@ -413,7 +420,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/registrations/registration/?registration__event=&attendance_mode=&page=` | Paginated registrations (lobby, attendance-mode analytics) |
+| `GET` | `/registrations/registration/?event=&page=` | Paginated registrations (lobby). Results include `registration_dates: [{ date, mode: PHYSICAL\|VIRTUAL }]`, `registered_sessions_count`, `status` |
 | `GET` | `/registrations/travel-assistance/?event=&page=` | Travel rows |
 | `GET` | `/registrations/medical-assistance/?event=&page=` | Medical rows |
 | `GET` | `/registrations/translation-assistance/?event=&page=` | Translation rows |
@@ -438,10 +445,11 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/registrations/counts/` | Overview registration status cards (`event_id` query). Response: `total`, `accepted`, `pending`, `on_hold`, `rejected` (`undecided_mode` ignored in UI) |
 | `GET` | `/analytics/registrations/trend/` | Registrations-by-day chart (`event_id`, `granularity=daily\|weekly\|monthly`). Response: `{ granularity, results: [{ date, count }] }` |
 | `GET` | `/analytics/registrations/insights/` | Attendance donut (`event_id`). Uses `attendance_mode` + `attendance_mode_by_date`; UI shows Physical / Virtual / Mixed only |
-| `GET` | `/analytics/registrations/demographics/` | Gender / state / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_designation` |
+| `GET` | `/analytics/registrations/demographics/` | Gender / state / country / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_country`, `by_designation` |
+| `GET` | `/analytics/events/feedback/` | Overview feedback charts (`event`, optional `day`). Response: `overall` (`feedback_by_date[]`, totals), `by_day[]` (`event_date`, `day_number`, count), `by_session[]` |
 | `GET` | `/analytics/streaming/summary/` | Live Event Insights streaming cards + details (`event_id`). Response: `currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time fields, `live_broadcast` |
 | `GET` | `/analytics/streaming/participation-trend/` | Participation Trend chart (`event_id`, `mode=all\|physical\|virtual`, `interval_minutes=15`, optional `date=YYYY-MM-DD`). Response: `{ mode, results: [{ bucket_start, count }] }` (empty `results` when no activity) |
-| `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`). Paginated `{ count, total_pages, current_page, results[] }` |
+| `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
@@ -500,7 +508,7 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 
 ### 2. Lobby: add user (two-step wizard)
 
-1. **Signup** → `POST /auth/users/` with `role: BASE_USER`, `country_code`, `phone_number`, `designation`, `org_type`, `org_name`, `motivation`, `city`, `state` (`auth-mappers.toLobbySignupPayload`)
+1. **Signup** → `POST /auth/users/` with `role: BASE_USER`, `country_code`, `phone_number`, `designation`, `org_type`, `org_name`, `motivation`, `city`, `state`, `country` (`auth-mappers.toLobbySignupPayload`)
 2. **Register for event** → `POST /registrations/registration/` with `user` id (`registration-mappers.toLobbyRegistrationApiPayload`)
 
 Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
@@ -562,8 +570,30 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-07-24
 
+- **Home — account menu:** Signed-in landing navbar uses a user dropdown with **My Registrations**, **Profile**, and **Logout** (mobile menu lists the same actions).
+- **Home — My Registrations:** `/my-registrations` loads `GET /registrations/registration/my/`; empty state links to event registration.
+- **Analytics — overview header:** Removed **Event ID** badge; ICAS events show **India Clean Air Summit** under the event title.
+- **Analytics — event feedback dates:** Feedback by day maps `by_day.event_date` (labels like `Day 1 · 19 Aug`) from `GET /analytics/events/feedback/`.
+- **Analytics — event feedback charts:** Overview Registration Insights adds **Feedback by day** and **Feedback by sessions** from `GET /analytics/events/feedback/?event=` (optional `day`; bars show total feedback count; tooltip includes average rating).
+- **Analytics — demographics by_country:** Overview Registration Insights adds a **By country** bar chart from `GET /analytics/registrations/demographics/` `by_country`.
+- **Analytics — Attendance Mode dates:** Table/export show **Date of Registration** (`created_at`) and **Modified** (`updated_at`, fallback `user.updated_at`) from `GET /analytics/registrations/users/`.
+- **Lobby — registration_dates mode:** List `GET /registrations/registration/` maps `registration_dates: [{ date, mode }]` into day columns (**19 Aug / 20 Aug / 21 Aug**) with Physical, Virtual, or — (same pattern as Attendance Mode analytics; export matches).
+- **Signup — country / state by dial code:** For **+91**, show Indian state/UT dropdown only (country field hidden; payload still sends `country: India`). For other country codes, hide state and show country as a text field. Non-India sends empty `state`. Shared UI: `SignupLocationFields` (`src/lib/india-states.ts`).
+- **Signup — more dial codes:** Expanded `COUNTRY_DIAL_CODES` in `src/lib/country-codes.ts` (~100 countries; India first, then A–Z).
+- **Analytics — weekly trend labels:** Registrations Over Time weekly buckets use `13th July (week beginning)` (horizontal, not slanted) instead of `Week of 13 Jul`.
+- **Analytics — Attendance Mode day filter columns:** Choosing a participation day (e.g. **20 Aug**) shows only that day’s mode column; **All days** still shows 19/20/21 Aug.
+- **Analytics — Attendance Mode day columns:** Registrations table (and export) uses separate columns for **19 Aug / 20 Aug / 21 Aug**, each showing Physical, Virtual, or —.
+- **Feedback — enriched list fields:** Mapper reads `event_title`, `event_day_date`, `schedule_item_title`, `user`, and `user_full_name` from `GET /events/feedback/` so dashboard tables show real event/day/session/user labels.
+- **Feedback — list display fix:** Feedback summary now groups live `GET /events/feedback/` rows (was stuck on hardcoded mock session titles, so API data looked empty). Date labels support day ids until calendar dates are returned.
+- **Feedback — list API:** Dashboard `/dashboard/feedback` and `/feedback` load from `GET /events/feedback/?event=` (all pages). Mapper supports current fields plus upcoming day / session name / user details when the API adds them.
+- **Feedback — submit validation:** Submit requires at least one rated session (matches `POST /events/feedback/`). ICAS Overall is optional. Validation/API errors show next to the submit button instead of failing silently.
+- **Feedback — create API:** Submitting multi-day feedback posts one `POST /events/feedback/` per rated session with `{ event, event_date, schedule_item, rating, comment }` (`event` default `11`, `event_date` = day id, `schedule_item` = session id).
+- **Feedback — sessions API:** Selecting a feedback day tab loads sessions from `GET /events/schedule-items/?day=<dayId>` (titles + time range). Days still come from `GET /events/event-days/dropdown/`.
+- **Feedback — event days API:** Multi-day feedback tabs (`/feedback` and streaming Exit) load from `GET /events/event-days/dropdown/?event=` (default event `11`), with an **ICAS Overall** tab after the day list. Falls back to hardcoded ICAS dates if the API fails.
+- **Streaming — back opens feedback:** Browser back on `/streaming` opens the same exit feedback dialog as the **Exit** button (history guard + `popstate`); submit/skip then leave to home.
+- **Analytics — Attendance Mode loading:** `/dashboard/analytics/attendance-mode` shows a table skeleton while `GET /analytics/registrations/users/` is in flight (initial load, filter, and page changes).
 - **Signup — skip OTP for non-India:** After account creation, only **+91** users go to mobile OTP (`/otp`). Other country codes auto-sign in with the new password and continue to event registration (`resolvePostAuthDestination`).
-- **Signup — country code:** Public `/signup` and Lobby Add Users phone fields include a country dial-code selector (`PhoneWithCountryCode`). Payloads send `country_code` (e.g. `+91`) with national `phone_number` via `toSignupPayload` / `toLobbySignupPayload`. Digit length follows the selected country (`src/lib/country-codes.ts`). Gender is still collected and sent.
+- **Signup — country code:** Public `/signup` and Lobby Add Users phone fields include a country dial-code selector (`PhoneWithCountryCode`). Payloads send `country_code` (e.g. `+91`) with national `phone_number` via `toSignupPayload` / `toLobbySignupPayload`. Digit length follows the selected country (`src/lib/country-codes.ts`). Gender is still collected and sent. Location fields depend on dial code (see **Signup — country / state by dial code**).
 - **Docs — application architecture rule:** Added `.cursor/rules/application-architecture.mdc` (always-on) with layers, domains, data flow, Mermaid diagrams, “how to explain this” (client–server + modular monolith FE), and where to add new work. README Architecture section embeds key diagrams and links to the full set.
 
 ### 2026-07-23
@@ -573,8 +603,8 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 - **Analytics — participation trend API:** **Participation Trend** uses `GET /analytics/streaming/participation-trend/` with `mode=all|physical|virtual`, fixed `interval_minutes=15`, and a day selector (`date`). Maps `{ mode, results }`; empty `results` shows an empty state. Day list always includes today.
 - **Analytics — streaming summary API:** Live Event Insights cards + **Streaming Details** use `GET /analytics/streaming/summary/?event_id=` (`currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time display strings, `live_broadcast`). Viewer Sessions / Logins rows removed (not in API).
 - **Analytics — demographics scroll:** State and designation bar charts list every category (no “Others” bucket) inside a vertically scrollable area so long tails remain visible.
-- **Analytics — live data visibility fix:** Registration cards + **Registration Insights** no longer wait on mock event analytics. Overview prefers event **id 11** (or highest `registeredCount`), shows **Event ID** badge, and uses live API payloads even when counts/charts are empty (no silent mock override).
-- **Analytics — demographics API:** Gender, state, and designation charts use `GET /analytics/registrations/demographics/?event_id=` (`by_gender`, `by_state`, `by_designation`). State and designation bars show all labels with vertical scroll when the list is long.
+- **Analytics — live data visibility fix:** Registration cards + **Registration Insights** no longer wait on mock event analytics. Overview prefers event **id 11** (or highest `registeredCount`) and uses live API payloads even when counts/charts are empty (no silent mock override).
+- **Analytics — demographics API:** Gender, state, country, and designation charts use `GET /analytics/registrations/demographics/?event_id=` (`by_gender`, `by_state`, `by_country`, `by_designation`). State/country/designation bars show all labels with vertical scroll when the list is long.
 - **Analytics — attendance insights API:** **How people will attend** uses `GET /analytics/registrations/insights/?event_id=` (`attendance_mode` + `attendance_mode_by_date`). Shows **Physical / Virtual / Mixed** only, with an **All days** / event-day filter.
 - **Analytics — registration trend API:** **Registrations by day** uses `GET /analytics/registrations/trend/?event_id=&granularity=` with a **Daily / Weekly / Monthly** toggle.
 - **Analytics — registration counts API:** Overview **Registrations** cards load from `GET /analytics/registrations/counts/?event_id=` (`total` → “Total registered for event”, plus Accepted / Pending / Hold / Rejected). `undecided_mode` is ignored.
@@ -619,7 +649,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 - **API base URL guard:** `getApiBaseUrl()` / `apiClient` reject missing or non-absolute `NEXT_PUBLIC_API_URL` and avoid falling back to the page origin (`localhost`) for Django calls.
 - **Event registration — auto Participation step:** On load, the first available event (or `?event=` preset) is auto-selected and the wizard advances to **Participation** (days/sessions); users can still go Back to review personal info or change the event.
 - **Signup OTP auto-login:** After mobile OTP on `/otp`, the same `/auth/verify-otp/` token response signs the user in immediately (no separate login step). New base users go to `/event-register` when not yet registered.
-- **Lobby — registration list:** `GET /registrations/registration/?event=` now maps `registration_dates` (replaces list-level `participation_dates` / `registered_days_count` / `attendance_mode`). Lobby table shows **Dates** + **Sessions** + **Status** (Attendance column removed from list view).
+- **Lobby — registration list:** `GET /registrations/registration/?event=` maps `registration_dates` (`[{ date, mode }]`) into **19 Aug / 20 Aug / 21 Aug** mode columns. Also uses `registered_sessions_count` and `status`. Lobby table shows day columns + **Sessions** + **Status**.
 - **Event registration — session cards:** Wider session cards (~20–22rem) with full wrapping titles (no 2-line clamp) so long session names fit; carousel scroll step increased to match.
 - **Lobby — Add Users signup:** Step 1 now matches public `/signup` — designation, organisation type/name, motivation, city/state (address block removed); shared Zod fields via `signup.schema.ts`.
 - **Lobby — attendance & sessions:** Add Users / Edit registration match self-registration: **Physical** hides session picker (all sessions included); **Virtual** requires session selection. Per-day modes come from API `allowed_attendance_modes` (e.g. **19 Aug** is Physical only).

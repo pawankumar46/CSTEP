@@ -150,6 +150,46 @@ function mapApiAttendanceMode(value: unknown): AttendanceMode {
   return "physical";
 }
 
+function formatAttendanceModeLabel(mode: AttendanceMode): string {
+  return mode === "virtual" ? "Virtual" : "Physical";
+}
+
+/** List API `registration_dates: [{ date, mode }]` (also accepts legacy date strings). */
+function extractRegistrationDateEntriesFromApi(
+  raw: Record<string, unknown>,
+): { date: string; attendanceMode?: AttendanceMode }[] {
+  const candidates = [raw.registration_dates, raw.participation_dates];
+
+  for (const dates of candidates) {
+    if (!Array.isArray(dates)) continue;
+    return dates
+      .map((item) => {
+        if (item && typeof item === "object") {
+          const entry = item as Record<string, unknown>;
+          const date = String(entry.date ?? "");
+          if (!date) return null;
+          const modeRaw = entry.mode ?? entry.attendance_mode;
+          const hasMode = modeRaw != null && String(modeRaw).trim() !== "";
+          return {
+            date,
+            attendanceMode: hasMode ? mapApiAttendanceMode(modeRaw) : undefined,
+          };
+        }
+        if (typeof item === "string" && item.trim()) {
+          return { date: item.trim() };
+        }
+        return null;
+      })
+      .filter((entry): entry is { date: string; attendanceMode?: AttendanceMode } => entry != null);
+  }
+
+  if (raw.participation_date) {
+    return [{ date: String(raw.participation_date) }];
+  }
+
+  return [];
+}
+
 const DEFAULT_ATTENDANCE_MODES: AttendanceMode[] = ["physical", "virtual"];
 
 export function mapApiAllowedAttendanceModes(values: unknown): AttendanceMode[] {
@@ -260,28 +300,6 @@ export function mapAppAttendanceModeToRegistrationSessionApi(mode: AttendanceMod
 
 function mapAppFoodPreferenceToApi(preference: FoodPreference): string {
   return FOOD_PREFERENCE_TO_API[preference];
-}
-
-function extractParticipationDatesFromApi(raw: Record<string, unknown>): string[] {
-  const candidates = [raw.registration_dates, raw.participation_dates];
-
-  for (const dates of candidates) {
-    if (!Array.isArray(dates)) continue;
-    return dates
-      .map((item) => {
-        if (item && typeof item === "object" && "date" in item) {
-          return String((item as { date: unknown }).date);
-        }
-        return typeof item === "string" ? item : "";
-      })
-      .filter(Boolean);
-  }
-
-  if (raw.participation_date) {
-    return [String(raw.participation_date)];
-  }
-
-  return [];
 }
 
 function resolveRegistrationDetails(raw: Record<string, unknown>): Record<string, unknown> {
@@ -817,15 +835,40 @@ export function mapApiRegistrationToRegistration(
     : travelKey;
   const participationTime = mapApiParticipationTime(raw.participation_time);
 
-  const apiParticipationDates = extractParticipationDatesFromApi(raw);
+  const apiRegistrationDateEntries = extractRegistrationDateEntriesFromApi(raw);
+  const apiParticipationDates = apiRegistrationDateEntries.map((entry) => entry.date);
   const participationDate =
     apiParticipationDates.length > 1
       ? "both_days"
       : mapApiParticipationDate(apiParticipationDates[0]);
   const participationDateLabel =
-    apiParticipationDates.length > 0
-      ? apiParticipationDates.map((date) => formatParticipationDateDisplay(date)).join(", ")
+    apiRegistrationDateEntries.length > 0
+      ? apiRegistrationDateEntries
+          .map((entry) => formatParticipationDateDisplay(entry.date))
+          .join(", ")
       : formatParticipationDateDisplay(raw.participation_date);
+  const modesForLabel = apiRegistrationDateEntries
+    .map((entry) => entry.attendanceMode)
+    .filter((mode): mode is AttendanceMode => mode != null);
+  const participationModeLabel =
+    modesForLabel.length > 0
+      ? modesForLabel.map(formatAttendanceModeLabel).join(", ")
+      : undefined;
+
+  const registrationDates = apiRegistrationDateEntries
+    .filter(
+      (entry): entry is { date: string; attendanceMode: AttendanceMode } =>
+        entry.attendanceMode != null,
+    )
+    .map((entry) => ({
+      date: entry.date,
+      attendanceMode: entry.attendanceMode,
+    }));
+
+  const modesFromDates = registrationDates.map((entry) => entry.attendanceMode);
+  const uniqueModesFromDates = [...new Set(modesFromDates)];
+  const attendanceModeFromDates =
+    uniqueModesFromDates.length === 1 ? uniqueModesFromDates[0] : undefined;
 
   const registeredSessionsRaw = raw.registered_sessions_count ?? raw.registeredSessionsCount;
   const registeredSessionsCount =
@@ -854,11 +897,14 @@ export function mapApiRegistrationToRegistration(
     id: String(raw.id ?? raw.pk ?? ""),
     userId: String(raw.user ?? raw.user_id ?? raw.userId ?? ""),
     eventId: String(eventId ?? raw.event ?? raw.event_id ?? raw.eventId ?? ""),
+    eventName: String(raw.event_name ?? raw.event_title ?? raw.eventName ?? "").trim() || undefined,
     userName: String(raw.user_name ?? raw.userName ?? ""),
     email: String(raw.email ?? ""),
     phone: String(raw.phone_number ?? raw.phone ?? ""),
     participationDate,
     participationDateLabel,
+    participationModeLabel,
+    registrationDates: registrationDates.length > 0 ? registrationDates : undefined,
     participationTime,
     registeredDaysCount: Number.isFinite(registeredDaysCount)
       ? registeredDaysCount
@@ -871,7 +917,7 @@ export function mapApiRegistrationToRegistration(
     sessionRegistrations,
     attendanceMode: hasAttendanceMode
       ? mapApiAttendanceMode(raw.attendance_mode)
-      : undefined,
+      : attendanceModeFromDates,
     foodPreference: mapApiFoodPreference(raw.food_preference ?? details.food_preference),
     travelAssistance,
     translationAssistance,

@@ -4,6 +4,7 @@ import type {
   AnalyticsData,
   AuditLog,
   EventAnalytics,
+  EventFeedbackAnalytics,
   Permission,
   RegistrationAttendanceInsights,
   RegistrationCounts,
@@ -21,6 +22,7 @@ interface AnalyticsState {
   registrationTrend: RegistrationTrend | null;
   registrationAttendanceInsights: RegistrationAttendanceInsights | null;
   registrationDemographics: RegistrationDemographics | null;
+  eventFeedbackAnalytics: EventFeedbackAnalytics | null;
   streamingSummary: StreamingSummary | null;
   streamingParticipationTrend: StreamingParticipationTrend | null;
   auditLogs: AuditLog[];
@@ -31,6 +33,7 @@ interface AnalyticsState {
   registrationTrendLoading: boolean;
   registrationAttendanceLoading: boolean;
   registrationDemographicsLoading: boolean;
+  eventFeedbackAnalyticsLoading: boolean;
   streamingSummaryLoading: boolean;
   streamingParticipationTrendLoading: boolean;
   error: string | null;
@@ -39,6 +42,7 @@ interface AnalyticsState {
   registrationTrendError: string | null;
   registrationAttendanceError: string | null;
   registrationDemographicsError: string | null;
+  eventFeedbackAnalyticsError: string | null;
   streamingSummaryError: string | null;
   streamingParticipationTrendError: string | null;
   fetchAnalytics: () => Promise<void>;
@@ -47,6 +51,7 @@ interface AnalyticsState {
   fetchRegistrationTrend: (eventId: string, granularity?: "daily" | "weekly" | "monthly") => Promise<void>;
   fetchRegistrationAttendanceInsights: (eventId: string) => Promise<void>;
   fetchRegistrationDemographics: (eventId: string) => Promise<void>;
+  fetchEventFeedbackAnalytics: (eventId: string) => Promise<void>;
   fetchStreamingSummary: (eventId: string) => Promise<void>;
   fetchStreamingParticipationTrend: (
     eventId: string,
@@ -61,6 +66,7 @@ interface AnalyticsState {
   clearRegistrationTrend: () => void;
   clearRegistrationAttendanceInsights: () => void;
   clearRegistrationDemographics: () => void;
+  clearEventFeedbackAnalytics: () => void;
   clearStreamingSummary: () => void;
   clearStreamingParticipationTrend: () => void;
   fetchAuditLogs: () => Promise<void>;
@@ -74,6 +80,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   registrationTrend: null,
   registrationAttendanceInsights: null,
   registrationDemographics: null,
+  eventFeedbackAnalytics: null,
   streamingSummary: null,
   streamingParticipationTrend: null,
   auditLogs: [],
@@ -84,6 +91,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   registrationTrendLoading: false,
   registrationAttendanceLoading: false,
   registrationDemographicsLoading: false,
+  eventFeedbackAnalyticsLoading: false,
   streamingSummaryLoading: false,
   streamingParticipationTrendLoading: false,
   error: null,
@@ -92,6 +100,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   registrationTrendError: null,
   registrationAttendanceError: null,
   registrationDemographicsError: null,
+  eventFeedbackAnalyticsError: null,
   streamingSummaryError: null,
   streamingParticipationTrendError: null,
 
@@ -183,6 +192,22 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
     }
   },
 
+  fetchEventFeedbackAnalytics: async (eventId) => {
+    set({ eventFeedbackAnalyticsLoading: true, eventFeedbackAnalyticsError: null });
+    try {
+      const eventFeedbackAnalytics =
+        await analyticsService.getEventFeedbackAnalytics(eventId);
+      set({ eventFeedbackAnalytics, eventFeedbackAnalyticsLoading: false });
+    } catch (err) {
+      set({
+        eventFeedbackAnalytics: null,
+        eventFeedbackAnalyticsError:
+          err instanceof Error ? err.message : "Failed to fetch feedback analytics",
+        eventFeedbackAnalyticsLoading: false,
+      });
+    }
+  },
+
   fetchStreamingSummary: async (eventId) => {
     set({ streamingSummaryLoading: true, streamingSummaryError: null });
     try {
@@ -247,6 +272,14 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
       registrationDemographics: null,
       registrationDemographicsError: null,
       registrationDemographicsLoading: false,
+    });
+  },
+
+  clearEventFeedbackAnalytics: () => {
+    set({
+      eventFeedbackAnalytics: null,
+      eventFeedbackAnalyticsError: null,
+      eventFeedbackAnalyticsLoading: false,
     });
   },
 

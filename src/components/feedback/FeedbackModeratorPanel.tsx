@@ -121,6 +121,11 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
           <CardTitle className="text-base">Feedback Summary</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
+          {summaryRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No feedback responses to summarize yet.
+            </p>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -146,9 +151,9 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
                       <span className="text-muted-foreground">—</span>
                     ) : (
                       <ul className="space-y-1.5">
-                        {row.respondents.map((respondent) => (
+                        {row.respondents.map((respondent, index) => (
                           <li
-                            key={`${respondent.userName}-${respondent.rating}`}
+                            key={`${respondent.userName}-${respondent.rating}-${index}`}
                             className="text-sm"
                           >
                             <span className="font-medium">{respondent.userName}</span>
@@ -166,8 +171,8 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
                       <span className="text-muted-foreground">—</span>
                     ) : (
                       <ul className="space-y-1.5">
-                        {row.respondents.map((respondent) => (
-                          <li key={`${respondent.userName}-comment`} className="text-sm">
+                        {row.respondents.map((respondent, index) => (
+                          <li key={`${respondent.userName}-comment-${index}`} className="text-sm">
                             <span className="font-medium">{respondent.userName}:</span>{" "}
                             <span className="text-muted-foreground">
                               {respondent.comments.trim() || "—"}
@@ -181,6 +186,7 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 

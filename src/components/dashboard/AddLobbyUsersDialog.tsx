@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { SessionScrollRow } from "@/components/shared/SessionScrollRow";
 import { PhoneWithCountryCode } from "@/components/auth/PhoneWithCountryCode";
+import { SignupLocationFields } from "@/components/auth/SignupLocationFields";
 import {
   addLobbyUserSchema,
   EMPTY_ADD_LOBBY_USER,
@@ -36,6 +37,8 @@ import {
   type LobbyUserSignupFormValues,
 } from "@/features/dashboard/admin-lobby-user.schema";
 import { SIGNUP_GENDERS, SIGNUP_ORG_TYPES } from "@/features/auth/signup.schema";
+import { isIndiaCountryCode } from "@/lib/country-codes";
+import { DEFAULT_SIGNUP_COUNTRY } from "@/lib/india-states";
 import {
   buildParticipationDateOptionsFromEventDays,
   formatEventDayDateLabel,
@@ -418,6 +421,7 @@ export function AddLobbyUsersDialog({
         "motivation",
         "city",
         "state",
+        "country",
         "password",
         "confirmPassword",
       ],
@@ -444,6 +448,7 @@ export function AddLobbyUsersDialog({
         motivation: signupValues.motivation,
         city: signupValues.city,
         state: signupValues.state,
+        country: signupValues.country,
         password: signupValues.password,
         confirmPassword: signupValues.confirmPassword,
       });
@@ -615,9 +620,18 @@ export function AddLobbyUsersDialog({
                     id="lobby-phone"
                     countryCode={countryCode}
                     phone={phone}
-                    onCountryCodeChange={(code) =>
-                      setValue("countryCode", code, { shouldValidate: true, shouldDirty: true })
-                    }
+                    onCountryCodeChange={(code) => {
+                      setValue("countryCode", code, { shouldValidate: true, shouldDirty: true });
+                      if (isIndiaCountryCode(code)) {
+                        setValue("country", DEFAULT_SIGNUP_COUNTRY, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      } else {
+                        setValue("state", "", { shouldValidate: true, shouldDirty: true });
+                        setValue("country", "", { shouldValidate: true, shouldDirty: true });
+                      }
+                    }}
                     onPhoneChange={(value) =>
                       setValue("phone", value, { shouldValidate: true, shouldDirty: true })
                     }
@@ -743,22 +757,13 @@ export function AddLobbyUsersDialog({
                 )}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="lobby-city">City</Label>
-                  <Input id="lobby-city" {...register("city")} />
-                  {errors.city && (
-                    <p className="text-xs text-destructive">{errors.city.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lobby-state">State</Label>
-                  <Input id="lobby-state" {...register("state")} />
-                  {errors.state && (
-                    <p className="text-xs text-destructive">{errors.state.message}</p>
-                  )}
-                </div>
-              </div>
+              <SignupLocationFields
+                countryCode={countryCode}
+                register={register}
+                control={control}
+                errors={errors}
+                idPrefix="lobby-"
+              />
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">

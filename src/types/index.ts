@@ -235,15 +235,27 @@ export interface RegistrationDay {
   sessions: SessionRegistration[];
 }
 
+/** List payload `registration_dates[]` entry (`date` + `mode`). */
+export interface RegistrationDateEntry {
+  date: string;
+  attendanceMode: AttendanceMode;
+}
+
 export interface Registration {
   id: string;
   userId: string;
   eventId: string;
+  /** Present when API includes `event_name` / `event_title`. */
+  eventName?: string;
   userName: string;
   email: string;
   phone: string;
   participationDate: ParticipationDate;
   participationDateLabel?: string;
+  /** Comma-separated modes aligned with `registrationDates` / date label order. */
+  participationModeLabel?: string;
+  /** Per-date attendance from list `registration_dates` (`date` + `mode`). */
+  registrationDates?: RegistrationDateEntry[];
   participationTime: ParticipationTime;
   registeredDaysCount?: number;
   registeredSessionsCount?: number;
@@ -315,6 +327,11 @@ export interface Feedback {
   rating: number;
   comments: string;
   createdAt: string;
+  /** API `event_date` (day id) when present. */
+  eventDayId?: string;
+  /** API `schedule_item` id when present. */
+  scheduleItemId?: string;
+  isOverallRating?: boolean;
 }
 
 export interface AnalyticsSummary {
@@ -462,6 +479,44 @@ export interface RegistrationDemographics {
   byGender: DemographicShareRow[];
   byDesignation: DemographicShareRow[];
   byState: DemographicShareRow[];
+  byCountry: DemographicShareRow[];
+}
+
+/** GET /analytics/events/feedback/?event=&day= */
+export interface EventFeedbackDateCount {
+  date: string;
+  count: number;
+}
+
+export interface EventFeedbackOverall {
+  totalFeedback: number;
+  averageRating: number;
+  ratingDistribution: Record<string, number>;
+  /** When feedback was submitted (`overall.feedback_by_date`). */
+  feedbackByDate: EventFeedbackDateCount[];
+}
+
+export interface EventFeedbackDayStat {
+  eventDayId: string;
+  dayNumber: number;
+  /** Conference day calendar date (`event_date`). */
+  eventDate?: string;
+  totalFeedback: number;
+  averageRating: number;
+}
+
+export interface EventFeedbackSessionStat {
+  scheduleItemId: string;
+  title: string;
+  totalFeedback: number;
+  averageRating: number;
+}
+
+export interface EventFeedbackAnalytics {
+  eventId: string;
+  overall: EventFeedbackOverall;
+  byDay: EventFeedbackDayStat[];
+  bySession: EventFeedbackSessionStat[];
 }
 
 /** GET /analytics/streaming/summary/?event_id= — Live Event Insights streaming cards. */
@@ -508,7 +563,10 @@ export interface AttendanceModeUserRow {
   eventName: string;
   status: RegistrationStatus;
   days: AttendanceModeUserDay[];
+  /** Registration `created_at` — Date of Registration */
   createdAt: string;
+  /** Registration `updated_at` (fallback: user.updated_at) — Modified */
+  updatedAt: string;
 }
 
 export interface AttendanceModeUsersPage {
@@ -569,6 +627,8 @@ export interface DistributionDataPoint {
   name: string;
   value: number;
   color?: string;
+  /** Optional secondary metric (e.g. feedback count alongside average rating). */
+  secondaryValue?: number;
 }
 
 export interface AnalyticsData {
@@ -724,6 +784,8 @@ export interface SignupCredentials {
   orgType: SignupOrgType;
   orgName?: string;
   motivation: string;
+  /** Preferred when set; otherwise address.country. */
+  country?: string;
   city: string;
   state: string;
   /** Lobby signup may still collect a full address; city/state are preferred when set. */

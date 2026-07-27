@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { DEFAULT_COUNTRY_CODE, maxPhoneDigitsForCountry } from "@/lib/country-codes";
+import {
+  DEFAULT_COUNTRY_CODE,
+  isIndiaCountryCode,
+  maxPhoneDigitsForCountry,
+} from "@/lib/country-codes";
+import { DEFAULT_SIGNUP_COUNTRY } from "@/lib/india-states";
 
 export const SIGNUP_ORG_TYPES = [
   { value: "ORGANISATION", label: "Institution or Organisation" },
@@ -37,7 +42,7 @@ export const EMPTY_SIGNUP_ADDRESS: SignupAddressFormValues = {
   city: "",
   district: "",
   state: "",
-  country: "India",
+  country: DEFAULT_SIGNUP_COUNTRY,
   postalCode: "",
 };
 
@@ -68,7 +73,10 @@ export const signupBaseFields = {
   orgName: z.string().trim().optional(),
   motivation: requiredText("Please tell us what motivates you to attend"),
   city: requiredText("City is required"),
-  state: requiredText("State is required"),
+  /** Required for +91 (dropdown); omitted/empty for other country codes. */
+  state: z.string(),
+  /** Required for non-+91 (text field); +91 sends India via mapper (field hidden). */
+  country: z.string(),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(1, "Please confirm your password"),
 } as const;
@@ -105,6 +113,22 @@ export function refineSignupForm(
       path: ["phone"],
     });
   }
+
+  if (isIndiaCountryCode(data.countryCode) && !data.state.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "State / UT is required",
+      path: ["state"],
+    });
+  }
+
+  if (!isIndiaCountryCode(data.countryCode) && !data.country.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Country is required",
+      path: ["country"],
+    });
+  }
 }
 
 export const publicSignupSchema = z
@@ -128,6 +152,7 @@ export const EMPTY_PUBLIC_SIGNUP: PublicSignupFormValues = {
   motivation: "",
   city: "",
   state: "",
+  country: DEFAULT_SIGNUP_COUNTRY,
   password: "",
   confirmPassword: "",
 };

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -10,20 +9,18 @@ import {
 } from "@/components/ui/dialog";
 import {
   MultiDayFeedbackForm,
-  mapStreamingFeedbackToEntries,
 } from "@/components/feedback/MultiDayFeedbackForm";
 import type { StreamingFeedbackFormValues } from "@/features/feedback/streaming-feedback.schema";
-import {
-  resolveFeedbackEventId,
-  resolveFeedbackEventName,
-} from "@/lib/feedback-options";
-import { ROUTES } from "@/lib/routes";
+import { mapStreamingFeedbackToCreatePayloads } from "@/lib/feedback-mappers";
+import { resolveFeedbackEventId } from "@/lib/feedback-options";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
 
 interface StreamingExitFeedbackDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after submit or skip — parent should navigate away. */
+  onLeave: () => void;
   eventId?: string;
   eventName?: string;
 }
@@ -31,33 +28,25 @@ interface StreamingExitFeedbackDialogProps {
 export function StreamingExitFeedbackDialog({
   open,
   onOpenChange,
+  onLeave,
   eventId,
-  eventName,
 }: StreamingExitFeedbackDialogProps) {
-  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { isSubmitting, submitMultiDayFeedback } = useFeedbackStore();
 
   const feedbackEventId = resolveFeedbackEventId(eventId);
-  const feedbackEventName = resolveFeedbackEventName(eventName);
 
-  const goHome = () => {
+  const handleLeave = () => {
     onOpenChange(false);
-    router.push(ROUTES.home);
+    onLeave();
   };
 
   const handleSubmit = async (data: StreamingFeedbackFormValues) => {
     if (!user) return;
 
-    const entries = mapStreamingFeedbackToEntries(data, {
-      userId: user.id,
-      userName: `${user.firstName} ${user.lastName}`.trim(),
-      eventId: feedbackEventId,
-      eventName: feedbackEventName,
-    });
-
-    await submitMultiDayFeedback(entries);
-    goHome();
+    const payloads = mapStreamingFeedbackToCreatePayloads(data, feedbackEventId);
+    await submitMultiDayFeedback(payloads);
+    handleLeave();
   };
 
   return (
@@ -69,15 +58,16 @@ export function StreamingExitFeedbackDialog({
         <DialogHeader>
           <DialogTitle>Share Your Feedback</DialogTitle>
           <DialogDescription>
-            Rate sessions for 19, 20, and 21 Aug, then share your overall ICAS experience.
+          Rate sessions for each event day, then share your overall ICAS experience.
           </DialogDescription>
         </DialogHeader>
 
         <MultiDayFeedbackForm
+          eventId={feedbackEventId}
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
           showSkip
-          onSkip={goHome}
+          onSkip={handleLeave}
           submitLabel="Submit & Go Home"
         />
       </DialogContent>

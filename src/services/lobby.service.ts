@@ -54,6 +54,7 @@ export const createLobbyUser = async (
     motivation,
     city,
     state,
+    country,
     password,
   } = values;
 
@@ -72,6 +73,7 @@ export const createLobbyUser = async (
     motivation,
     city,
     state,
+    country,
     password,
   });
 

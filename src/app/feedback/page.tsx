@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import {
   MultiDayFeedbackForm,
-  mapStreamingFeedbackToEntries,
 } from "@/components/feedback/MultiDayFeedbackForm";
 import { UserFeedbackList } from "@/components/feedback/UserFeedbackList";
 import { LandingFooter } from "@/components/layout/LandingFooter";
@@ -16,7 +15,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import type { StreamingFeedbackFormValues } from "@/features/feedback/streaming-feedback.schema";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
-import { resolveFeedbackEventId, resolveFeedbackEventName } from "@/lib/feedback-options";
+import { mapStreamingFeedbackToCreatePayloads } from "@/lib/feedback-mappers";
+import { resolveFeedbackEventId } from "@/lib/feedback-options";
 import { ROUTES } from "@/lib/routes";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
@@ -29,29 +29,25 @@ function FeedbackContent() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const feedbackEventId = resolveFeedbackEventId(upcomingEvent?.id);
-  const feedbackEventName = resolveFeedbackEventName(upcomingEvent?.name);
 
   useEffect(() => {
     void fetchFeedback();
   }, [fetchFeedback]);
 
-  const userFeedback = useMemo(
-    () => (user ? feedback.filter((item) => item.userId === user.id) : []),
-    [feedback, user],
-  );
+  const userFeedback = useMemo(() => {
+    if (!user) return [];
+    const userId = String(user.id);
+    return feedback.filter(
+      (item) => item.userId === userId || item.userId === user.id,
+    );
+  }, [feedback, user]);
 
   const handleSubmit = async (data: StreamingFeedbackFormValues) => {
     if (!user) return;
 
     setSubmitSuccess(false);
-    const entries = mapStreamingFeedbackToEntries(data, {
-      userId: user.id,
-      userName: `${user.firstName} ${user.lastName}`.trim(),
-      eventId: feedbackEventId,
-      eventName: feedbackEventName,
-    });
-
-    await submitMultiDayFeedback(entries);
+    const payloads = mapStreamingFeedbackToCreatePayloads(data, feedbackEventId);
+    await submitMultiDayFeedback(payloads);
     setSubmitSuccess(true);
     router.push(ROUTES.home);
   };
@@ -61,7 +57,7 @@ function FeedbackContent() {
       <div>
         <h1 className="text-2xl font-bold">Session Feedback</h1>
         <p className="text-sm text-muted-foreground">
-          Rate sessions for 19, 20, and 21 Aug, then share your overall ICAS experience. You can also
+          Rate sessions for each event day, then share your overall ICAS experience. You can also
           submit feedback when leaving the live stream via the Exit button.
         </p>
       </div>
@@ -81,11 +77,12 @@ function FeedbackContent() {
             Multi-day Feedback
           </CardTitle>
           <CardDescription>
-            19, 20, and 21 Aug sessions plus ICAS overall feedback.
+            Event-day sessions (from event days) plus ICAS overall feedback.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <MultiDayFeedbackForm
+            eventId={feedbackEventId}
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}
             submitLabel="Submit Feedback"

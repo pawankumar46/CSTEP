@@ -6,7 +6,7 @@ import { MapPin, Monitor, Users } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
+import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/select";
 import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
-import { ATTENDANCE_MODE_USERS_EXPORT_COLUMNS } from "@/lib/registration-export";
+import { formatDateTime } from "@/lib/utils";
+import { getAttendanceModeUsersExportColumns } from "@/lib/registration-export";
 import { getAllAttendanceModeUsers, getAttendanceModeUsers } from "@/services/analytics.service";
 import { getAllEvents } from "@/services/event.service";
 import type {
@@ -99,45 +100,54 @@ export function AttendanceModeAnalytics() {
     };
   }, []);
 
-  const loadPage = useCallback(async () => {
-    if (!selectedEventId) return;
-
-    setLoading(true);
-    setFetchError(null);
-    try {
-      const result = await getAttendanceModeUsers({
-        eventId: selectedEventId,
-        dayDate: dayDate === "all" ? undefined : dayDate,
-        attendanceMode: attendanceMode === "all" ? undefined : attendanceMode,
-        page,
-        pageSize: TABLE_PAGE_SIZE,
-      });
-      setRows(result.rows);
-      setTotalCount(result.total);
-      setTotalPages(result.totalPages);
-      setHasNext(result.hasNext);
-      setHasPrevious(result.hasPrevious);
-    } catch (err) {
+  useEffect(() => {
+    if (!selectedEventId) {
       setRows([]);
       setTotalCount(0);
       setTotalPages(1);
       setHasNext(false);
       setHasPrevious(false);
-      setFetchError(err instanceof Error ? err.message : "Failed to load attendance mode users");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedEventId, dayDate, attendanceMode, page]);
-
-  useEffect(() => {
-    if (!selectedEventId) {
-      setRows([]);
-      setTotalCount(0);
       setFetchError(null);
+      setLoading(false);
       return;
     }
-    void loadPage();
-  }, [selectedEventId, loadPage]);
+
+    let cancelled = false;
+    setLoading(true);
+    setFetchError(null);
+
+    void (async () => {
+      try {
+        const result = await getAttendanceModeUsers({
+          eventId: selectedEventId,
+          dayDate: dayDate === "all" ? undefined : dayDate,
+          attendanceMode: attendanceMode === "all" ? undefined : attendanceMode,
+          page,
+          pageSize: TABLE_PAGE_SIZE,
+        });
+        if (cancelled) return;
+        setRows(result.rows);
+        setTotalCount(result.total);
+        setTotalPages(result.totalPages);
+        setHasNext(result.hasNext);
+        setHasPrevious(result.hasPrevious);
+      } catch (err) {
+        if (cancelled) return;
+        setRows([]);
+        setTotalCount(0);
+        setTotalPages(1);
+        setHasNext(false);
+        setHasPrevious(false);
+        setFetchError(err instanceof Error ? err.message : "Failed to load attendance mode users");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEventId, dayDate, attendanceMode, page]);
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
@@ -154,6 +164,14 @@ export function AttendanceModeAnalytics() {
     setPage(1);
   };
 
+  const visibleDayDates = useMemo(
+    () =>
+      dayDate === "all"
+        ? [...EVENT_DAY_OPTIONS]
+        : EVENT_DAY_OPTIONS.filter((date) => date === dayDate),
+    [dayDate],
+  );
+
   const columns = useMemo<ColumnDef<AttendanceModeUserRow>[]>(
     () => [
       { accessorKey: "userName", header: "User Name" },
@@ -165,23 +183,44 @@ export function AttendanceModeAnalytics() {
         header: "Organization",
         cell: ({ row }) => row.original.orgName || "—",
       },
+      ...visibleDayDates.map((date) => ({
+        id: `day-${date}`,
+        header: formatRegistrationIntervalDayLabel(date),
+        cell: ({ row }: { row: { original: AttendanceModeUserRow } }) => {
+          const day = row.original.days.find((item) => item.date === date);
+          if (!day) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <Badge variant="outline" className="font-normal">
+              {day.attendanceMode === "virtual" ? "Virtual" : "Physical"}
+            </Badge>
+          );
+        },
+      })),
       {
-        id: "days",
-        header: "Days & mode",
-        cell: ({ row }) => (
-          <div className="flex max-w-[16rem] flex-wrap gap-1">
-            {row.original.days.length === 0 ? (
-              <span className="text-muted-foreground">—</span>
-            ) : (
-              row.original.days.map((day) => (
-                <Badge key={day.id} variant="outline" className="font-normal">
-                  {formatRegistrationIntervalDayLabel(day.date)} ·{" "}
-                  {day.attendanceMode === "virtual" ? "Virtual" : "Physical"}
-                </Badge>
-              ))
-            )}
-          </div>
-        ),
+        accessorKey: "createdAt",
+        header: "Date of Registration",
+        cell: ({ row }) =>
+          row.original.createdAt ? (
+            <span className="whitespace-nowrap text-sm">
+              {formatDateTime(row.original.createdAt)}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        accessorKey: "updatedAt",
+        header: "Modified",
+        cell: ({ row }) =>
+          row.original.updatedAt ? (
+            <span className="whitespace-nowrap text-sm">
+              {formatDateTime(row.original.updatedAt)}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
       },
       {
         accessorKey: "status",
@@ -193,7 +232,7 @@ export function AttendanceModeAnalytics() {
         ),
       },
     ],
-    [],
+    [visibleDayDates],
   );
 
   const modeLabel =
@@ -211,6 +250,11 @@ export function AttendanceModeAnalytics() {
   const exportTitle = selectedEvent
     ? `Attendance Mode — ${selectedEvent.name} (${modeLabel}, ${dayLabel})`
     : `Attendance Mode (${modeLabel}, ${dayLabel})`;
+
+  const exportColumns = useMemo(
+    () => getAttendanceModeUsersExportColumns(dayDate),
+    [dayDate],
+  );
 
   const fetchAllForExport = useCallback(async () => {
     if (!selectedEventId) return [];
@@ -312,7 +356,7 @@ export function AttendanceModeAnalytics() {
         </CardContent>
       </Card>
 
-      {fetchError && (
+      {fetchError && !loading && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
           <p className="text-sm text-destructive">{fetchError}</p>
         </div>
@@ -330,9 +374,19 @@ export function AttendanceModeAnalytics() {
         </Card>
       )}
 
-      {selectedEventId && loading && rows.length === 0 && <DashboardSkeleton />}
+      {selectedEventId && loading && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Registrations</CardTitle>
+            <CardDescription>Loading attendance mode users…</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TableSkeleton rows={8} />
+          </CardContent>
+        </Card>
+      )}
 
-      {selectedEventId && (!loading || rows.length > 0) && (
+      {selectedEventId && !loading && (
         <Card>
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
             <div>
@@ -343,7 +397,7 @@ export function AttendanceModeAnalytics() {
             </div>
             <ExportMenu
               data={rows}
-              columns={ATTENDANCE_MODE_USERS_EXPORT_COLUMNS}
+              columns={exportColumns}
               filename={exportFilename}
               title={exportTitle}
               disabled={rows.length === 0}
@@ -353,13 +407,13 @@ export function AttendanceModeAnalytics() {
             />
           </CardHeader>
           <CardContent>
-            {rows.length === 0 && !loading ? (
+            {rows.length === 0 ? (
               <EmptyState
                 icon={Users}
                 title="No registrations found"
                 description="Try another day or attendance mode."
               />
-            ) : rows.length > 0 ? (
+            ) : (
               <DataTable
                 columns={columns}
                 data={rows}
@@ -374,9 +428,6 @@ export function AttendanceModeAnalytics() {
                   onPageChange: setPage,
                 }}
               />
-            ) : null}
-            {loading && rows.length > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">Refreshing…</p>
             )}
           </CardContent>
         </Card>

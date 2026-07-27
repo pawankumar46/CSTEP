@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { PhoneWithCountryCode } from "@/components/auth/PhoneWithCountryCode";
+import { SignupLocationFields } from "@/components/auth/SignupLocationFields";
 import {
   EMPTY_PUBLIC_SIGNUP,
   publicSignupSchema,
@@ -24,7 +25,8 @@ import {
   type PublicSignupFormValues,
 } from "@/features/auth/signup.schema";
 import { useAuthStore } from "@/store/useAuthStore";
-import { requiresSignupPhoneOtp } from "@/lib/country-codes";
+import { isIndiaCountryCode, requiresSignupPhoneOtp } from "@/lib/country-codes";
+import { DEFAULT_SIGNUP_COUNTRY } from "@/lib/india-states";
 import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
@@ -74,6 +76,7 @@ function SignupForm() {
         motivation: data.motivation,
         city: data.city,
         state: data.state,
+        country: data.country,
         password: data.password,
       });
 
@@ -199,9 +202,18 @@ function SignupForm() {
                   id="phone"
                   countryCode={countryCode}
                   phone={phone}
-                  onCountryCodeChange={(code) =>
-                    setValue("countryCode", code, { shouldValidate: true, shouldDirty: true })
-                  }
+                  onCountryCodeChange={(code) => {
+                    setValue("countryCode", code, { shouldValidate: true, shouldDirty: true });
+                    if (isIndiaCountryCode(code)) {
+                      setValue("country", DEFAULT_SIGNUP_COUNTRY, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                    } else {
+                      setValue("state", "", { shouldValidate: true, shouldDirty: true });
+                      setValue("country", "", { shouldValidate: true, shouldDirty: true });
+                    }
+                  }}
                   onPhoneChange={(value) =>
                     setValue("phone", value, { shouldValidate: true, shouldDirty: true })
                   }
@@ -327,22 +339,12 @@ function SignupForm() {
               )}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
-                <Input id="city" {...register("city")} />
-                {errors.city && (
-                  <p className="text-xs text-destructive">{errors.city.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
-                <Input id="state" {...register("state")} />
-                {errors.state && (
-                  <p className="text-xs text-destructive">{errors.state.message}</p>
-                )}
-              </div>
-            </div>
+            <SignupLocationFields
+              countryCode={countryCode}
+              register={register}
+              control={control}
+              errors={errors}
+            />
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">

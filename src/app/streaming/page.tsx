@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Pause, Play, VolumeX, Share2, Heart, ThumbsUp, HandMetal,
@@ -26,6 +27,7 @@ import {
   STREAM_RIGHT_BANNER_URL,
 } from "@/lib/constants";
 import { getAppUrl } from "@/lib/env";
+import { ROUTES } from "@/lib/routes";
 import type { StreamViewMode } from "@/lib/stream-view";
 import { cn } from "@/lib/utils";
 import { UserInitials } from "@/components/shared/UserInitials";
@@ -37,6 +39,7 @@ const REACTIONS = [
 ];
 
 export default function StreamingPage() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isModerator = useMinRole("moderator");
   const event = mockEvents.find((e) => e.status === "live") || mockEvents[2];
@@ -53,6 +56,7 @@ export default function StreamingPage() {
   const [streamUrl, setStreamUrl] = useState<string | undefined>(LIVE_STREAM_URL || undefined);
   const isDriveEmbed = Boolean(streamUrl && isGoogleDriveStreamUrl(streamUrl));
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allowLeaveRef = useRef(false);
 
   useEffect(() => {
     if (LIVE_STREAM_URL && isGoogleDriveStreamUrl(LIVE_STREAM_URL)) {
@@ -78,6 +82,21 @@ export default function StreamingPage() {
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.history.pushState({ streamExitGuard: true }, "", window.location.href);
+
+    const onPopState = () => {
+      if (allowLeaveRef.current) return;
+      window.history.pushState({ streamExitGuard: true }, "", window.location.href);
+      setFeedbackOpen(true);
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
     };
   }, []);
 
@@ -113,6 +132,12 @@ export default function StreamingPage() {
 
   const handleExit = () => {
     setFeedbackOpen(true);
+  };
+
+  const leaveStreaming = () => {
+    allowLeaveRef.current = true;
+    setFeedbackOpen(false);
+    router.push(ROUTES.home);
   };
 
   const isTheaterView = viewMode === "theater";
@@ -366,6 +391,7 @@ export default function StreamingPage() {
       <StreamingExitFeedbackDialog
         open={feedbackOpen}
         onOpenChange={setFeedbackOpen}
+        onLeave={leaveStreaming}
         eventId={event.id}
         eventName={event.name}
       />

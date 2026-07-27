@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import type { CreateEventFeedbackPayload } from "@/lib/feedback-mappers";
+import { DEFAULT_FEEDBACK_EVENT_ID } from "@/lib/feedback-options";
 import * as feedbackService from "@/services/feedback.service";
 import type { Feedback } from "@/types";
 
@@ -14,10 +16,10 @@ interface FeedbackState {
   isLoading: boolean;
   isSubmitting: boolean;
   error: string | null;
-  fetchFeedback: () => Promise<void>;
-  fetchStats: () => Promise<void>;
+  fetchFeedback: (eventId?: string) => Promise<void>;
+  fetchStats: (eventId?: string) => Promise<void>;
   submitFeedback: (data: Omit<Feedback, "id" | "createdAt">) => Promise<void>;
-  submitMultiDayFeedback: (entries: Omit<Feedback, "id" | "createdAt">[]) => Promise<void>;
+  submitMultiDayFeedback: (payloads: CreateEventFeedbackPayload[]) => Promise<void>;
 }
 
 export const useFeedbackStore = create<FeedbackState>((set, get) => ({
@@ -27,10 +29,10 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   isSubmitting: false,
   error: null,
 
-  fetchFeedback: async () => {
+  fetchFeedback: async (eventId = DEFAULT_FEEDBACK_EVENT_ID) => {
     set({ isLoading: true, error: null });
     try {
-      const feedback = await feedbackService.getFeedback();
+      const feedback = await feedbackService.getFeedback(eventId);
       set({ feedback, isLoading: false });
     } catch (err) {
       set({
@@ -40,9 +42,9 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     }
   },
 
-  fetchStats: async () => {
+  fetchStats: async (eventId = DEFAULT_FEEDBACK_EVENT_ID) => {
     try {
-      const stats = await feedbackService.getFeedbackStats();
+      const stats = await feedbackService.getFeedbackStats(eventId);
       set({ stats });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to fetch stats" });
@@ -66,14 +68,15 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     }
   },
 
-  submitMultiDayFeedback: async (entries) => {
+  submitMultiDayFeedback: async (payloads) => {
     set({ isSubmitting: true, error: null });
     try {
-      const created = await feedbackService.submitMultiDayFeedback(entries);
+      const created = await feedbackService.submitMultiDayFeedback(payloads);
       set({
         feedback: [...created, ...get().feedback],
         isSubmitting: false,
       });
+      void get().fetchFeedback();
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Failed to submit feedback",

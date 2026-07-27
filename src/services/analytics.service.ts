@@ -8,6 +8,7 @@ import {
   mapApiRegistrationTrend,
   mapApiRegistrationAttendanceInsights,
   mapApiRegistrationDemographics,
+  mapApiEventFeedbackAnalytics,
   mapApiStreamingSummary,
   mapApiStreamingParticipationTrend,
   mapApiAttendanceModeUsersPage,
@@ -30,6 +31,7 @@ import type {
   RegistrationAttendanceInsights,
   RegistrationCounts,
   RegistrationDemographics,
+  EventFeedbackAnalytics,
   RegistrationTrend,
   StreamingParticipationMode,
   StreamingParticipationTrend,
@@ -102,6 +104,25 @@ export const getRegistrationDemographics = async (
       params: { event_id: eventId },
     });
     return mapApiRegistrationDemographics(data);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+/** Live: GET /analytics/events/feedback/?event=&day= (day optional) */
+export const getEventFeedbackAnalytics = async (
+  eventId: string,
+  options?: { dayId?: string },
+): Promise<EventFeedbackAnalytics> => {
+  try {
+    const params: Record<string, string> = { event: eventId };
+    if (options?.dayId) {
+      params.day = options.dayId;
+    }
+    const { data } = await apiClient.get<unknown>("/analytics/events/feedback/", {
+      params,
+    });
+    return mapApiEventFeedbackAnalytics(data);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

@@ -8,6 +8,7 @@ export const ROUTES = {
   eventRegister: "/event-register",
   streaming: "/streaming",
   profile: "/profile",
+  myRegistrations: "/my-registrations",
   feedback: "/feedback",
 } as const;
 

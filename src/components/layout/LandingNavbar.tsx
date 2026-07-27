@@ -3,14 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Menu, User, X } from "lucide-react";
+import { ChevronDown, ClipboardList, Loader2, LogOut, Menu, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { UserInitials } from "@/components/shared/UserInitials";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
 import { useWatchLiveAccess } from "@/hooks/useWatchLiveAccess";
-import { isBaseUserRole, isStaffRole } from "@/lib/auth-utils";
+import { isStaffRole } from "@/lib/auth-utils";
 import { BrandLogo } from "@/components/shared/BrandLogo";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -25,7 +32,7 @@ export function LandingNavbar() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const { user, isAuthenticated, logout, isLoggingOut } = useAuthStore();
-  const { isRegistered, upcomingEvent } = useEventRegistration();
+  const { upcomingEvent } = useEventRegistration();
   const { canWatchLive, disabledTitle, showSignInToWatch } = useWatchLiveAccess(upcomingEvent);
 
   const handleLogout = async () => {
@@ -35,42 +42,66 @@ export function LandingNavbar() {
     setOpen(false);
   };
 
+  const userMenu = user ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="gap-2 px-2"
+          disabled={isLoggingOut}
+          aria-label="Account menu"
+        >
+          {isLoggingOut ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <UserInitials name={`${user.firstName} ${user.lastName}`} size="sm" />
+          )}
+          <span className="hidden max-w-[8rem] truncate lg:inline text-sm">
+            {isLoggingOut ? "Logging out..." : user.firstName || "Account"}
+          </span>
+          {!isLoggingOut && <ChevronDown className="h-3.5 w-3.5 opacity-70" />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem asChild>
+          <Link href={ROUTES.myRegistrations} className="cursor-pointer">
+            <ClipboardList className="mr-2 h-4 w-4" />
+            My Registrations
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={ROUTES.profile} className="cursor-pointer">
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="cursor-pointer text-destructive focus:text-destructive"
+          disabled={isLoggingOut}
+          onSelect={() => {
+            void handleLogout();
+          }}
+        >
+          {isLoggingOut ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="mr-2 h-4 w-4" />
+          )}
+          {isLoggingOut ? "Logging out..." : "Logout"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
+
   const authButtons = isAuthenticated && user ? (
     <>
-      {/* {canWatchLive ? (
-        <Button variant="outline" asChild>
-          <Link href="/streaming">Watch Live</Link>
-        </Button>
-      ) : showSignInToWatch ? (
-        <Button variant="outline" asChild>
-          <Link href={buildAuthUrl(ROUTES.login, { redirect: ROUTES.streaming })}>Watch Live</Link>
-        </Button>
-      ) : (
-        <Button variant="outline" disabled title={disabledTitle}>
-          Watch Live
-        </Button>
-      )} */}
       {isStaffRole(user.role) && (
         <Button asChild>
           <Link href="/dashboard">Dashboard</Link>
         </Button>
       )}
-      {isBaseUserRole(user.role) && (
-        <Button variant="ghost" className="gap-2" asChild>
-          <Link href={ROUTES.profile}>
-            <User className="h-4 w-4" />
-            <span className="hidden lg:inline text-sm">Profile</span>
-          </Link>
-        </Button>
-      )}
-      <Button variant="ghost" className="gap-2 px-2" onClick={handleLogout} disabled={isLoggingOut}>
-        {isLoggingOut ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <UserInitials name={`${user.firstName} ${user.lastName}`} size="sm" />
-        )}
-        <span className="hidden lg:inline text-sm">{isLoggingOut ? "Logging out..." : "Logout"}</span>
-      </Button>
+      {userMenu}
     </>
   ) : (
     <>
@@ -130,7 +161,9 @@ export function LandingNavbar() {
               <>
                 {canWatchLive ? (
                   <Button variant="outline" asChild>
-                    <Link href="/streaming" onClick={() => setOpen(false)}>Watch Live</Link>
+                    <Link href="/streaming" onClick={() => setOpen(false)}>
+                      Watch Live
+                    </Link>
                   </Button>
                 ) : showSignInToWatch ? (
                   <Button variant="outline" asChild>
@@ -148,19 +181,34 @@ export function LandingNavbar() {
                 )}
                 {isStaffRole(user.role) && (
                   <Button asChild>
-                    <Link href="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
-                  </Button>
-                )}
-                {isBaseUserRole(user.role) && (
-                  <Button variant="ghost" className="justify-start" asChild>
-                    <Link href={ROUTES.profile} onClick={() => setOpen(false)}>
-                      <User className="h-4 w-4 mr-2" />
-                      Profile
+                    <Link href="/dashboard" onClick={() => setOpen(false)}>
+                      Dashboard
                     </Link>
                   </Button>
                 )}
-                <Button variant="ghost" onClick={handleLogout} disabled={isLoggingOut}>
-                  {isLoggingOut && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                <Button variant="ghost" className="justify-start" asChild>
+                  <Link href={ROUTES.myRegistrations} onClick={() => setOpen(false)}>
+                    <ClipboardList className="mr-2 h-4 w-4" />
+                    My Registrations
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="justify-start" asChild>
+                  <Link href={ROUTES.profile} onClick={() => setOpen(false)}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start text-destructive"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="mr-2 h-4 w-4" />
+                  )}
                   {isLoggingOut ? "Logging out..." : "Logout"}
                 </Button>
               </>

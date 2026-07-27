@@ -145,14 +145,18 @@ export interface ApiAttendanceModeUserRow {
     role?: string;
     city?: string;
     state?: string;
+    country?: string;
     designation?: string;
     org_type?: string;
     org_name?: string;
+    created_at?: string;
+    updated_at?: string;
   };
   event_name?: string;
   status?: string;
   days?: ApiAttendanceModeUserDay[];
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface ApiAttendanceModeUsersResponse {
@@ -222,6 +226,40 @@ export interface ApiRegistrationDemographicsResponse {
   by_designation?: ApiDemographicShareRow[];
   by_state?: ApiDemographicShareRow[];
   by_city?: ApiDemographicShareRow[];
+  by_country?: ApiDemographicShareRow[];
+}
+
+/** GET /analytics/events/feedback/?event=&day= */
+export interface ApiEventFeedbackDayRow {
+  event_day_id: number | string;
+  day_number: number;
+  event_date?: string;
+  total_feedback: number;
+  average_rating: number;
+}
+
+export interface ApiEventFeedbackSessionRow {
+  schedule_item_id: number | string;
+  title: string;
+  total_feedback: number;
+  average_rating: number;
+}
+
+export interface ApiEventFeedbackByDateRow {
+  date: string;
+  count: number;
+}
+
+export interface ApiEventFeedbackAnalyticsResponse {
+  event_id: number | string;
+  overall?: {
+    total_feedback?: number;
+    average_rating?: number;
+    rating_distribution?: Record<string, number>;
+    feedback_by_date?: ApiEventFeedbackByDateRow[];
+  };
+  by_day?: ApiEventFeedbackDayRow[];
+  by_session?: ApiEventFeedbackSessionRow[];
 }
 
 /** GET /analytics/streaming/summary/?event_id= */

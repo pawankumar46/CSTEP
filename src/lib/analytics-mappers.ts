@@ -14,6 +14,10 @@ import type {
   RegistrationTrend,
   RegistrationAttendanceInsights,
   RegistrationDemographics,
+  EventFeedbackAnalytics,
+  EventFeedbackDayStat,
+  EventFeedbackSessionStat,
+  EventFeedbackDateCount,
   StreamingSummary,
   StreamingParticipationMode,
   StreamingParticipationTrend,
@@ -430,7 +434,134 @@ export function mapApiRegistrationDemographics(raw: unknown): RegistrationDemogr
     byGender: mapDemographicShareRows(row.by_gender),
     byDesignation: mapDemographicShareRows(row.by_designation),
     byState: mapDemographicShareRows(row.by_state),
+    byCountry: mapDemographicShareRows(row.by_country),
   };
+}
+
+export function mapApiEventFeedbackAnalytics(raw: unknown): EventFeedbackAnalytics {
+  const nested =
+    raw && typeof raw === "object" && "data" in (raw as object) && !("by_day" in (raw as object))
+      ? (raw as { data: unknown }).data
+      : raw;
+  const row = (nested ?? {}) as Record<string, unknown>;
+  const overallRaw =
+    row.overall && typeof row.overall === "object"
+      ? (row.overall as Record<string, unknown>)
+      : {};
+  const distributionRaw =
+    overallRaw.rating_distribution && typeof overallRaw.rating_distribution === "object"
+      ? (overallRaw.rating_distribution as Record<string, unknown>)
+      : {};
+
+  const ratingDistribution: Record<string, number> = {};
+  for (const [key, value] of Object.entries(distributionRaw)) {
+    ratingDistribution[key] = Number(value ?? 0);
+  }
+
+  const byDay: EventFeedbackDayStat[] = Array.isArray(row.by_day)
+    ? row.by_day
+        .map((item) => {
+          const day = item as Record<string, unknown>;
+          const eventDate = String(day.event_date ?? "").slice(0, 10);
+          return {
+            eventDayId: String(day.event_day_id ?? ""),
+            dayNumber: Number(day.day_number ?? 0),
+            eventDate: eventDate || undefined,
+            totalFeedback: Number(day.total_feedback ?? 0),
+            averageRating: Number(day.average_rating ?? 0),
+          };
+        })
+        .filter((day) => day.eventDayId || day.dayNumber > 0 || day.eventDate)
+    : [];
+
+  const bySession: EventFeedbackSessionStat[] = Array.isArray(row.by_session)
+    ? row.by_session
+        .map((item) => {
+          const session = item as Record<string, unknown>;
+          return {
+            scheduleItemId: String(session.schedule_item_id ?? ""),
+            title: String(session.title ?? "").trim() || "Untitled session",
+            totalFeedback: Number(session.total_feedback ?? 0),
+            averageRating: Number(session.average_rating ?? 0),
+          };
+        })
+        .filter((session) => session.scheduleItemId || session.title)
+    : [];
+
+  const feedbackByDate: EventFeedbackDateCount[] = Array.isArray(overallRaw.feedback_by_date)
+    ? overallRaw.feedback_by_date
+        .map((item) => {
+          const entry = item as Record<string, unknown>;
+          return {
+            date: String(entry.date ?? "").slice(0, 10),
+            count: Number(entry.count ?? 0),
+          };
+        })
+        .filter((entry) => entry.date && entry.count > 0)
+    : [];
+
+  return {
+    eventId: String(row.event_id ?? ""),
+    overall: {
+      totalFeedback: Number(overallRaw.total_feedback ?? 0),
+      averageRating: Number(overallRaw.average_rating ?? 0),
+      ratingDistribution,
+      feedbackByDate,
+    },
+    byDay,
+    bySession,
+  };
+}
+
+/** Feedback count bars for feedback-by-day (labels prefer `event_date`). */
+export function buildFeedbackByDayChart(
+  days: EventFeedbackDayStat[],
+): DistributionDataPoint[] {
+  const sorted = [...days].sort((a, b) => {
+    if (a.eventDate && b.eventDate) return a.eventDate.localeCompare(b.eventDate);
+    return a.dayNumber - b.dayNumber;
+  });
+  const palette = ["#3b82f6", "#0ea5e9", "#06b6d4", "#14b8a6"];
+  return sorted
+    .filter((day) => day.totalFeedback > 0)
+    .map((day, index) => {
+      const dateLabel = day.eventDate
+        ? formatRegistrationIntervalDayLabel(day.eventDate)
+        : "";
+      const name = dateLabel
+        ? day.dayNumber > 0
+          ? `Day ${day.dayNumber} · ${dateLabel}`
+          : dateLabel
+        : `Day ${day.dayNumber}`;
+      return {
+        name,
+        value: day.totalFeedback,
+        secondaryValue: Number(day.averageRating.toFixed(1)),
+        color: palette[index % palette.length],
+      };
+    });
+}
+
+/** Feedback count bars for feedback-by-session. */
+export function buildFeedbackBySessionChart(
+  sessions: EventFeedbackSessionStat[],
+): DistributionDataPoint[] {
+  const sorted = [...sessions].sort((a, b) => b.totalFeedback - a.totalFeedback);
+  const palette = ["#a855f7", "#8b5cf6", "#6366f1", "#3b82f6", "#0ea5e9", "#06b6d4"];
+  const seen = new Map<string, number>();
+  return sorted
+    .filter((session) => session.totalFeedback > 0)
+    .map((session, index) => {
+      const base = session.title || "Untitled session";
+      const occurrence = seen.get(base) ?? 0;
+      seen.set(base, occurrence + 1);
+      return {
+        name: occurrence === 0 ? base : `${base} (${occurrence + 1})`,
+        value: session.totalFeedback,
+        secondaryValue: Number(session.averageRating.toFixed(1)),
+        color: palette[index % palette.length],
+      };
+    });
 }
 
 export function mapApiStreamingSummary(raw: unknown): StreamingSummary {
@@ -564,6 +695,7 @@ export function mapApiAttendanceModeUserRow(raw: unknown): AttendanceModeUserRow
     status: mapAttendanceUserStatus(row.status),
     days,
     createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? user.updated_at ?? ""),
   };
 }
 
@@ -618,16 +750,24 @@ export function buildDemographicDonutChart(
   rows: DemographicShareRow[],
 ): DistributionDataPoint[] {
   const colors = ["#3b82f6", "#ec4899", "#94a3b8", "#22c55e", "#f59e0b", "#a855f7"];
+  const seen = new Map<string, number>();
   return rows
     .filter((row) => row.count > 0)
     .map((row, index) => {
-      const lower = row.label.toLowerCase();
+      const base = row.label || "Unspecified";
+      const occurrence = seen.get(base) ?? 0;
+      seen.set(base, occurrence + 1);
+      const lower = base.toLowerCase();
       let color = colors[index % colors.length];
       if (lower === "male") color = "#3b82f6";
       else if (lower === "female") color = "#ec4899";
       else if (lower.includes("prefer") || lower.includes("not")) color = "#94a3b8";
       else if (lower === "other") color = "#a855f7";
-      return { name: row.label, value: row.count, color };
+      return {
+        name: occurrence === 0 ? base : `${base} (${occurrence + 1})`,
+        value: row.count,
+        color,
+      };
     });
 }
 
@@ -667,12 +807,18 @@ export function buildDemographicBarChartAll(
     .sort((a, b) => b.count - a.count);
 
   const palette = ["#3b82f6", "#0ea5e9", "#06b6d4", "#14b8a6", "#22c55e", "#84cc16", "#f59e0b", "#a855f7"];
+  const seen = new Map<string, number>();
 
-  return sorted.map((row, index) => ({
-    name: row.label,
-    value: row.count,
-    color: palette[index % palette.length],
-  }));
+  return sorted.map((row, index) => {
+    const base = row.label || "Unspecified";
+    const occurrence = seen.get(base) ?? 0;
+    seen.set(base, occurrence + 1);
+    return {
+      name: occurrence === 0 ? base : `${base} (${occurrence + 1})`,
+      value: row.count,
+      color: palette[index % palette.length],
+    };
+  });
 }
 
 function emptyRegistrationInsights(): RegistrationInsights {
@@ -808,6 +954,7 @@ export function registrationMatchesEventDate(
   registration: Registration,
   isoDate: string,
 ): boolean {
+  if (registration.registrationDates?.some((entry) => entry.date === isoDate)) return true;
   if (registration.days?.some((day) => day.date === isoDate)) return true;
   if (registration.sessionRegistrations?.some((session) => session.date === isoDate)) {
     return true;
@@ -991,6 +1138,20 @@ function parseTrendDate(isoDate: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function getTrendOrdinalSuffix(day: number): string {
+  if (day >= 11 && day <= 13) return "th";
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
 function formatTrendBucketLabel(
   isoDate: string,
   granularity: RegistrationTrendGranularity,
@@ -1002,7 +1163,9 @@ function formatTrendBucketLabel(
     return new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric" }).format(date);
   }
   if (granularity === "weekly") {
-    return `Week of ${new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date)}`;
+    const day = date.getDate();
+    const month = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(date);
+    return `${day}${getTrendOrdinalSuffix(day)} ${month} (week beginning)`;
   }
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
 }

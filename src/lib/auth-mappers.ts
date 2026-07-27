@@ -1,4 +1,6 @@
 import axios from "axios";
+import { isIndiaCountryCode } from "@/lib/country-codes";
+import { DEFAULT_SIGNUP_COUNTRY } from "@/lib/india-states";
 import { mapApiRoleToAppRole } from "@/lib/user-roles";
 import type { SignupCredentials, User } from "@/types";
 
@@ -45,15 +47,23 @@ export function toResetPasswordPayload(data: {
   };
 }
 
-function resolveSignupCityState(data: SignupCredentials): { city: string; state: string } {
+function resolveSignupLocation(data: SignupCredentials): {
+  city: string;
+  state: string;
+  country: string;
+} {
+  const isIndia = isIndiaCountryCode(data.countryCode || "+91");
   return {
     city: (data.city || data.address?.city || "").trim(),
-    state: (data.state || data.address?.state || "").trim(),
+    state: isIndia ? (data.state || data.address?.state || "").trim() : "",
+    country: isIndia
+      ? DEFAULT_SIGNUP_COUNTRY
+      : (data.country || data.address?.country || "").trim(),
   };
 }
 
 export function toSignupPayload(data: SignupCredentials) {
-  const { city, state } = resolveSignupCityState(data);
+  const { city, state, country } = resolveSignupLocation(data);
   const orgType = data.orgType ?? "INDEPENDENT";
 
   return {
@@ -72,13 +82,14 @@ export function toSignupPayload(data: SignupCredentials) {
     motivation: (data.motivation ?? "").trim(),
     city,
     state,
+    country,
     password: data.password,
   };
 }
 
 /** Manage Lobby step 1 — matches POST /auth/users/ admin payload */
 export function toLobbySignupPayload(data: SignupCredentials) {
-  const { city, state } = resolveSignupCityState(data);
+  const { city, state, country } = resolveSignupLocation(data);
   const orgType = data.orgType ?? "INDEPENDENT";
 
   return {
@@ -97,6 +108,7 @@ export function toLobbySignupPayload(data: SignupCredentials) {
     motivation: (data.motivation ?? "").trim(),
     city,
     state,
+    country,
     password: data.password,
   };
 }
