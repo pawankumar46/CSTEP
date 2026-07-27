@@ -432,9 +432,11 @@ export function MultiDayFeedbackForm({
         </TabsContent>
       </Tabs>
 
-      {(formError || errors.sessions?.message) && (
+      {(formError ||
+        (typeof errors.sessions?.message === "string" && errors.sessions.message)) && (
         <p className="text-sm text-destructive" role="alert">
-          {formError ?? errors.sessions?.message}
+          {formError ??
+            (typeof errors.sessions?.message === "string" ? errors.sessions.message : null)}
         </p>
       )}
 
