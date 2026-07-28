@@ -9,10 +9,12 @@ import {
   toLobbyRegistrationApiPayload,
   toRegistrationApiPayload,
   toRegistrationPreferencesPayload,
+  toRegistrationUpdatePayload,
   type RegistrationScheduleType,
 } from "@/lib/registration-mappers";
 import { toAccommodationRequestPayload, toMedicalRequestPayload, toTranslationRequestPayload, toTravelRequestPayload } from "@/lib/event-support-mappers";
 import type { EventSupportFormValues } from "@/features/profile/event-support.schema";
+import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
 
 export class AlreadyRegisteredError extends Error {
   constructor() {
@@ -147,6 +149,33 @@ export const getRegistrations = async (): Promise<Registration[]> => {
   try {
     const { data } = await apiClient.get<unknown>("/registrations/registration/my/");
     return extractRegistrationList(data).map((raw) => mapApiRegistrationToRegistration(raw));
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+/** Live: PUT /registrations/registration/:id/ — update own (or staff) registration. */
+export const updateRegistration = async (
+  registrationId: string,
+  registration: RegistrationEditFormValues,
+  scheduleType?: RegistrationScheduleType,
+): Promise<void> => {
+  try {
+    await apiClient.put(
+      `/registrations/registration/${registrationId}/`,
+      toRegistrationUpdatePayload(registration, {
+        scheduleType: scheduleType ?? "WHOLE_DAY",
+      }),
+    );
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+/** Live: DELETE /registrations/registration/:id/ — delete own (or staff) registration. */
+export const deleteRegistration = async (registrationId: string): Promise<void> => {
+  try {
+    await apiClient.delete(`/registrations/registration/${registrationId}/`);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

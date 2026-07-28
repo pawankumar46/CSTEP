@@ -2,8 +2,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { AlreadyRegisteredError } from "@/services/registration.service";
 import * as registrationService from "@/services/registration.service";
+import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
 import type { PaginatedResponse, Registration, RegistrationFormData, RegistrationStatus } from "@/types";
 import type { SubmitRegistrationOptions } from "@/services/registration.service";
+import type { RegistrationScheduleType } from "@/lib/registration-mappers";
 
 interface RegistrationState {
   registrations: Registration[];
@@ -15,6 +17,12 @@ interface RegistrationState {
   fetchRegistrations: () => Promise<void>;
   fetchPaginated: (page?: number, pageSize?: number, search?: string, status?: RegistrationStatus) => Promise<void>;
   updateStatus: (id: string, status: RegistrationStatus) => Promise<void>;
+  updateRegistration: (
+    id: string,
+    values: RegistrationEditFormValues,
+    scheduleType?: RegistrationScheduleType,
+  ) => Promise<void>;
+  deleteRegistration: (id: string) => Promise<void>;
   submitRegistration: (
     data: RegistrationFormData,
     options?: SubmitRegistrationOptions,
@@ -73,6 +81,29 @@ export const useRegistrationStore = create<RegistrationState>()(
       });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to update status" });
+      throw err;
+    }
+  },
+
+  updateRegistration: async (id, values, scheduleType) => {
+    try {
+      await registrationService.updateRegistration(id, values, scheduleType);
+      await get().fetchRegistrations();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to update registration" });
+      throw err;
+    }
+  },
+
+  deleteRegistration: async (id) => {
+    try {
+      await registrationService.deleteRegistration(id);
+      set({
+        registrations: get().registrations.filter((r) => r.id !== id),
+        error: null,
+      });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to delete registration" });
       throw err;
     }
   },

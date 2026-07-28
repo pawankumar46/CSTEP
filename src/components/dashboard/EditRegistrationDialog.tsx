@@ -42,7 +42,7 @@ import {
   EMPTY_REGISTRATION_EDIT,
   type RegistrationEditFormValues,
 } from "@/features/dashboard/admin-registration.schema";
-import { sortEventDaysByDate } from "@/lib/icas-conference";
+import { ICAS_CONFERENCE, isIcasEventName, sortEventDaysByDate } from "@/lib/icas-conference";
 import {
   getEventDays,
   getScheduleItemsDropdown,
@@ -64,6 +64,9 @@ interface EditRegistrationDialogProps {
   events: Event[];
   eventsLoading?: boolean;
   defaultEventId?: string | null;
+  /** When true, event cannot be changed (self-service edit). */
+  lockEvent?: boolean;
+  description?: string;
   onSubmit: (
     id: string,
     values: RegistrationEditFormValues,
@@ -88,6 +91,8 @@ export function EditRegistrationDialog({
   events,
   eventsLoading = false,
   defaultEventId,
+  lockEvent = false,
+  description,
   onSubmit,
 }: EditRegistrationDialogProps) {
   const {
@@ -491,13 +496,26 @@ export function EditRegistrationDialog({
             Edit registration
           </DialogTitle>
           <DialogDescription>
-            Update event and participation details for {registration?.userName ?? "this user"}.
+            {description
+              ?? `Update event and participation details for ${registration?.userName ?? "this user"}.`}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={(event) => void handleSubmit(handleFormSubmit)(event)} className="space-y-4">
           <div className="space-y-2">
             <Label>Event</Label>
+            {lockEvent ? (
+              <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                {selectedEvent?.name
+                  ?? (registration && isIcasEventName(registration.eventName ?? "")
+                    ? ICAS_CONFERENCE.shortName
+                    : null)
+                  ?? (String(registration?.eventId) === "11"
+                    ? ICAS_CONFERENCE.shortName
+                    : null)
+                  ?? (registration?.eventName?.trim() || `Event ${registration?.eventId ?? ""}`)}
+              </p>
+            ) : (
             <Controller
               name="eventId"
               control={control}
@@ -533,6 +551,7 @@ export function EditRegistrationDialog({
                 </Select>
               )}
             />
+            )}
             {errors.eventId && (
               <p className="text-xs text-destructive">{errors.eventId.message}</p>
             )}
