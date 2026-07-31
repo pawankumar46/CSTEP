@@ -16,6 +16,8 @@ export function readPublicEnv(name: string): string | undefined {
   switch (name) {
     case "NEXT_PUBLIC_API_URL":
       return trimEnv(process.env.NEXT_PUBLIC_API_URL);
+    case "NEXT_PUBLIC_WS_URL":
+      return trimEnv(process.env.NEXT_PUBLIC_WS_URL);
     case "NEXT_PUBLIC_APP_URL":
       return trimEnv(process.env.NEXT_PUBLIC_APP_URL);
     case "NEXT_PUBLIC_BRAND_LOGO_DARK_SRC":
@@ -47,11 +49,36 @@ export function getApiBaseUrl(): string {
   const normalized = normalizeBaseUrl(url);
   if (!/^https?:\/\//i.test(normalized)) {
     throw new Error(
-      "NEXT_PUBLIC_API_URL must be an absolute URL (e.g. https://cstep-django.vercel.app).",
+      "NEXT_PUBLIC_API_URL must be an absolute URL.",
     );
   }
 
   return normalized;
+}
+
+/**
+ * WebSocket origin for live analytics.
+ * Prefer `NEXT_PUBLIC_WS_URL` in `.env.local` (e.g. `wss://your-api.example.com`).
+ * Falls back to deriving `ws`/`wss` from `NEXT_PUBLIC_API_URL`.
+ */
+export function getWebSocketBaseUrl(): string {
+  const explicit = readPublicEnv("NEXT_PUBLIC_WS_URL");
+  if (explicit) {
+    const normalized = normalizeBaseUrl(explicit);
+    if (!/^wss?:\/\//i.test(normalized)) {
+      throw new Error(
+        "NEXT_PUBLIC_WS_URL must be an absolute WebSocket URL.",
+      );
+    }
+    return normalized;
+  }
+
+  const api = getApiBaseUrl();
+  if (api.startsWith("https://")) return `wss://${api.slice("https://".length)}`;
+  if (api.startsWith("http://")) return `ws://${api.slice("http://".length)}`;
+  throw new Error(
+    "Set NEXT_PUBLIC_WS_URL in .env.local, or provide NEXT_PUBLIC_API_URL to derive the WebSocket host.",
+  );
 }
 
 /** Public frontend origin for absolute links (share, emails). */

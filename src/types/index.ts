@@ -320,6 +320,8 @@ export interface Feedback {
   id: string;
   userId: string;
   userName: string;
+  userEmail?: string;
+  userPhone?: string;
   eventId: string;
   eventName: string;
   sessionDate: string;

@@ -17,6 +17,7 @@ import {
   formatHomeEventDateRange,
 } from "@/lib/event-display";
 import { ICAS_CONFERENCE } from "@/lib/icas-conference";
+import { useLocationPermissionPromptOnMount } from "@/lib/location-permission";
 
 const HIGHLIGHT_ICONS = [Wind, Layers, FileText, BarChart3, GraduationCap] as const;
 
@@ -182,6 +183,8 @@ function AboutSection() {
 }
 
 export default function LandingPage() {
+  useLocationPermissionPromptOnMount();
+
   return (
     <div className="flex flex-col min-h-screen">
       <LandingNavbar />

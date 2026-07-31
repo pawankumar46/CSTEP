@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CalendarDays, Globe2, MapPin, MessageSquareText, Monitor, UserRound, Briefcase } from "lucide-react";
+import { CalendarDays, Globe2, MapPin, Monitor, UserRound, Briefcase } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildAttendanceModeByDateChart,
@@ -23,8 +23,6 @@ import {
   buildDemographicBarChartAll,
   buildDemographicDonutChart,
   buildDesignationInsightChart,
-  buildFeedbackByDayChart,
-  buildFeedbackBySessionChart,
   buildGenderInsightChart,
   buildRegistrationTrendChart,
   buildStateInsightChart,
@@ -32,6 +30,8 @@ import {
   type RegistrationTrendGranularity,
 } from "@/lib/analytics-mappers";
 import { ChartFilterGroup } from "@/components/shared/ChartFilterGroup";
+import { CountryRegistrationsGlobe } from "@/components/dashboard/CountryRegistrationsGlobe";
+import { IndiaStateRegistrationsMap } from "@/components/dashboard/IndiaStateRegistrationsMap";
 import {
   Select,
   SelectContent,
@@ -42,7 +42,6 @@ import {
 import { cn } from "@/lib/utils";
 import type {
   DistributionDataPoint,
-  EventFeedbackAnalytics,
   RegistrationAttendanceInsights,
   RegistrationDemographics,
   RegistrationInsights,
@@ -184,36 +183,6 @@ function PeopleTooltip({
   );
 }
 
-function FeedbackCountTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: {
-    value?: number;
-    name?: string;
-    payload?: { name?: string; secondaryValue?: number };
-  }[];
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const count = Number(payload[0]?.value ?? 0);
-  const avg = Number(payload[0]?.payload?.secondaryValue ?? 0);
-  const name = label || payload[0]?.payload?.name || payload[0]?.name || "";
-  return (
-    <div style={TOOLTIP_STYLE} className="px-3 py-2">
-      <p className="font-medium">{name}</p>
-      <p className="text-muted-foreground">
-        {count} response{count === 1 ? "" : "s"}
-      </p>
-      {avg > 0 ? (
-        <p className="text-xs text-muted-foreground">Avg rating {avg.toFixed(1)}</p>
-      ) : null}
-    </div>
-  );
-}
-
 const SCROLLABLE_BAR_ROW_HEIGHT = 36;
 
 function ScrollableDemographicBarChart({
@@ -223,7 +192,6 @@ function ScrollableDemographicBarChart({
   maxViewportHeight = 240,
   defaultBarFill,
   allowDecimals = false,
-  tooltip = "people",
   domainMax,
 }: {
   data: DistributionDataPoint[];
@@ -232,7 +200,6 @@ function ScrollableDemographicBarChart({
   maxViewportHeight?: number;
   defaultBarFill?: string;
   allowDecimals?: boolean;
-  tooltip?: "people" | "feedback";
   domainMax?: number;
 }) {
   const chartHeight = Math.max(data.length * SCROLLABLE_BAR_ROW_HEIGHT + 8, 120);
@@ -265,7 +232,7 @@ function ScrollableDemographicBarChart({
               tickLine={false}
             />
             <Tooltip
-              content={tooltip === "feedback" ? <FeedbackCountTooltip /> : <PeopleTooltip />}
+              content={<PeopleTooltip />}
               cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
             />
             <Bar
@@ -354,9 +321,6 @@ interface RegistrationInsightsChartsProps {
   demographics?: RegistrationDemographics | null;
   demographicsLoading?: boolean;
   demographicsError?: string | null;
-  eventFeedback?: EventFeedbackAnalytics | null;
-  eventFeedbackLoading?: boolean;
-  eventFeedbackError?: string | null;
 }
 
 export function RegistrationInsightsCharts({
@@ -374,9 +338,6 @@ export function RegistrationInsightsCharts({
   demographics,
   demographicsLoading,
   demographicsError,
-  eventFeedback,
-  eventFeedbackLoading,
-  eventFeedbackError,
 }: RegistrationInsightsChartsProps) {
   const byState = useMemo(() => {
     if (demographics) {
@@ -405,16 +366,6 @@ export function RegistrationInsightsCharts({
     }
     return buildDesignationInsightChart(insights.byDesignation);
   }, [demographics, insights.byDesignation]);
-
-  const feedbackByDay = useMemo(
-    () => (eventFeedback ? buildFeedbackByDayChart(eventFeedback.byDay) : []),
-    [eventFeedback],
-  );
-
-  const feedbackBySession = useMemo(
-    () => (eventFeedback ? buildFeedbackBySessionChart(eventFeedback.bySession) : []),
-    [eventFeedback],
-  );
 
   const dayTrend = useMemo(() => {
     // Prefer live trend payload whenever it was fetched (even if all zeros).
@@ -590,7 +541,7 @@ export function RegistrationInsightsCharts({
         <InsightCard
           icon={MapPin}
           title="Registered Users from India by State"
-          description="All states by registration count. Scroll to see the full list."
+          description="Registration counts on the India map. Hover a state for details."
         >
           {demographicsLoading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Loading state data…</p>
@@ -599,18 +550,14 @@ export function RegistrationInsightsCharts({
           ) : byState.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No state data yet.</p>
           ) : (
-            <ScrollableDemographicBarChart
-              data={byState}
-              yAxisWidth={92}
-              maxViewportHeight={240}
-            />
+            <IndiaStateRegistrationsMap data={byState} />
           )}
         </InsightCard>
 
         <InsightCard
           icon={Globe2}
           title="Registered Users by Country"
-          description="Registrations by country. Scroll if the list is long."
+          description="Registration counts on the globe. Drag to rotate; hover a country for details."
         >
           {demographicsLoading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Loading country data…</p>
@@ -619,11 +566,7 @@ export function RegistrationInsightsCharts({
           ) : byCountry.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No country data yet.</p>
           ) : (
-            <ScrollableDemographicBarChart
-              data={byCountry}
-              yAxisWidth={92}
-              maxViewportHeight={240}
-            />
+            <CountryRegistrationsGlobe data={byCountry} />
           )}
         </InsightCard>
 
@@ -644,51 +587,6 @@ export function RegistrationInsightsCharts({
               yAxisWidth={128}
               tickFontSize={11}
               maxViewportHeight={280}
-            />
-          )}
-        </InsightCard>
-
-        <InsightCard
-          icon={CalendarDays}
-          title="Feedback by day"
-          description="Total feedback responses for each event day (with date)."
-        >
-          {eventFeedbackLoading ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Loading feedback…</p>
-          ) : eventFeedbackError ? (
-            <p className="py-8 text-center text-sm text-destructive">{eventFeedbackError}</p>
-          ) : feedbackByDay.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No feedback by day yet.</p>
-          ) : (
-            <ScrollableDemographicBarChart
-              data={feedbackByDay}
-              yAxisWidth={110}
-              maxViewportHeight={200}
-              tooltip="feedback"
-              defaultBarFill="#3b82f6"
-            />
-          )}
-        </InsightCard>
-
-        <InsightCard
-          icon={MessageSquareText}
-          title="Feedback by sessions"
-          description="Total feedback responses per session. Scroll to see every session."
-        >
-          {eventFeedbackLoading ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Loading feedback…</p>
-          ) : eventFeedbackError ? (
-            <p className="py-8 text-center text-sm text-destructive">{eventFeedbackError}</p>
-          ) : feedbackBySession.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No session feedback yet.</p>
-          ) : (
-            <ScrollableDemographicBarChart
-              data={feedbackBySession}
-              yAxisWidth={140}
-              tickFontSize={11}
-              maxViewportHeight={280}
-              tooltip="feedback"
-              defaultBarFill="#a855f7"
             />
           )}
         </InsightCard>

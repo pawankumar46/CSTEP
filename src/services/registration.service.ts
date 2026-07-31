@@ -154,14 +154,14 @@ export const getRegistrations = async (): Promise<Registration[]> => {
   }
 };
 
-/** Live: PUT /registrations/registration/:id/ — update own (or staff) registration. */
+/** Live: PATCH /registrations/registration/:id/ — update own registration (My Registrations). */
 export const updateRegistration = async (
   registrationId: string,
   registration: RegistrationEditFormValues,
   scheduleType?: RegistrationScheduleType,
 ): Promise<void> => {
   try {
-    await apiClient.put(
+    await apiClient.patch(
       `/registrations/registration/${registrationId}/`,
       toRegistrationUpdatePayload(registration, {
         scheduleType: scheduleType ?? "WHOLE_DAY",

@@ -36,6 +36,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { AlreadyRegisteredError } from "@/services/registration.service";
 import { getEventDays, getEventDropdown, getScheduleItemsDropdown } from "@/services/event.service";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
+import { markLocationPermissionPromptForDestination } from "@/lib/location-permission";
 import { ROUTES, buildProfileSupportUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
@@ -549,6 +550,7 @@ function EventRegisterForm() {
       if (enabledServices.length > 0) {
         router.replace(buildProfileSupportUrl(eventId, enabledServices));
       } else {
+        markLocationPermissionPromptForDestination(ROUTES.home, "registration");
         router.replace(ROUTES.home);
       }
     } catch (err) {

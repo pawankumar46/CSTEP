@@ -29,6 +29,7 @@ import { isIndiaCountryCode, requiresSignupPhoneOtp } from "@/lib/country-codes"
 import { DEFAULT_SIGNUP_COUNTRY } from "@/lib/india-states";
 import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
+import { markLocationPermissionPromptForDestination } from "@/lib/location-permission";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
 function RequiredMark() {
@@ -98,6 +99,7 @@ function SignupForm() {
       const destination = user
         ? await resolvePostAuthDestination(user.id, user.role, redirectTo)
         : ROUTES.eventRegister;
+      markLocationPermissionPromptForDestination(destination, "login");
       router.replace(destination);
     } catch {
       // error handled in store

@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
-import { ClipboardList, Loader2, Pencil, Trash2 } from "lucide-react";
-import { EditRegistrationDialog } from "@/components/dashboard/EditRegistrationDialog";
+import { ClipboardList, Loader2, Trash2 } from "lucide-react";
 import { LandingNavbar } from "@/components/layout/LandingNavbar";
 import { LandingFooter } from "@/components/layout/LandingFooter";
 import { RouteGuard } from "@/components/layout/RouteGuard";
@@ -22,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
 import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import { ICAS_CONFERENCE, isIcasEventName } from "@/lib/icas-conference";
 import {
@@ -31,9 +29,8 @@ import {
 } from "@/lib/registration-export";
 import { formatDateTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
-import * as eventService from "@/services/event.service";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
-import type { Event, Registration, RegistrationStatus } from "@/types";
+import type { Registration, RegistrationStatus } from "@/types";
 
 const STATUS_VARIANT: Record<
   RegistrationStatus,
@@ -64,14 +61,9 @@ function MyRegistrationsContent() {
     isLoading,
     error,
     fetchRegistrations,
-    updateRegistration,
     deleteRegistration,
   } = useRegistrationStore();
 
-  const [events, setEvents] = useState<Event[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingRegistration, setEditingRegistration] = useState<Registration | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingRegistration, setDeletingRegistration] = useState<Registration | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -88,61 +80,11 @@ function MyRegistrationsContent() {
     };
   }, [fetchRegistrations]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setEventsLoading(true);
-      try {
-        const upcoming = await eventService.getEvents("upcoming");
-        if (!cancelled) setEvents(upcoming);
-      } catch {
-        if (!cancelled) setEvents([]);
-      } finally {
-        if (!cancelled) setEventsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const ensureEventForRegistration = useCallback(async (registration: Registration) => {
-    if (!registration.eventId) return;
-    if (events.some((event) => event.id === registration.eventId)) return;
-
-    try {
-      const event = await eventService.getEventById(registration.eventId);
-      if (!event) return;
-      setEvents((prev) =>
-        prev.some((entry) => entry.id === event.id) ? prev : [...prev, event],
-      );
-    } catch {
-      // Edit dialog still works with list defaults if event fetch fails.
-    }
-  }, [events]);
-
-  const openEditDialog = useCallback(
-    (registration: Registration) => {
-      setEditingRegistration(registration);
-      setEditOpen(true);
-      void ensureEventForRegistration(registration);
-    },
-    [ensureEventForRegistration],
-  );
-
   const openDeleteDialog = useCallback((registration: Registration) => {
     setDeletingRegistration(registration);
     setDeleteError(null);
     setDeleteOpen(true);
   }, []);
-
-  const handleEditRegistration = async (
-    id: string,
-    values: RegistrationEditFormValues,
-    scheduleType?: "WHOLE_DAY" | "MULTI_SESSION",
-  ) => {
-    await updateRegistration(id, values, scheduleType);
-  };
 
   const handleDeleteRegistration = async () => {
     if (!deletingRegistration) return;
@@ -213,36 +155,23 @@ function MyRegistrationsContent() {
       },
       {
         id: "actions",
-        header: "Actions",
+        header: "",
         cell: ({ row }) => (
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              title="Edit"
-              onClick={() => openEditDialog(row.original)}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              <span className="sr-only">Edit registration</span>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              title="Delete"
-              onClick={() => openDeleteDialog(row.original)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span className="sr-only">Delete registration</span>
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            title="Delete"
+            onClick={() => openDeleteDialog(row.original)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="sr-only">Delete registration</span>
+          </Button>
         ),
       },
     ],
-    [openDeleteDialog, openEditDialog],
+    [openDeleteDialog],
   );
 
   return (
@@ -251,7 +180,7 @@ function MyRegistrationsContent() {
         <div>
           <h1 className="text-2xl font-bold">My Registrations</h1>
           <p className="text-muted-foreground">
-            Events you have registered for. Edit attendance or remove a registration anytime.
+            Events you have registered for. You can remove a registration anytime.
           </p>
         </div>
         <Button asChild>
@@ -290,17 +219,6 @@ function MyRegistrationsContent() {
       <Button variant="outline" asChild>
         <Link href={ROUTES.home}>Back to Home</Link>
       </Button>
-
-      <EditRegistrationDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        registration={editingRegistration}
-        events={events}
-        eventsLoading={eventsLoading}
-        lockEvent
-        description="Update your participation days, attendance mode, and sessions."
-        onSubmit={handleEditRegistration}
-      />
 
       <Dialog
         open={deleteOpen}

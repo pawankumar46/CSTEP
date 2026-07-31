@@ -41,6 +41,8 @@ const FEEDBACK_EXPORT_COLUMNS: ExportColumn<FeedbackTableRow>[] = [
   { header: "Event Name", value: (row) => row.eventName },
   { header: "Session Name", value: (row) => row.sessionName },
   { header: "User Name", value: (row) => row.userName },
+  { header: "Email", value: (row) => row.userEmail ?? "" },
+  { header: "Phone", value: (row) => row.userPhone ?? "" },
   { header: "Star Rating", value: (row) => row.rating },
   { header: "Comment", value: (row) => row.comments },
 ];
@@ -95,6 +97,16 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
       { accessorKey: "sessionName", header: "Session Name" },
       { accessorKey: "userName", header: "User Name" },
       {
+        id: "contact",
+        header: "Contact",
+        cell: ({ row }) => (
+          <div className="max-w-[220px] space-y-0.5 text-sm">
+            <div className="truncate">{row.original.userEmail || "—"}</div>
+            <div className="text-muted-foreground">{row.original.userPhone || "—"}</div>
+          </div>
+        ),
+      },
+      {
         accessorKey: "rating",
         header: "Star Rating",
         cell: ({ row }) => (
@@ -107,7 +119,7 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
         accessorKey: "comments",
         header: "Comment",
         cell: ({ row }) => (
-          <span className="line-clamp-2 max-w-md text-sm">{row.original.comments || "—"}</span>
+          <span className="line-clamp-2 block max-w-md text-sm">{row.original.comments || "—"}</span>
         ),
       },
     ],

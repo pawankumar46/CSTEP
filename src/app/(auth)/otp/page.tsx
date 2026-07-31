@@ -14,6 +14,7 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { resendOtp } from "@/services/auth.service";
 import { resolvePostAuthDestination } from "@/lib/auth-utils";
+import { markLocationPermissionPromptForDestination } from "@/lib/location-permission";
 import { ROUTES, buildAuthUrl, sanitizeRedirect } from "@/lib/routes";
 
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -95,6 +96,7 @@ function OTPForm() {
         ? await resolvePostAuthDestination(user.id, user.role, redirectParam)
         : sanitizeRedirect(redirectParam) ?? ROUTES.eventRegister;
 
+      markLocationPermissionPromptForDestination(destination, "login");
       setTimeout(() => router.replace(destination), 1200);
     } catch {
       // error handled in store

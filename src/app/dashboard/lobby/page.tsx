@@ -55,6 +55,7 @@ function LobbyContent() {
     selectedEventId,
     registrations,
     registrationsLoading,
+    registrationsPagination,
     error,
     clearError,
     setSelectedEventId,
@@ -94,9 +95,17 @@ function LobbyContent() {
 
   useEffect(() => {
     if (selectedEventId) {
-      fetchRegistrations(selectedEventId);
+      void fetchRegistrations(selectedEventId, 1);
     }
   }, [selectedEventId, fetchRegistrations]);
+
+  const handleLobbyPageChange = useCallback(
+    (page: number) => {
+      if (!selectedEventId) return;
+      void fetchRegistrations(selectedEventId, page);
+    },
+    [fetchRegistrations, selectedEventId],
+  );
 
   const filteredRegistrations = useMemo(() => {
     if (statusFilter === "all") return registrations;
@@ -487,7 +496,13 @@ function LobbyContent() {
                   />
                 ) : undefined
               }
-              pageSize={10}
+              serverPagination={{
+                page: registrationsPagination.page,
+                totalPages: registrationsPagination.totalPages,
+                hasNext: registrationsPagination.hasNext,
+                hasPrevious: registrationsPagination.hasPrevious,
+                onPageChange: handleLobbyPageChange,
+              }}
             />
           </div>
         </>

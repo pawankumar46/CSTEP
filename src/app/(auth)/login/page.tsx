@@ -20,6 +20,7 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
+import { markLocationPermissionPromptForDestination } from "@/lib/location-permission";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
 const loginSchema = z.object({
@@ -68,11 +69,13 @@ function LoginForm() {
   const finishLogin = async () => {
     const user = useAuthStore.getState().user;
     if (!user) {
+      markLocationPermissionPromptForDestination(ROUTES.home, "login");
       router.replace(ROUTES.home);
       return;
     }
 
     const destination = await resolvePostAuthDestination(user.id, user.role, redirectTo);
+    markLocationPermissionPromptForDestination(destination, "login");
     router.replace(destination);
   };
 

@@ -46,6 +46,7 @@ The app uses **Zustand** for client state, **React Hook Form + Zod** for forms, 
 - **Forms / validation:** react-hook-form, Zod
 - **HTTP:** Axios with JWT interceptors and token refresh
 - **Streaming:** hls.js, Google Drive embed / proxied video
+- **Charts:** Recharts; India state choropleth + country globe via `d3-geo` + `public/maps/india-states.geojson` / `world-countries.geojson`
 - **Export:** jsPDF, xlsx
 
 ---
@@ -91,6 +92,7 @@ Create `.env.local` from `.env.example`:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NEXT_PUBLIC_API_URL` | Yes | Django API base URL (e.g. `*******`) |
+| `NEXT_PUBLIC_WS_URL` | Recommended | Live analytics WebSocket origin (e.g. `wss://your-api.example.com`). Used as `{WS_URL}/ws/analytics/{eventId}/?token=…`. If unset, derived from `NEXT_PUBLIC_API_URL` |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Public frontend URL for share links and redirects |
 | `NEXT_PUBLIC_LIVE_STREAM_URL` | Optional | Live stream source (Google Drive preview, `.mp4`, or `.m3u8`) |
 | `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Google Drive file ID fallback |
@@ -108,6 +110,7 @@ Create `.env.local` from `.env.example`:
 c-step/
 ├── docs/                      # Source PDFs (Concept Note, Agenda); copies served from public/docs/
 ├── public/                    # Static assets (logos, banner images, conference PDFs)
+│   └── maps/                  # India states GeoJSON + world countries (India outline dissolved from states)
 ├── src/
 │   ├── app/                   # Next.js App Router pages & API routes
 │   │   ├── (auth)/            # login, signup, otp, forgot-password, reset-password
@@ -136,6 +139,11 @@ c-step/
 │   │   ├── auth/              # Auth guards, PhoneWithCountryCode, SignupLocationFields
 │   │   ├── dashboard/         # Admin dialogs, event cards, lobby & analytics UI
 │   │   │   ├── AttendanceModeAnalytics.tsx
+│   │   │   ├── EventFeedbackCharts.tsx
+│   │   │   ├── LiveLoginInsightsCharts.tsx
+│   │   │   ├── SessionParticipationAnalytics.tsx
+│   │   │   ├── CountryRegistrationsGlobe.tsx
+│   │   │   ├── IndiaStateRegistrationsMap.tsx
 │   │   │   ├── EventSelectCard.tsx
 │   │   │   └── *AssistanceDialog.tsx
 │   │   ├── forms/             # Multi-step form shell
@@ -149,12 +157,14 @@ c-step/
 │   │   ├── dashboard/         # Role dashboards + Zod schemas (admin-*)
 │   │   ├── profile/           # Profile Zod schemas
 │   │   └── registration/      # Registration Zod schemas
-│   ├── hooks/                 # useRoleGuard, useEventRegistration, etc.
+│   ├── hooks/                 # useRoleGuard, useEventRegistration, useLiveAnalyticsSocket, etc.
 │   ├── lib/                   # Utilities, mappers, env, API client
 │   │   ├── api-client.ts      # Axios instance + JWT interceptors
 │   │   ├── auth-mappers.ts    # Auth request/response mapping
 │   │   ├── country-codes.ts   # Dial codes for signup phone (`country_code`)
 │   │   ├── india-states.ts    # Indian states/UTs + default country for +91 signup
+│   │   ├── india-state-map.ts # State name aliases + choropleth color helpers
+│   │   ├── country-map.ts     # Country name aliases + globe choropleth helpers
 │   │   ├── registration-mappers.ts
 │   │   ├── event-support-mappers.ts
 │   │   ├── event-mappers.ts
@@ -163,6 +173,14 @@ c-step/
 │   │   ├── broadcast-mappers.ts
 │   │   ├── stream-utils.ts    # Stream URL parsing (Drive, HLS, mp4)
 │   │   ├── date-input.ts      # Date input min values & past-date validation
+│   │   ├── client-ip.ts       # Client IP from proxy request headers
+│   │   ├── ipwhois-api-contract.ts # ipwhois.io location field contract
+│   │   ├── ipwhois.ts         # Server fetch to https://ipwho.is
+│   │   ├── live-analytics-ws.ts # Live analytics WebSocket URL builder
+│   │   ├── live-analytics-api-contract.ts
+│   │   ├── live-analytics-mappers.ts
+│   │   ├── participation-session-analytics.ts # Session participation time/rate tables + day fixtures
+│   │   ├── location-permission.ts # Post-login/registration location prompt + logging
 │   │   └── env.ts             # Public env readers
 │   ├── mock/                  # Fallback mock data (dev / API errors)
 │   ├── services/              # API service layer (calls Django or proxies)
@@ -352,6 +370,7 @@ await apiClient.post("/registrations/registration/", payload);
 | `fetch("/api/broadcast-sessions/:id/url?target=...")` | `app/api/broadcast-sessions/[id]/url/route.ts` | Resolve HLS/RTMP URLs |
 | `GET /api/stream/video?fileId=...` | `app/api/stream/video/route.ts` | Proxy Google Drive video for `<video>` tag |
 | `GET /api/stream/resolve` | `app/api/stream/resolve/route.ts` | Resolve stream metadata |
+| `GET /api/ip-lookup` | `app/api/ip-lookup/route.ts` | Client location via [ipwhois.io](https://ipwhois.io/documentation#overview): `{ ip, region, latitude, longitude }` |
 
 ---
 
@@ -389,9 +408,10 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/events/event/` | Create event |
 | `PATCH` | `/events/event/:id/` | Update event |
 | `DELETE` | `/events/event/:id/` | Delete event |
+| `POST` | `/events/event/:id/join/` | Record join location after login/registration (`{ ip_address, latitude, longitude, location_accuracy, state }`; `state` ← ipwhois `region`) |
 | `GET` | `/events/event-days/dropdown/?event=` | Event day options (feedback tabs, attendance-mode edit); `{ id, day_number, date, label, allowed_attendance_modes }` |
 | `GET` | `/events/schedule-items/?day=` | Schedule items for a day (feedback session list; paginated `results[]`) |
-| `GET` | `/events/feedback/?event=` | Paginated feedback (`results[]`: `event_title`, `event_day_date`, `schedule_item_title`, `user_full_name`, rating, comment, …) |
+| `GET` | `/events/feedback/?event=` | Paginated feedback (`results[]`: `event_title`, `event_day_date`, `schedule_item_title`, `user_full_name`, `user_email`, `user_phone`, rating, comment, …) |
 | `POST` | `/events/feedback/` | Create session feedback `{ event, event_date, schedule_item, rating, comment }` |
 
 #### Registrations — `registration.service.ts`, `lobby.service.ts`
@@ -401,7 +421,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/registrations/registration/my/` | Signed-in user’s registrations (array: `registration_dates[{ date, mode }]`, `registered_sessions_count`, `status`, …) |
 | `GET` | `/registrations/` | Legacy / alternate registrations list |
 | `POST` | `/registrations/registration/` | Create registration. **WHOLE_DAY:** `{ event, day_ids, attendance_mode }`. **MULTI_SESSION:** `{ event, sessions: [{ day, attendance_mode: PHYSICAL \| VIRTUAL, session_ids }] }` |
-| `PUT` | `/registrations/registration/:id/` | Update registration |
+| `PATCH` | `/registrations/registration/:id/` | Update registration (lobby / staff edit) |
 | `DELETE` | `/registrations/registration/:id/` | Delete registration (own registration for base users) |
 | `PATCH` | `/registrations/registration/bulk-status/` | Bulk status: `{ ids, status }` |
 | `PATCH` | `/registrations/:id/` | Update registration preferences |
@@ -419,7 +439,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/registrations/registration/?event=&page=` | Paginated registrations (lobby). Results include `registration_dates: [{ date, mode: PHYSICAL\|VIRTUAL }]`, `registered_sessions_count`, `status` |
+| `GET` | `/registrations/registration/?event=&page=&page_size=10` | Paginated lobby registrations (`count`, `next`, `previous`, `results[]`). FE uses `page_size=10` and Next/Previous from `next`/`previous` |
 | `GET` | `/registrations/travel-assistance/?event=&page=` | Travel rows |
 | `GET` | `/registrations/medical-assistance/?event=&page=` | Medical rows |
 | `GET` | `/registrations/translation-assistance/?event=&page=` | Translation rows |
@@ -444,15 +464,16 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/registrations/counts/` | Overview registration status cards (`event_id` query). Response: `total`, `accepted`, `pending`, `on_hold`, `rejected` (`undecided_mode` ignored in UI) |
 | `GET` | `/analytics/registrations/trend/` | Registrations-by-day chart (`event_id`, `granularity=daily\|weekly\|monthly`). Response: `{ granularity, results: [{ date, count }] }` |
 | `GET` | `/analytics/registrations/insights/` | Attendance donut (`event_id`). Uses `attendance_mode` + `attendance_mode_by_date`; UI shows Physical / Virtual / Mixed only |
-| `GET` | `/analytics/registrations/demographics/` | Gender / state / country / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_country`, `by_designation` |
-| `GET` | `/analytics/events/feedback/` | Overview feedback charts (`event`, optional `day`). Response: `overall` (`feedback_by_date[]`, totals), `by_day[]` (`event_date`, `day_number`, count), `by_session[]` |
+| `GET` | `/analytics/registrations/demographics/` | Gender / state / country / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_country`, `by_designation`. Overview **by state** → India map (`IndiaStateRegistrationsMap`); **by country** → rotatable globe (`CountryRegistrationsGlobe`) |
+| `GET` | `/analytics/events/feedback/` | Live Event Insights feedback charts (`event`, optional `day`). Response: `overall` (`feedback_by_date[]`, totals), `by_day[]` (`event_date`, `day_number`, count), `by_session[]` |
 | `GET` | `/analytics/streaming/summary/` | Live Event Insights streaming cards + details (`event_id`). Response: `currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time fields, `live_broadcast` |
 | `GET` | `/analytics/streaming/participation-trend/` | Participation Trend chart (`event_id`, `mode=all\|physical\|virtual`, `interval_minutes=15`, optional `date=YYYY-MM-DD`). Response: `{ mode, results: [{ bucket_start, count }] }` (empty `results` when no activity) |
+| `WS` | `/ws/analytics/{eventId}/?token=` | Live Event Insights WebSocket. Base from `NEXT_PUBLIC_WS_URL` (fallback: derive from `NEXT_PUBLIC_API_URL`). Client: `useLiveAnalyticsSocket` → `useLiveAnalyticsStore` |
 | `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
-**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **Attendance Mode users** call live Django endpoints. Participation Time still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
+**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **login insights** (WebSocket `/ws/analytics/{eventId}/?token=` — statewise / countrywise / session max virtual) + **session participation time/rate tables** (day toggle 19–21 Aug — placeholder) + **event feedback** (by day / by sessions under **Live Event Insights**) + **Attendance Mode users** call live Django endpoints. Participation Time (viewer join/leave) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
 
 Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 
@@ -504,6 +525,7 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 3. **Other country codes:** Skip OTP; auto-login → `POST /auth/login/` with the new email/password
 4. Event register → `POST /registrations/registration/` (base users land on `/event-register` when not yet registered)
 5. Optional profile support → `POST /registrations/request-*`
+6. When login or registration lands on `/` or `/dashboard`, the app resolves IP geo via [ipwhois.io](https://ipwhois.io/documentation#overview) (`GET /api/ip-lookup`), optionally reads browser GPS accuracy, and `POST /events/event/:id/join/` with `{ ip_address, latitude, longitude, location_accuracy, state }` (`state` ← `region`)
 
 ### 2. Lobby: add user (two-step wizard)
 
@@ -560,7 +582,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 | Auth changes | `auth.service.ts`, `auth-mappers.ts`, `useAuthStore.ts` |
 | Registration payload | `registration-mappers.ts`, `registration.service.ts` |
 | Assistance forms | `event-support-mappers.ts`, `lobby.service.ts`, `date-input.ts`, `features/dashboard/admin-*.schema.ts` |
-| Analytics | `analytics.service.ts`, `analytics-mappers.ts`, `app/dashboard/analytics/`, `AttendanceModeAnalytics.tsx` |
+| Analytics | `analytics.service.ts`, `analytics-mappers.ts`, `useLiveAnalyticsSocket`, `useLiveAnalyticsStore`, `app/dashboard/analytics/`, `AttendanceModeAnalytics.tsx`, `EventFeedbackCharts.tsx`, `LiveLoginInsightsCharts.tsx`, `SessionParticipationAnalytics.tsx`, `IndiaStateRegistrationsMap.tsx`, `CountryRegistrationsGlobe.tsx` |
 | Streaming | `VideoPlayer.tsx`, `stream-utils.ts`, `streaming/page.tsx` |
 
 ---

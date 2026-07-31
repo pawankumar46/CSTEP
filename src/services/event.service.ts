@@ -116,6 +116,31 @@ export const getEventById = async (id: string): Promise<Event | null> => {
   }
 };
 
+/** Live: POST /events/event/:id/join/ — record client location on login/registration landing. */
+export const joinEvent = async (
+  eventId: string,
+  payload: {
+    ipAddress: string;
+    latitude: number | null;
+    longitude: number | null;
+    locationAccuracy: number | null;
+    state: string;
+  },
+): Promise<void> => {
+  try {
+    await apiClient.post(`/events/event/${eventId}/join/`, {
+      ip_address: payload.ipAddress,
+      latitude: payload.latitude == null ? "" : String(payload.latitude),
+      longitude: payload.longitude == null ? "" : String(payload.longitude),
+      location_accuracy:
+        payload.locationAccuracy == null ? "" : String(payload.locationAccuracy),
+      state: payload.state,
+    });
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 export const createEvent = async (payload: CreateEventPayload): Promise<Event> => {
   try {
     const { data } = await apiClient.post<Record<string, unknown>>(

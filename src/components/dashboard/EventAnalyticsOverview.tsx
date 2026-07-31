@@ -23,7 +23,10 @@ import {
 } from "recharts";
 import { AnalyticsMetricTable } from "@/components/dashboard/AnalyticsDistributionTable";
 import { AnalyticsCollapsibleSection } from "@/components/dashboard/AnalyticsCollapsibleSection";
+import { EventFeedbackCharts } from "@/components/dashboard/EventFeedbackCharts";
+import { LiveLoginInsightsCharts } from "@/components/dashboard/LiveLoginInsightsCharts";
 import { ParticipationTimeTable } from "@/components/dashboard/ParticipationTimeTable";
+import { SessionParticipationAnalytics } from "@/components/dashboard/SessionParticipationAnalytics";
 import { RegistrationInsightsCharts } from "@/components/dashboard/RegistrationInsightsCharts";
 import { ChartCard } from "@/components/shared/ChartCard";
 import { ChartFilterGroup } from "@/components/shared/ChartFilterGroup";
@@ -48,8 +51,10 @@ import {
 } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
 import { MOCK_PARTICIPATION_TIME_SESSIONS } from "@/mock/analytics-participation-time";
+import { useLiveAnalyticsSocket } from "@/hooks/useLiveAnalyticsSocket";
 import { getAllEvents } from "@/services/event.service";
 import { useAnalyticsStore } from "@/store/useAnalyticsStore";
+import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
 import type { Event, StreamingParticipationMode } from "@/types";
 
 const COMPACT_CHART_HEIGHT = 128;
@@ -191,6 +196,9 @@ export function EventAnalyticsOverview() {
     clearStreamingParticipationTrend,
   } = useAnalyticsStore();
 
+  useLiveAnalyticsSocket(selectedEventId);
+  const liveStreamingPartial = useLiveAnalyticsStore((s) => s.snapshot?.streamingSummary ?? null);
+
   useEffect(() => {
     void fetchAnalytics();
   }, [fetchAnalytics]);
@@ -314,22 +322,44 @@ export function EventAnalyticsOverview() {
     });
   }, [streamingParticipationTrend]);
 
+  const liveStreamingSummary = useMemo(() => {
+    if (!streamingSummary && !liveStreamingPartial) return null;
+    if (!streamingSummary) {
+      return {
+        currentlyWatching: liveStreamingPartial?.currentlyWatching ?? 0,
+        uniqueViewers: liveStreamingPartial?.uniqueViewers ?? 0,
+        broadcastSessions: liveStreamingPartial?.broadcastSessions ?? 0,
+        peakConcurrentViewers: liveStreamingPartial?.peakConcurrentViewers ?? 0,
+        avgWatchTimeSeconds: liveStreamingPartial?.avgWatchTimeSeconds ?? 0,
+        avgWatchTimeDisplay: liveStreamingPartial?.avgWatchTimeDisplay ?? "—",
+        totalWatchTimeSeconds: liveStreamingPartial?.totalWatchTimeSeconds ?? 0,
+        totalWatchTimeDisplay: liveStreamingPartial?.totalWatchTimeDisplay ?? "—",
+        liveBroadcast: liveStreamingPartial?.liveBroadcast ?? false,
+      };
+    }
+    if (!liveStreamingPartial) return streamingSummary;
+    return {
+      ...streamingSummary,
+      ...liveStreamingPartial,
+    };
+  }, [streamingSummary, liveStreamingPartial]);
+
   const streamingMetrics = useMemo(() => {
-    if (!streamingSummary) return [];
+    if (!liveStreamingSummary) return [];
 
     return [
-      { metric: "Currently Watching", value: streamingSummary.currentlyWatching },
-      { metric: "Unique Viewers", value: streamingSummary.uniqueViewers },
-      { metric: "Broadcast Sessions", value: streamingSummary.broadcastSessions },
-      { metric: "Peak Concurrent Viewers", value: streamingSummary.peakConcurrentViewers },
-      { metric: "Avg Watch Time", value: streamingSummary.avgWatchTimeDisplay },
-      { metric: "Total Watch Time", value: streamingSummary.totalWatchTimeDisplay },
+      { metric: "Currently Watching", value: liveStreamingSummary.currentlyWatching },
+      { metric: "Unique Viewers", value: liveStreamingSummary.uniqueViewers },
+      { metric: "Broadcast Sessions", value: liveStreamingSummary.broadcastSessions },
+      { metric: "Peak Concurrent Viewers", value: liveStreamingSummary.peakConcurrentViewers },
+      { metric: "Avg Watch Time", value: liveStreamingSummary.avgWatchTimeDisplay },
+      { metric: "Total Watch Time", value: liveStreamingSummary.totalWatchTimeDisplay },
       {
         metric: "Live Broadcast",
-        value: streamingSummary.liveBroadcast ? "Active" : "Inactive",
+        value: liveStreamingSummary.liveBroadcast ? "Active" : "Inactive",
       },
     ];
-  }, [streamingSummary]);
+  }, [liveStreamingSummary]);
 
   const exportSlugPrefix = useMemo(
     () => slugifyFilename(selectedEvent?.name ?? eventAnalytics?.event.title ?? "event-analytics"),
@@ -366,12 +396,10 @@ export function EventAnalyticsOverview() {
       || Boolean(registrationTrend)
       || Boolean(registrationAttendanceInsights)
       || Boolean(registrationDemographics)
-      || Boolean(eventFeedbackAnalytics)
       || registrationCountsLoading
       || registrationTrendLoading
       || registrationAttendanceLoading
       || registrationDemographicsLoading
-      || eventFeedbackAnalyticsLoading
     );
   const initialEventLoading =
     Boolean(selectedEventId)
@@ -494,9 +522,6 @@ export function EventAnalyticsOverview() {
               demographics={registrationDemographics}
               demographicsLoading={registrationDemographicsLoading}
               demographicsError={registrationDemographicsError}
-              eventFeedback={eventFeedbackAnalytics}
-              eventFeedbackLoading={eventFeedbackAnalyticsLoading}
-              eventFeedbackError={eventFeedbackAnalyticsError}
             />
           </AnalyticsCollapsibleSection>
         </div>
@@ -505,9 +530,16 @@ export function EventAnalyticsOverview() {
       {(streamingSummary
         || streamingParticipationTrend
         || eventAnalytics
+        || eventFeedbackAnalytics
         || streamingSummaryLoading
-        || streamingParticipationTrendLoading) && !initialEventLoading && (
+        || streamingParticipationTrendLoading
+        || eventFeedbackAnalyticsLoading
+        || Boolean(selectedEventId)) && !initialEventLoading && (
         <AnalyticsCollapsibleSection title="Live Event Insights">
+          <LiveLoginInsightsCharts />
+
+          <SessionParticipationAnalytics />
+
           <div className="max-w-xl space-y-2">
             <ChartCard
               compact
@@ -559,29 +591,35 @@ export function EventAnalyticsOverview() {
             </ChartCard>
           </div>
 
-          {streamingSummaryLoading && !streamingSummary ? (
+          <EventFeedbackCharts
+            eventFeedback={eventFeedbackAnalytics}
+            eventFeedbackLoading={eventFeedbackAnalyticsLoading}
+            eventFeedbackError={eventFeedbackAnalyticsError}
+          />
+
+          {streamingSummaryLoading && !liveStreamingSummary ? (
             <p className="py-4 text-sm text-muted-foreground">Loading streaming insights…</p>
-          ) : streamingSummary ? (
+          ) : liveStreamingSummary ? (
             <>
               <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard
                   title="Currently Watching"
-                  value={streamingSummary.currentlyWatching}
+                  value={liveStreamingSummary.currentlyWatching}
                   icon={Eye}
                 />
                 <StatCard
                   title="Unique Viewers"
-                  value={streamingSummary.uniqueViewers}
+                  value={liveStreamingSummary.uniqueViewers}
                   icon={Users}
                 />
                 <StatCard
                   title="Broadcast Sessions"
-                  value={streamingSummary.broadcastSessions}
+                  value={liveStreamingSummary.broadcastSessions}
                   icon={Radio}
                 />
                 <StatCard
                   title="Peak Concurrent"
-                  value={streamingSummary.peakConcurrentViewers}
+                  value={liveStreamingSummary.peakConcurrentViewers}
                   icon={TrendingUp}
                 />
               </div>

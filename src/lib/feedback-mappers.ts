@@ -9,6 +9,8 @@ import type { Feedback } from "@/types";
 
 export interface FeedbackSummaryRespondent {
   userName: string;
+  userEmail?: string;
+  userPhone?: string;
   rating: number;
   comments: string;
 }
@@ -27,6 +29,8 @@ export interface FeedbackTableRow {
   eventName: string;
   sessionName: string;
   userName: string;
+  userEmail?: string;
+  userPhone?: string;
   rating: number;
   comments: string;
 }
@@ -74,6 +78,8 @@ export function buildFeedbackSummaryRows(feedback: Feedback[]): FeedbackSummaryR
     existing.count += 1;
     existing.respondents.push({
       userName: item.userName,
+      userEmail: item.userEmail,
+      userPhone: item.userPhone,
       rating: item.rating,
       comments: item.comments,
     });
@@ -102,6 +108,8 @@ export function buildFeedbackTableRows(feedback: Feedback[]): FeedbackTableRow[]
     eventName: item.eventName,
     sessionName: getFeedbackSessionDisplayName(item.sessionTitle, item.eventName),
     userName: item.userName,
+    userEmail: item.userEmail,
+    userPhone: item.userPhone,
     rating: item.rating,
     comments: item.comments,
   }));
@@ -233,6 +241,19 @@ export function mapApiFeedbackToFeedback(raw: unknown): Feedback {
     pickString(row.user_full_name, row.user_name, row.userName) ||
     composeUserName(userRecord) ||
     "Attendee";
+  const userEmail = pickString(
+    row.user_email,
+    row.email,
+    userRecord?.email,
+    userRecord?.user_email,
+  );
+  const userPhone = pickString(
+    row.user_phone,
+    row.phone,
+    userRecord?.phone,
+    userRecord?.mobile,
+    userRecord?.phone_number,
+  );
 
   const userId = pickString(
     row.user_id,
@@ -246,6 +267,8 @@ export function mapApiFeedbackToFeedback(raw: unknown): Feedback {
     id: pickString(row.id) || `fb-${Date.now()}`,
     userId: userId || "unknown",
     userName,
+    userEmail: userEmail || undefined,
+    userPhone: userPhone || undefined,
     eventId: pickString(
       typeof row.event === "object" ? undefined : row.event,
       row.event_id,

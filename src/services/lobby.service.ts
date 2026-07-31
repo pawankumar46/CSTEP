@@ -260,7 +260,7 @@ export const updateRegistration = async (
 };
 
 const DEFAULT_ASSISTANCE_PAGE_SIZE = 10;
-const DEFAULT_LOBBY_PAGE_SIZE = 50;
+const DEFAULT_LOBBY_PAGE_SIZE = 10;
 
 export interface AssistancePageResult<T> {
   items: T[];
@@ -404,7 +404,9 @@ export interface LobbyRegistrationsPageResult {
   page: number;
   pageSize: number;
   total: number;
-  hasMore: boolean;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
 }
 
 export const getLobbyRegistrationDetail = async (
@@ -482,14 +484,25 @@ export const getLobbyRegistrationsPage = async (
     const record = data as {
       count?: number;
       next?: string | null;
+      previous?: string | null;
       total_pages?: number;
       current_page?: number;
     };
     const total = Number(record.count ?? registrations.length);
-    const hasMore = Boolean(record.next);
     const currentPage = Number(record.current_page ?? page);
+    const totalPages = Number(
+      record.total_pages ?? Math.max(1, Math.ceil(total / pageSize) || 1),
+    );
 
-    return { registrations, page: currentPage, pageSize, total, hasMore };
+    return {
+      registrations,
+      page: Number.isFinite(currentPage) && currentPage > 0 ? currentPage : page,
+      pageSize,
+      total,
+      totalPages: Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1,
+      hasNext: Boolean(record.next),
+      hasPrevious: Boolean(record.previous),
+    };
   }
 
   return {
@@ -497,7 +510,9 @@ export const getLobbyRegistrationsPage = async (
     page,
     pageSize,
     total: registrations.length,
-    hasMore: false,
+    totalPages: 1,
+    hasNext: false,
+    hasPrevious: page > 1,
   };
 };
 
@@ -505,12 +520,12 @@ export const getLobbyRegistrations = async (eventId: string): Promise<Registrati
   try {
     const allRegistrations: Registration[] = [];
     let page = 1;
-    let hasMore = true;
+    let hasNext = true;
 
-    while (hasMore && page <= 100) {
+    while (hasNext && page <= 100) {
       const result = await getLobbyRegistrationsPage(eventId, page);
       allRegistrations.push(...result.registrations);
-      hasMore = result.hasMore;
+      hasNext = result.hasNext;
       page += 1;
     }
 
