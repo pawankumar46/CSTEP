@@ -316,7 +316,7 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 |------|-------------|
 | `/` | Landing page |
 | `/login`, `/signup`, `/otp` | Authentication |
-| `/event-register` | Multi-step event registration |
+| `/event-register` | Multi-step event registration (ICAS includes **19 Aug** as **Physical only**; 20–21 Aug keep Physical/Virtual) |
 | `/profile` | Delegate profile & assistance requests |
 | `/my-registrations` | Signed-in user’s event registrations (`GET /registrations/registration/my/`) |
 | `/feedback` | Multi-day session feedback (all authenticated users) |
@@ -523,7 +523,7 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 1. Sign up → `POST /auth/sign_up/` (includes `country_code` + `phone_number`)
 2. **+91 (India):** Verify mobile OTP → `POST /auth/verify-otp/` (signs the user in)
 3. **Other country codes:** Skip OTP; auto-login → `POST /auth/login/` with the new email/password
-4. Event register → `POST /registrations/registration/` (base users land on `/event-register` when not yet registered)
+4. Event register → `POST /registrations/registration/` (base users land on `/event-register` when not yet registered). For ICAS, **19 Aug** is selectable as **Physical only**; 20–21 Aug keep Physical/Virtual from the API.
 5. Optional profile support → `POST /registrations/request-*`
 6. When login or registration lands on `/` or `/dashboard`, the app resolves IP geo via [ipwhois.io](https://ipwhois.io/documentation#overview) (`GET /api/ip-lookup`), optionally reads browser GPS accuracy, and `POST /events/event/:id/join/` with `{ ip_address, latitude, longitude, location_accuracy, state }` (`state` ← `region`)
 

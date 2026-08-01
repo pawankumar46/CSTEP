@@ -728,6 +728,9 @@ function EventRegisterForm() {
                               day.allowedAttendanceModes,
                             );
                             const dayAttendanceOptions = getAttendanceModeOptions(day.allowedAttendanceModes);
+                            const isPhysicalOnly =
+                              dayAttendanceOptions.length === 1
+                              && dayAttendanceOptions[0]?.value === "physical";
                             return (
                               <div key={day.id} className="space-y-2">
                                 <div
@@ -748,21 +751,26 @@ function EventRegisterForm() {
                                       : "border-border bg-card hover:border-primary/40",
                                   )}
                                 >
-                                  <div className="flex items-center gap-2 min-w-0">
+                                  <div className="flex items-start gap-2 min-w-0">
                                     <div
                                       aria-hidden
                                       className={cn(
-                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
+                                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary shadow",
                                         isSelected && "bg-primary text-primary-foreground",
                                       )}
                                     >
                                       {isSelected && <Check className="h-3 w-3" />}
                                     </div>
-                                    <p className="font-medium text-sm truncate">{getDayLabel(day)}</p>
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-sm truncate">{getDayLabel(day)}</p>
+                                      {isPhysicalOnly && (
+                                        <p className="text-[11px] text-muted-foreground">Physical only</p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
 
-                                {isSelected && isMultiSession && (
+                                {isSelected && isMultiSession && dayAttendanceOptions.length > 1 && (
                                   <div
                                     role="radiogroup"
                                     aria-label={`Attendance mode for ${getDayLabel(day)}`}

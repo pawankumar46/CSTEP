@@ -1,3 +1,5 @@
+import type { AttendanceMode } from "@/types";
+
 export const ICAS_CONFERENCE = {
   name: "India Clean Air Summit (ICAS) 2026",
   shortName: "ICAS 2026",
@@ -49,16 +51,18 @@ export function isIcasEventName(name: string): boolean {
   return normalized.includes("icas") || normalized.includes("clean air summit");
 }
 
-/** Training day on 19 Aug — hidden from self-registration only; lobby/admin flows keep all days. */
-export const ICAS_SELF_REGISTRATION_EXCLUDED_DATES = new Set(["2026-08-19"]);
+/** Training day on 19 Aug — Physical-only on self-registration; lobby/admin keep API modes. */
+export const ICAS_SELF_REGISTRATION_PHYSICAL_ONLY_DATES = new Set(["2026-08-19"]);
 
 /** Self-registration (`/event-register`) only — do not use in lobby/admin dialogs. */
-export function filterEventDaysForSelfRegistration<T extends { date: string }>(
-  days: T[],
-  eventName?: string | null,
-): T[] {
+export function filterEventDaysForSelfRegistration<
+  T extends { date: string; allowedAttendanceModes?: AttendanceMode[] },
+>(days: T[], eventName?: string | null): T[] {
   if (!eventName || !isIcasEventName(eventName)) return days;
-  return days.filter((day) => !ICAS_SELF_REGISTRATION_EXCLUDED_DATES.has(day.date));
+  return days.map((day) => {
+    if (!ICAS_SELF_REGISTRATION_PHYSICAL_ONLY_DATES.has(day.date)) return day;
+    return { ...day, allowedAttendanceModes: ["physical"] as AttendanceMode[] };
+  });
 }
 
 export function sortEventDaysByDate<T extends { date: string }>(days: T[]): T[] {
