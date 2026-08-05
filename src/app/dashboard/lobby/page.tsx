@@ -55,17 +55,20 @@ function LobbyContent() {
     selectedEventId,
     registrations,
     registrationsLoading,
+    registrationsSearch,
     registrationsPagination,
     error,
     clearError,
     setSelectedEventId,
     fetchRegistrations,
+    clearRegistrationsSearch,
     bulkUpdateStatus,
     updateRegistration,
     registerLobbyUser,
     signUpLobbyUser,
   } = useLobbyStore();
   const [statusFilter, setStatusFilter] = useState<RegistrationStatus | "all">("all");
+  const [searchDraft, setSearchDraft] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editRegistrationOpen, setEditRegistrationOpen] = useState(false);
   const [editingRegistration, setEditingRegistration] = useState<Registration | null>(null);
@@ -95,9 +98,23 @@ function LobbyContent() {
 
   useEffect(() => {
     if (selectedEventId) {
-      void fetchRegistrations(selectedEventId, 1);
+      setSearchDraft("");
+      clearRegistrationsSearch();
+      void fetchRegistrations(selectedEventId, 1, "");
     }
-  }, [selectedEventId, fetchRegistrations]);
+  }, [selectedEventId, fetchRegistrations, clearRegistrationsSearch]);
+
+  const handleLobbySearchSubmit = useCallback(() => {
+    if (!selectedEventId) return;
+    void fetchRegistrations(selectedEventId, 1, searchDraft);
+  }, [fetchRegistrations, searchDraft, selectedEventId]);
+
+  const handleLobbySearchClear = useCallback(() => {
+    if (!selectedEventId) return;
+    setSearchDraft("");
+    clearRegistrationsSearch();
+    void fetchRegistrations(selectedEventId, 1, "");
+  }, [clearRegistrationsSearch, fetchRegistrations, selectedEventId]);
 
   const handleLobbyPageChange = useCallback(
     (page: number) => {
@@ -484,8 +501,15 @@ function LobbyContent() {
             <DataTable
               columns={columns}
               data={filteredRegistrations}
-              searchKey="userName"
               searchPlaceholder="Search participants..."
+              serverSearch={{
+                value: searchDraft,
+                onChange: setSearchDraft,
+                onSubmit: handleLobbySearchSubmit,
+                onClear: handleLobbySearchClear,
+                appliedValue: registrationsSearch,
+                placeholder: "Search participants… (press Enter)",
+              }}
               searchExtra={
                 canManage ? (
                   <AddLobbyUsersDialog

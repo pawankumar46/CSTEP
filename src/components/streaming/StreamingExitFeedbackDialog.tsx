@@ -58,7 +58,7 @@ export function StreamingExitFeedbackDialog({
         <DialogHeader>
           <DialogTitle>Share Your Feedback</DialogTitle>
           <DialogDescription>
-          Rate sessions for each event day, then share your overall ICAS experience.
+            Rate sessions for your registered event days, then share your overall ICAS experience.
           </DialogDescription>
         </DialogHeader>
 

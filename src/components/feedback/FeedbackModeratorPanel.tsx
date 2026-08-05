@@ -56,9 +56,19 @@ const EMPTY_FILTERS = {
 
 interface FeedbackModeratorPanelProps {
   feedback: Feedback[];
+  serverPagination?: {
+    page: number;
+    totalPages: number;
+    hasNext?: boolean;
+    hasPrevious?: boolean;
+    onPageChange: (page: number) => void;
+  };
 }
 
-export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps) {
+export function FeedbackModeratorPanel({
+  feedback,
+  serverPagination,
+}: FeedbackModeratorPanelProps) {
   const [userName, setUserName] = useState(ALL_FEEDBACK_FILTER);
   const [sessionName, setSessionName] = useState(ALL_FEEDBACK_FILTER);
   const [eventName, setEventName] = useState(ALL_FEEDBACK_FILTER);
@@ -138,66 +148,66 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
               No feedback responses to summarize yet.
             </p>
           ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Event Date</TableHead>
-                <TableHead>Session</TableHead>
-                <TableHead className="text-right">Avg</TableHead>
-                <TableHead className="text-right">Responses</TableHead>
-                <TableHead>Respondents</TableHead>
-                <TableHead>Comments</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {summaryRows.map((row) => (
-                <TableRow key={`${row.eventDate}-${row.sessionName}`}>
-                  <TableCell className="font-medium">{row.eventDateLabel}</TableCell>
-                  <TableCell>{row.sessionName}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.responseCount > 0 ? row.avgRating : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{row.responseCount}</TableCell>
-                  <TableCell>
-                    {row.respondents.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <ul className="space-y-1.5">
-                        {row.respondents.map((respondent, index) => (
-                          <li
-                            key={`${respondent.userName}-${respondent.rating}-${index}`}
-                            className="text-sm"
-                          >
-                            <span className="font-medium">{respondent.userName}</span>
-                            <span className="mx-1.5 text-muted-foreground">·</span>
-                            <span className="tabular-nums text-muted-foreground">
-                              {formatStarRatingDisplay(respondent.rating)} ({respondent.rating})
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {row.respondents.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <ul className="space-y-1.5">
-                        {row.respondents.map((respondent, index) => (
-                          <li key={`${respondent.userName}-comment-${index}`} className="text-sm">
-                            <span className="font-medium">{respondent.userName}:</span>{" "}
-                            <span className="text-muted-foreground">
-                              {respondent.comments.trim() || "—"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </TableCell>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Event Date</TableHead>
+                  <TableHead>Session</TableHead>
+                  <TableHead className="text-right">Avg</TableHead>
+                  <TableHead className="text-right">Responses</TableHead>
+                  <TableHead>Respondents</TableHead>
+                  <TableHead>Comments</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {summaryRows.map((row) => (
+                  <TableRow key={`${row.eventDate}-${row.sessionName}`}>
+                    <TableCell className="font-medium">{row.eventDateLabel}</TableCell>
+                    <TableCell>{row.sessionName}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {row.responseCount > 0 ? row.avgRating : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{row.responseCount}</TableCell>
+                    <TableCell>
+                      {row.respondents.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {row.respondents.map((respondent, index) => (
+                            <li
+                              key={`${respondent.userName}-${respondent.rating}-${index}`}
+                              className="text-sm"
+                            >
+                              <span className="font-medium">{respondent.userName}</span>
+                              <span className="mx-1.5 text-muted-foreground">·</span>
+                              <span className="tabular-nums text-muted-foreground">
+                                {formatStarRatingDisplay(respondent.rating)} ({respondent.rating})
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.respondents.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {row.respondents.map((respondent, index) => (
+                            <li key={`${respondent.userName}-comment-${index}`} className="text-sm">
+                              <span className="font-medium">{respondent.userName}:</span>{" "}
+                              <span className="text-muted-foreground">
+                                {respondent.comments.trim() || "—"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -297,7 +307,7 @@ export function FeedbackModeratorPanel({ feedback }: FeedbackModeratorPanelProps
             data={tableRows}
             searchKey="userName"
             searchPlaceholder="Search by user..."
-            pageSize={10}
+            serverPagination={serverPagination}
           />
         </CardContent>
       </Card>

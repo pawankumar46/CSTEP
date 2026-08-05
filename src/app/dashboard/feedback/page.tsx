@@ -1,18 +1,31 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { FeedbackModeratorPanel } from "@/components/feedback/FeedbackModeratorPanel";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
 
 export default function FeedbackPage() {
-  const { feedback, isLoading, error, fetchFeedback } = useFeedbackStore();
+  const {
+    feedback,
+    feedbackPagination,
+    isLoading,
+    error,
+    fetchFeedbackPage,
+  } = useFeedbackStore();
 
   useEffect(() => {
-    void fetchFeedback();
-  }, [fetchFeedback]);
+    void fetchFeedbackPage(1);
+  }, [fetchFeedbackPage]);
 
-  if (isLoading) return <DashboardSkeleton />;
+  const handlePageChange = useCallback(
+    (page: number) => {
+      void fetchFeedbackPage(page);
+    },
+    [fetchFeedbackPage],
+  );
+
+  if (isLoading && feedback.length === 0) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -20,7 +33,9 @@ export default function FeedbackPage() {
         <h1 className="text-2xl font-bold">Feedback</h1>
         <p className="text-muted-foreground">
           Session ratings, daily summaries, and event-wide feedback from attendees.
-          {!isLoading && !error ? ` (${feedback.length} response${feedback.length === 1 ? "" : "s"})` : null}
+          {!isLoading && !error
+            ? ` (${feedbackPagination.total} response${feedbackPagination.total === 1 ? "" : "s"})`
+            : null}
         </p>
       </div>
 
@@ -30,12 +45,21 @@ export default function FeedbackPage() {
         </div>
       )}
 
-      {!error && feedback.length === 0 ? (
+      {!error && feedbackPagination.total === 0 ? (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           No feedback has been submitted yet.
         </div>
       ) : (
-        <FeedbackModeratorPanel feedback={feedback} />
+        <FeedbackModeratorPanel
+          feedback={feedback}
+          serverPagination={{
+            page: feedbackPagination.page,
+            totalPages: feedbackPagination.totalPages,
+            hasNext: feedbackPagination.hasNext,
+            hasPrevious: feedbackPagination.hasPrevious,
+            onPageChange: handlePageChange,
+          }}
+        />
       )}
     </div>
   );

@@ -319,7 +319,7 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 | `/event-register` | Multi-step event registration (ICAS includes **19 Aug** as **Physical only**; 20–21 Aug keep Physical/Virtual) |
 | `/profile` | Delegate profile & assistance requests |
 | `/my-registrations` | Signed-in user’s event registrations (`GET /registrations/registration/my/`) |
-| `/feedback` | Multi-day session feedback (all authenticated users) |
+| `/feedback` | Multi-day session feedback — day tabs and sessions scoped to the signed-in user's registration (`GET /registrations/registration/my/`) |
 | `/streaming` | Live stream (guarded by registration + event phase) |
 | `/dashboard` | Role-based dashboard home |
 | `/dashboard/lobby` | Manage registrations |
@@ -334,7 +334,7 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 | `/dashboard/users` | User admin (super admin) |
 | `/dashboard/analytics` | Analytics overview |
 | `/dashboard/analytics/attendance-mode` | Attendance mode analytics (event + virtual/physical filters, registration list) |
-| `/dashboard/feedback` | Feedback |
+| `/dashboard/feedback` | Feedback moderator view (`FeedbackModeratorPanel`) — summary table + paginated comment section |
 | `/dashboard/recordings` | Recordings |
 
 Route guards: `RouteGuard`, `StreamAccessGuard`, `EventRegisterGuard` in `src/components/`.
@@ -411,14 +411,14 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/events/event/:id/join/` | Record join location after login/registration (`{ ip_address, latitude, longitude, location_accuracy, state }`; `state` ← ipwhois `region`) |
 | `GET` | `/events/event-days/dropdown/?event=` | Event day options (feedback tabs, attendance-mode edit); `{ id, day_number, date, label, allowed_attendance_modes }` |
 | `GET` | `/events/schedule-items/?day=` | Schedule items for a day (feedback session list; paginated `results[]`) |
-| `GET` | `/events/feedback/?event=` | Paginated feedback (`results[]`: `event_title`, `event_day_date`, `schedule_item_title`, `user_full_name`, `user_email`, `user_phone`, rating, comment, …) |
-| `POST` | `/events/feedback/` | Create session feedback `{ event, event_date, schedule_item, rating, comment }` |
+| `GET` | `/events/feedback/` | Paginated feedback (`page`, `page_size=10`, `event`, optional `event_date`, `user`, `is_overall_rating`). Response: `count`, `total_pages`, `current_page`, `next`, `previous`, `results[]`. Dashboard `/dashboard/feedback` uses server Next/Previous |
+| `POST` | `/events/feedback/` | Session feedback: `{ event, event_date, schedule_item, rating, comment }`. Day overall (no session): `{ event, event_date, rating, comment }` |
 
 #### Registrations — `registration.service.ts`, `lobby.service.ts`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/registrations/registration/my/` | Signed-in user’s registrations (array: `registration_dates[{ date, mode }]`, `registered_sessions_count`, `status`, …) |
+| `GET` | `/registrations/registration/my/` | Signed-in user’s registrations (array with `days[]`: `date`, `day`, `attendance_mode`, `sessions[]` — used by streaming exit / `/feedback` day tabs) |
 | `GET` | `/registrations/` | Legacy / alternate registrations list |
 | `POST` | `/registrations/registration/` | Create registration. **WHOLE_DAY:** `{ event, day_ids, attendance_mode }`. **MULTI_SESSION:** `{ event, sessions: [{ day, attendance_mode: PHYSICAL \| VIRTUAL, session_ids }] }` |
 | `PATCH` | `/registrations/registration/:id/` | Update registration (lobby / staff edit) |
@@ -439,7 +439,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/registrations/registration/?event=&page=&page_size=10` | Paginated lobby registrations (`count`, `next`, `previous`, `results[]`). FE uses `page_size=10` and Next/Previous from `next`/`previous` |
+| `GET` | `/registrations/registration/?event=&page=&page_size=10` | Paginated lobby registrations (`count`, `next`, `previous`, `results[]`). Optional `search` (submitted from lobby search on Enter). FE uses `page_size=10` and Next/Previous from `next`/`previous` |
 | `GET` | `/registrations/travel-assistance/?event=&page=` | Travel rows |
 | `GET` | `/registrations/medical-assistance/?event=&page=` | Medical rows |
 | `GET` | `/registrations/translation-assistance/?event=&page=` | Translation rows |
@@ -473,7 +473,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
-**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **login insights** (WebSocket `/ws/analytics/{eventId}/?token=` — statewise / countrywise / session max virtual) + **session participation time/rate tables** (day toggle 19–21 Aug — placeholder) + **event feedback** (by day / by sessions under **Live Event Insights**) + **Attendance Mode users** call live Django endpoints. Participation Time (viewer join/leave) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
+**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **login insights** (WebSocket `/ws/analytics/{eventId}/?token=` — statewise / countrywise / session max virtual) + **session participation time/rate tables** (day toggle 19–21 Aug — placeholder) + **event feedback** (by day bar chart; by sessions scrollable bar cards with truncated titles in **Live Event Insights**) + **Attendance Mode users** call live Django endpoints. Participation Time (viewer join/leave) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
 
 Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 
@@ -539,6 +539,7 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 1. Stream URL from env (`NEXT_PUBLIC_LIVE_STREAM_URL`) or active broadcast HLS via `resolveLivePlaybackUrl()`
 2. `VideoPlayer` tries proxied Drive video (`/api/stream/video`) first, falls back to iframe embed
 3. `StreamAccessGuard` enforces auth + registration + live event phase
+4. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
 
 ### 4. Assistance moderation
 

@@ -10,12 +10,30 @@ interface FeedbackStats {
   distribution: { rating: number; count: number }[];
 }
 
+interface FeedbackPaginationState {
+  page: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+const EMPTY_FEEDBACK_PAGINATION: FeedbackPaginationState = {
+  page: 1,
+  total: 0,
+  totalPages: 1,
+  hasNext: false,
+  hasPrevious: false,
+};
+
 interface FeedbackState {
   feedback: Feedback[];
+  feedbackPagination: FeedbackPaginationState;
   stats: FeedbackStats | null;
   isLoading: boolean;
   isSubmitting: boolean;
   error: string | null;
+  fetchFeedbackPage: (page?: number, eventId?: string) => Promise<void>;
   fetchFeedback: (eventId?: string) => Promise<void>;
   fetchStats: (eventId?: string) => Promise<void>;
   submitFeedback: (data: Omit<Feedback, "id" | "createdAt">) => Promise<void>;
@@ -24,16 +42,52 @@ interface FeedbackState {
 
 export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   feedback: [],
+  feedbackPagination: EMPTY_FEEDBACK_PAGINATION,
   stats: null,
   isLoading: false,
   isSubmitting: false,
   error: null,
 
+  fetchFeedbackPage: async (page = 1, eventId = DEFAULT_FEEDBACK_EVENT_ID) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await feedbackService.getFeedbackListPage(eventId, page);
+      set({
+        feedback: result.rows,
+        feedbackPagination: {
+          page: result.page,
+          total: result.total,
+          totalPages: result.totalPages,
+          hasNext: result.hasNext,
+          hasPrevious: result.hasPrevious,
+        },
+        isLoading: false,
+      });
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to fetch feedback",
+        feedback: [],
+        feedbackPagination: EMPTY_FEEDBACK_PAGINATION,
+        isLoading: false,
+      });
+    }
+  },
+
   fetchFeedback: async (eventId = DEFAULT_FEEDBACK_EVENT_ID) => {
     set({ isLoading: true, error: null });
     try {
       const feedback = await feedbackService.getFeedback(eventId);
-      set({ feedback, isLoading: false });
+      set({
+        feedback,
+        feedbackPagination: {
+          page: 1,
+          total: feedback.length,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false,
+        },
+        isLoading: false,
+      });
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Failed to fetch feedback",
@@ -76,7 +130,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         feedback: [...created, ...get().feedback],
         isSubmitting: false,
       });
-      void get().fetchFeedback();
+      void get().fetchFeedbackPage(get().feedbackPagination.page || 1);
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Failed to submit feedback",

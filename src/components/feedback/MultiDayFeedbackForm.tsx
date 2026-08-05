@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { StarRatingInput } from "@/components/shared/StarRatingInput";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,10 +17,16 @@ import {
   type StreamingFeedbackFormValues,
 } from "@/features/feedback/streaming-feedback.schema";
 import {
+  getSubmittedDailyOverallDates,
+  getSubmittedFeedbackSessionIds,
+  mergeExistingFeedbackIntoForm,
+} from "@/lib/feedback-mappers";
+import {
   FEEDBACK_DATE_OPTIONS,
   FEEDBACK_DAY_OVERALL_TITLE,
   FEEDBACK_EVENT_OVERALL_TITLE,
   FEEDBACK_SESSIONS_BY_DATE,
+  buildFeedbackOptionsFromRegistrationDays,
   formatFeedbackEventDate,
   mapEventDaysToFeedbackDateOptions,
   mapScheduleItemsToFeedbackSessions,
@@ -29,6 +36,10 @@ import {
   type FeedbackSessionOption,
 } from "@/lib/feedback-options";
 import { getEventDaysDropdown, getScheduleItems } from "@/services/event.service";
+import { getUserFeedbackForRegisteredDays } from "@/services/feedback.service";
+import { getRegistrations } from "@/services/registration.service";
+import { useAuthStore } from "@/store/useAuthStore";
+import { cn } from "@/lib/utils";
 import type { Feedback } from "@/types";
 
 interface MultiDayFeedbackFormProps {
@@ -48,12 +59,17 @@ export function MultiDayFeedbackForm({
   onSkip,
   submitLabel = "Submit Feedback",
 }: MultiDayFeedbackFormProps) {
+  const user = useAuthStore((s) => s.user);
   const resolvedEventId = resolveFeedbackEventId(eventId);
   const [dateOptions, setDateOptions] = useState<FeedbackDateOption[]>([]);
   const [daysLoading, setDaysLoading] = useState(true);
   const [daysError, setDaysError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("");
+  const [submittedSessionIds, setSubmittedSessionIds] = useState<Set<string>>(new Set());
+  const [submittedDailyOverallDates, setSubmittedDailyOverallDates] = useState<Set<string>>(
+    new Set(),
+  );
   const [sessionsByDate, setSessionsByDate] = useState<
     Record<string, FeedbackSessionOption[]>
   >({});
@@ -90,19 +106,79 @@ export function MultiDayFeedbackForm({
       setSessionsByDate({});
       setSessionsLoadingByDate({});
       setSessionsErrorByDate({});
+
       try {
-        const days = await getEventDaysDropdown(resolvedEventId);
+        const [eventDays, registrations] = await Promise.all([
+          getEventDaysDropdown(resolvedEventId).catch(() => []),
+          getRegistrations().catch(() => []),
+        ]);
         if (cancelled) return;
-        const options = mapEventDaysToFeedbackDateOptions(days);
-        const resolved = options.length > 0 ? options : FEEDBACK_DATE_OPTIONS;
-        setDateOptions(resolved);
-        setActiveTab(resolved[0]?.value ?? "event-overall");
-        reset(
-          buildDefaultStreamingFeedbackForm(
-            resolved.map((option) => option.value),
-            {},
-          ),
+
+        const registration = registrations.find(
+          (entry) => String(entry.eventId) === String(resolvedEventId),
         );
+        const registeredDays = registration?.days ?? [];
+
+        let resolved: FeedbackDateOption[];
+        let initialSessionsByDate: Record<string, FeedbackSessionOption[]> = {};
+        let dayIdByDate: Record<string, string> = {};
+
+        if (registeredDays.length > 0) {
+          const fromRegistration = buildFeedbackOptionsFromRegistrationDays(registeredDays);
+          resolved = fromRegistration.dateOptions;
+          initialSessionsByDate = fromRegistration.sessionsByDate;
+          dayIdByDate = fromRegistration.dayIdByDate;
+        } else {
+          const options = mapEventDaysToFeedbackDateOptions(eventDays);
+          resolved = options.length > 0 ? options : FEEDBACK_DATE_OPTIONS;
+          dayIdByDate = Object.fromEntries(
+            resolved
+              .filter((option) => option.dayId)
+              .map((option) => [option.value, option.dayId!]),
+          );
+        }
+
+        setDateOptions(resolved);
+        setSessionsByDate(initialSessionsByDate);
+        for (const date of Object.keys(initialSessionsByDate)) {
+          fetchedSessionDatesRef.current.add(date);
+        }
+
+        const defaultForm = buildDefaultStreamingFeedbackForm(
+          resolved.map((option) => option.value),
+          initialSessionsByDate,
+          dayIdByDate,
+        );
+        let formValues = defaultForm;
+
+        for (const [date, sessionList] of Object.entries(initialSessionsByDate)) {
+          formValues = mergeSessionsIntoFormValues(
+            formValues,
+            date,
+            sessionList,
+            dayIdByDate[date] ?? "",
+          );
+        }
+
+        if (user?.id) {
+          const eventDateIds = resolved
+            .map((option) => option.dayId)
+            .filter((dayId): dayId is string => Boolean(dayId?.trim()));
+          if (eventDateIds.length > 0) {
+            const existing = await getUserFeedbackForRegisteredDays(
+              resolvedEventId,
+              String(user.id),
+              eventDateIds,
+            );
+            if (cancelled) return;
+            formValues = mergeExistingFeedbackIntoForm(formValues, existing);
+            setSubmittedSessionIds(getSubmittedFeedbackSessionIds(existing));
+            setSubmittedDailyOverallDates(getSubmittedDailyOverallDates(existing));
+          }
+        }
+
+        setActiveTab(resolved[0]?.value ?? "event-overall");
+        reset(formValues);
       } catch (err) {
         if (cancelled) return;
         setDaysError(err instanceof Error ? err.message : "Failed to load event days");
@@ -123,7 +199,9 @@ export function MultiDayFeedbackForm({
     return () => {
       cancelled = true;
     };
-  }, [resolvedEventId, reset]);
+    // mergeSessionsIntoForm uses getValues/setValue; intentional deps below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedEventId, reset, user?.id]);
 
   useEffect(() => {
     if (!activeTab || activeTab === "event-overall") return;
@@ -181,13 +259,13 @@ export function MultiDayFeedbackForm({
   const dailyOverall = watch("dailyOverall");
   const eventOverall = watch("eventOverall");
 
-  function mergeSessionsIntoForm(
+  function mergeSessionsIntoFormValues(
+    form: StreamingFeedbackFormValues,
     date: string,
     sessionList: FeedbackSessionOption[],
     eventDayId = "",
-  ) {
-    const currentSessions = getValues("sessions");
-    const nextSessions = { ...currentSessions };
+  ): StreamingFeedbackFormValues {
+    const nextSessions = { ...form.sessions };
     for (const session of sessionList) {
       const existing = nextSessions[session.id];
       nextSessions[session.id] = {
@@ -199,7 +277,17 @@ export function MultiDayFeedbackForm({
         comments: existing?.comments ?? "",
       };
     }
-    setValue("sessions", nextSessions, { shouldValidate: false });
+    return { ...form, sessions: nextSessions };
+  }
+
+  function mergeSessionsIntoForm(
+    date: string,
+    sessionList: FeedbackSessionOption[],
+    eventDayId = "",
+  ) {
+    const current = getValues();
+    const next = mergeSessionsIntoFormValues(current, date, sessionList, eventDayId);
+    setValue("sessions", next.sessions, { shouldValidate: false });
   }
 
   const updateSession = (
@@ -225,7 +313,7 @@ export function MultiDayFeedbackForm({
     field: "rating" | "comments",
     value: number | string,
   ) => {
-    const current = dailyOverall[date] ?? { rating: 0, comments: "" };
+    const current = dailyOverall[date] ?? { rating: 0, comments: "", eventDayId: "" };
     setValue(
       "dailyOverall",
       {
@@ -259,7 +347,17 @@ export function MultiDayFeedbackForm({
         async (data) => {
           setFormError(null);
           try {
-            await onSubmit(data);
+            const pendingSessions = Object.fromEntries(
+              Object.entries(data.sessions).filter(
+                ([sessionId]) => !submittedSessionIds.has(sessionId),
+              ),
+            );
+            const pendingDailyOverall = Object.fromEntries(
+              Object.entries(data.dailyOverall).filter(
+                ([date]) => !submittedDailyOverallDates.has(date),
+              ),
+            );
+            await onSubmit({ ...data, sessions: pendingSessions, dailyOverall: pendingDailyOverall });
           } catch (err) {
             setFormError(
               err instanceof Error ? err.message : "Failed to submit feedback",
@@ -309,7 +407,12 @@ export function MultiDayFeedbackForm({
         </TabsList>
 
         {dayTabs.map((tab) => {
-          const dayOverall = dailyOverall[tab.value] ?? { rating: 0, comments: "" };
+          const dayOverall = dailyOverall[tab.value] ?? {
+            rating: 0,
+            comments: "",
+            eventDayId: tab.dayId ?? "",
+          };
+          const isDayOverallSubmitted = submittedDailyOverallDates.has(tab.value);
           const daySessions = sessionsByDate[tab.value] ?? [];
           const sessionsLoading = Boolean(sessionsLoadingByDate[tab.value]);
           const sessionsError = sessionsErrorByDate[tab.value];
@@ -335,22 +438,38 @@ export function MultiDayFeedbackForm({
                   daySessions.map((session) => {
                     const entry = sessions[session.id];
                     if (!entry) return null;
+                    const isSubmitted = submittedSessionIds.has(session.id);
 
                     return (
-                      <div key={session.id} className="space-y-2 rounded-lg border p-3">
+                      <div
+                        key={session.id}
+                        className={cn(
+                          "space-y-2 rounded-lg border p-3",
+                          isSubmitted && "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20",
+                        )}
+                      >
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="min-w-0 flex-1 pr-2">
-                            <p className="text-sm font-medium leading-snug">{session.title}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium leading-snug">{session.title}</p>
+                              {isSubmitted && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Submitted
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">{session.time}</p>
                           </div>
                           <StarRatingInput
                             size="sm"
                             value={entry.rating}
+                            disabled={isSubmitted}
                             onChange={(rating) => updateSession(session.id, "rating", rating)}
                           />
                         </div>
                         <Textarea
                           value={entry.comments}
+                          disabled={isSubmitted}
                           onChange={(event) =>
                             updateSession(session.id, "comments", event.target.value)
                           }
@@ -364,20 +483,35 @@ export function MultiDayFeedbackForm({
                 )}
               </div>
 
-              <div className="space-y-2 rounded-lg border border-dashed bg-muted/30 p-3">
+              <div
+                className={cn(
+                  "space-y-2 rounded-lg border border-dashed bg-muted/30 p-3",
+                  isDayOverallSubmitted
+                    && "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20",
+                )}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-medium">{FEEDBACK_DAY_OVERALL_TITLE}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">{FEEDBACK_DAY_OVERALL_TITLE}</p>
+                      {isDayOverallSubmitted && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Submitted
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">Overall for {tab.label}</p>
                   </div>
                   <StarRatingInput
                     size="sm"
                     value={dayOverall.rating}
+                    disabled={isDayOverallSubmitted}
                     onChange={(rating) => updateDailyOverall(tab.value, "rating", rating)}
                   />
                 </div>
                 <Textarea
                   value={dayOverall.comments}
+                  disabled={isDayOverallSubmitted}
                   onChange={(event) =>
                     updateDailyOverall(tab.value, "comments", event.target.value)
                   }

@@ -45,6 +45,7 @@ interface LobbyState {
   selectedEventId: string | null;
   registrations: Registration[];
   registrationsLoading: boolean;
+  registrationsSearch: string;
   registrationsPagination: AssistancePaginationState;
   travelAssistance: TravelAssistanceRow[];
   travelAssistanceLoading: boolean;
@@ -61,7 +62,8 @@ interface LobbyState {
   error: string | null;
   clearError: () => void;
   setSelectedEventId: (eventId: string | null) => void;
-  fetchRegistrations: (eventId: string, page?: number) => Promise<void>;
+  fetchRegistrations: (eventId: string, page?: number, search?: string) => Promise<void>;
+  clearRegistrationsSearch: () => void;
   fetchTravelAssistance: (eventId: string, page?: number) => Promise<void>;
   fetchMedicalAssistance: (eventId: string, page?: number) => Promise<void>;
   fetchTranslationAssistance: (eventId: string, page?: number) => Promise<void>;
@@ -95,6 +97,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
   selectedEventId: null,
   registrations: [],
   registrationsLoading: false,
+  registrationsSearch: "",
   registrationsPagination: EMPTY_ASSISTANCE_PAGINATION,
   travelAssistance: [],
   travelAssistanceLoading: false,
@@ -116,6 +119,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     set({
       selectedEventId: eventId,
       registrations: [],
+      registrationsSearch: "",
       travelAssistance: [],
       medicalAssistance: [],
       translationAssistance: [],
@@ -129,10 +133,20 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     });
   },
 
-  fetchRegistrations: async (eventId, page = 1) => {
+  fetchRegistrations: async (eventId, page = 1, search) => {
+    const activeSearch = search !== undefined ? search.trim() : get().registrationsSearch;
+    if (search !== undefined) {
+      set({ registrationsSearch: activeSearch });
+    }
+
     set({ registrationsLoading: true, error: null, selectedEventId: eventId });
     try {
-      const result = await lobbyService.getLobbyRegistrationsPage(eventId, page);
+      const result = await lobbyService.getLobbyRegistrationsPage(
+        eventId,
+        page,
+        undefined,
+        activeSearch || undefined,
+      );
       set({
         registrations: result.registrations,
         registrationsPagination: {
@@ -152,6 +166,10 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
         registrationsLoading: false,
       });
     }
+  },
+
+  clearRegistrationsSearch: () => {
+    set({ registrationsSearch: "" });
   },
 
   fetchTravelAssistance: async (eventId, page = 1) => {

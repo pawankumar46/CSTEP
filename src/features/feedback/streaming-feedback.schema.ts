@@ -11,6 +11,11 @@ const ratingEntrySchema = z.object({
   comments: z.string(),
 });
 
+const dailyOverallEntrySchema = ratingEntrySchema.extend({
+  /** Event day id for `POST /events/feedback/` `event_date` (day overall — no schedule_item). */
+  eventDayId: z.string(),
+});
+
 const sessionEntrySchema = z.object({
   sessionId: z.string(),
   sessionTitle: z.string(),
@@ -24,17 +29,20 @@ const sessionEntrySchema = z.object({
 export const streamingFeedbackSchema = z
   .object({
     sessions: z.record(z.string(), sessionEntrySchema),
-    dailyOverall: z.record(z.string(), ratingEntrySchema),
+    dailyOverall: z.record(z.string(), dailyOverallEntrySchema),
     eventOverall: ratingEntrySchema,
   })
   .superRefine((data, ctx) => {
     const ratedSessions = Object.values(data.sessions).filter(
       (session) => session.rating >= 1,
     );
-    if (ratedSessions.length === 0) {
+    const ratedDailyOverall = Object.values(data.dailyOverall).filter(
+      (day) => day.rating >= 1,
+    );
+    if (ratedSessions.length === 0 && ratedDailyOverall.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Please rate at least one session before submitting",
+        message: "Please rate at least one session or day overall before submitting",
         path: ["sessions"],
       });
     }
@@ -45,6 +53,16 @@ export const streamingFeedbackSchema = z
           code: z.ZodIssueCode.custom,
           message: "Session day is missing. Switch tabs to reload sessions, then try again.",
           path: ["sessions", session.sessionId, "eventDayId"],
+        });
+      }
+    }
+
+    for (const day of ratedDailyOverall) {
+      if (!day.eventDayId.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Day overall is missing the event day id. Please reload and try again.",
+          path: ["dailyOverall"],
         });
       }
     }
@@ -68,12 +86,14 @@ export type SessionFeedbackEntry = StreamingFeedbackFormValues["sessions"][strin
 export function buildDefaultStreamingFeedbackForm(
   dates: string[] = FEEDBACK_DATE_OPTIONS.map((option) => option.value),
   sessionsByDate: Record<string, FeedbackSessionOption[]> = {},
+  dayIdByDate: Record<string, string> = {},
 ): StreamingFeedbackFormValues {
   const sessions: Record<string, SessionFeedbackEntry> = {};
-  const dailyOverall: Record<string, { rating: number; comments: string }> = {};
+  const dailyOverall: Record<string, { rating: number; comments: string; eventDayId: string }> =
+    {};
 
   for (const date of dates) {
-    dailyOverall[date] = { rating: 0, comments: "" };
+    dailyOverall[date] = { rating: 0, comments: "", eventDayId: dayIdByDate[date] ?? "" };
     const sessionList =
       sessionsByDate[date] ?? FEEDBACK_SESSIONS_BY_DATE[date] ?? [];
     for (const session of sessionList) {

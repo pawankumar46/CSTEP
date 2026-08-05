@@ -31,6 +31,15 @@ interface DataTableProps<TData, TValue> {
     hasPrevious?: boolean;
     onPageChange: (page: number) => void;
   };
+  /** Server-side search — API fires on submit/clear only (not per keystroke). */
+  serverSearch?: {
+    value: string;
+    onChange: (value: string) => void;
+    onSubmit: () => void;
+    onClear: () => void;
+    placeholder?: string;
+    appliedValue?: string;
+  };
 }
 
 export function DataTable<TData, TValue>({
@@ -41,9 +50,11 @@ export function DataTable<TData, TValue>({
   searchExtra,
   pageSize = 10,
   serverPagination,
+  serverSearch,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const useClientSearch = Boolean(searchKey) && !serverSearch;
 
   const table = useReactTable({
     data,
@@ -55,25 +66,44 @@ export function DataTable<TData, TValue>({
           getPaginationRowModel: getPaginationRowModel(),
           initialState: { pagination: { pageSize } },
         }),
+    ...(useClientSearch ? { getFilteredRowModel: getFilteredRowModel() } : {}),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
-    state: { sorting, globalFilter },
+    ...(useClientSearch
+      ? { onGlobalFilterChange: setGlobalFilter, state: { sorting, globalFilter } }
+      : { state: { sorting } }),
   });
+
+  const showSearchRow = useClientSearch || serverSearch || searchExtra;
 
   return (
     <div className="space-y-4">
-      {(searchKey || searchExtra) && (
+      {showSearchRow && (
         <div className="flex flex-wrap items-center gap-2">
-          {searchKey && (
+          {serverSearch ? (
             <SearchBar
-              value={globalFilter}
-              onChange={setGlobalFilter}
-              placeholder={searchPlaceholder}
+              value={serverSearch.value}
+              onChange={serverSearch.onChange}
+              onSubmit={serverSearch.onSubmit}
+              onClear={serverSearch.onClear}
+              placeholder={serverSearch.placeholder ?? searchPlaceholder}
               className="max-w-sm"
             />
+          ) : (
+            searchKey && (
+              <SearchBar
+                value={globalFilter}
+                onChange={setGlobalFilter}
+                placeholder={searchPlaceholder}
+                className="max-w-sm"
+              />
+            )
           )}
+          {serverSearch?.appliedValue ? (
+            <span className="text-xs text-muted-foreground">
+              Showing results for &quot;{serverSearch.appliedValue}&quot;
+            </span>
+          ) : null}
           {searchExtra}
         </div>
       )}

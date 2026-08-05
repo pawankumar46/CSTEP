@@ -468,13 +468,20 @@ export const getLobbyRegistrationsPage = async (
   eventId: string,
   page = 1,
   pageSize = DEFAULT_LOBBY_PAGE_SIZE,
+  search?: string,
 ): Promise<LobbyRegistrationsPageResult> => {
+  const params: Record<string, string | number> = {
+    event: eventId,
+    page,
+    page_size: pageSize,
+  };
+  const trimmedSearch = search?.trim();
+  if (trimmedSearch) {
+    params.search = trimmedSearch;
+  }
+
   const { data } = await apiClient.get<unknown>("/registrations/registration/", {
-    params: {
-      event: eventId,
-      page,
-      page_size: pageSize,
-    },
+    params,
   });
 
   const list = extractRegistrationList(data);

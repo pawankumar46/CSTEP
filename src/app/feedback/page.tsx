@@ -57,7 +57,7 @@ function FeedbackContent() {
       <div>
         <h1 className="text-2xl font-bold">Session Feedback</h1>
         <p className="text-sm text-muted-foreground">
-          Rate sessions for each event day, then share your overall ICAS experience. You can also
+          Rate sessions for your registered event days, then share your overall ICAS experience. You can also
           submit feedback when leaving the live stream via the Exit button.
         </p>
       </div>
@@ -77,7 +77,7 @@ function FeedbackContent() {
             Multi-day Feedback
           </CardTitle>
           <CardDescription>
-            Event-day sessions (from event days) plus ICAS overall feedback.
+            Event-day sessions from your registration (`GET /registrations/registration/my/`) plus ICAS overall feedback.
           </CardDescription>
         </CardHeader>
         <CardContent>

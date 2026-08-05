@@ -1,10 +1,12 @@
 import {
   DEFAULT_FEEDBACK_EVENT_ID,
   DEFAULT_FEEDBACK_EVENT_NAME,
+  FEEDBACK_DAY_OVERALL_TITLE,
   FEEDBACK_EVENT_OVERALL_TITLE,
   formatFeedbackEventDate,
   getFeedbackSessionDisplayName,
 } from "@/lib/feedback-options";
+import type { StreamingFeedbackFormValues } from "@/features/feedback/streaming-feedback.schema";
 import type { Feedback } from "@/types";
 
 export interface FeedbackSummaryRespondent {
@@ -221,21 +223,29 @@ export function mapApiFeedbackToFeedback(raw: unknown): Feedback {
     row.date,
   );
 
-  const sessionTitle = isOverallRating
-    ? pickString(
-        row.schedule_item_title,
-        row.session_name,
-        row.session_title,
-        FEEDBACK_EVENT_OVERALL_TITLE,
-      ) || FEEDBACK_EVENT_OVERALL_TITLE
-    : pickString(
-        row.schedule_item_title,
-        row.session_name,
-        row.session_title,
-        scheduleRecord?.title,
-        scheduleRecord?.name,
-        scheduleItemId ? `Session ${scheduleItemId}` : "",
-      ) || "Session";
+  const isDayOverall =
+    isOverallRating
+    && Boolean(sessionDate)
+    && sessionDate !== "overall"
+    && !scheduleItemId;
+
+  const sessionTitle = isDayOverall
+    ? FEEDBACK_DAY_OVERALL_TITLE
+    : isOverallRating
+      ? pickString(
+          row.schedule_item_title,
+          row.session_name,
+          row.session_title,
+          FEEDBACK_EVENT_OVERALL_TITLE,
+        ) || FEEDBACK_EVENT_OVERALL_TITLE
+      : pickString(
+          row.schedule_item_title,
+          row.session_name,
+          row.session_title,
+          scheduleRecord?.title,
+          scheduleRecord?.name,
+          scheduleItemId ? `Session ${scheduleItemId}` : "",
+        ) || "Session";
 
   const userName =
     pickString(row.user_full_name, row.user_name, row.userName) ||
@@ -307,11 +317,11 @@ export function extractFeedbackTotalPages(data: unknown): number {
   return Number.isFinite(total) && total > 0 ? total : 1;
 }
 
-/** `POST /events/feedback/` body */
+/** `POST /events/feedback/` body — `schedule_item` omitted for day overall feedback. */
 export interface CreateEventFeedbackPayload {
   event: number;
   event_date: number;
-  schedule_item: number;
+  schedule_item?: number;
   rating: number;
   comment: string;
 }
@@ -324,13 +334,21 @@ function toPositiveIntId(value: string, label: string): number {
   return parsed;
 }
 
-/** Map rated sessions to `POST /events/feedback/` payloads (one per rated schedule item). */
+/** Map rated sessions + day overall rows to `POST /events/feedback/` payloads. */
 export function mapStreamingFeedbackToCreatePayloads(
   data: {
     sessions: Record<
       string,
       {
         sessionId: string;
+        eventDayId: string;
+        rating: number;
+        comments: string;
+      }
+    >;
+    dailyOverall: Record<
+      string,
+      {
         eventDayId: string;
         rating: number;
         comments: string;
@@ -358,6 +376,98 @@ export function mapStreamingFeedbackToCreatePayloads(
     });
   }
 
+  for (const dayOverall of Object.values(data.dailyOverall)) {
+    if (dayOverall.rating <= 0) continue;
+    if (!dayOverall.eventDayId.trim()) {
+      throw new Error(
+        "Day overall feedback is missing the event day id. Please reload and try again.",
+      );
+    }
+    payloads.push({
+      event,
+      event_date: toPositiveIntId(dayOverall.eventDayId, "event day"),
+      rating: dayOverall.rating,
+      comment: dayOverall.comments.trim(),
+    });
+  }
+
   return payloads;
+}
+
+/** Pre-fill streaming feedback form from `GET /events/feedback/` rows for this user/day. */
+export function mergeExistingFeedbackIntoForm(
+  form: StreamingFeedbackFormValues,
+  existing: Feedback[],
+): StreamingFeedbackFormValues {
+  const next: StreamingFeedbackFormValues = {
+    sessions: { ...form.sessions },
+    dailyOverall: { ...form.dailyOverall },
+    eventOverall: { ...form.eventOverall },
+  };
+
+  for (const item of existing) {
+    if (item.isOverallRating) {
+      const isDayOverall =
+        item.sessionTitle === FEEDBACK_DAY_OVERALL_TITLE
+        || (
+          Boolean(item.sessionDate)
+          && item.sessionDate !== "overall"
+          && !item.scheduleItemId
+        );
+
+      if (isDayOverall && item.sessionDate && next.dailyOverall[item.sessionDate]) {
+        next.dailyOverall[item.sessionDate] = {
+          rating: item.rating,
+          comments: item.comments,
+          eventDayId:
+            item.eventDayId || next.dailyOverall[item.sessionDate].eventDayId,
+        };
+        continue;
+      }
+
+      if (
+        item.sessionDate === "overall"
+        || item.sessionTitle === FEEDBACK_EVENT_OVERALL_TITLE
+      ) {
+        next.eventOverall = { rating: item.rating, comments: item.comments };
+      }
+      continue;
+    }
+
+    const scheduleId = item.scheduleItemId?.trim();
+    if (scheduleId && next.sessions[scheduleId]) {
+      next.sessions[scheduleId] = {
+        ...next.sessions[scheduleId],
+        rating: item.rating,
+        comments: item.comments,
+        eventDayId: item.eventDayId || next.sessions[scheduleId].eventDayId,
+      };
+    }
+  }
+
+  return next;
+}
+
+/** ISO dates that already have saved day-overall feedback (read-only in form). */
+export function getSubmittedDailyOverallDates(existing: Feedback[]): Set<string> {
+  const dates = new Set<string>();
+  for (const item of existing) {
+    if (!item.isOverallRating || item.scheduleItemId) continue;
+    if (item.sessionDate && item.sessionDate !== "overall") {
+      dates.add(item.sessionDate);
+    }
+  }
+  return dates;
+}
+
+/** Session schedule-item ids that already have saved feedback (read-only in form). */
+export function getSubmittedFeedbackSessionIds(existing: Feedback[]): Set<string> {
+  const ids = new Set<string>();
+  for (const item of existing) {
+    if (item.isOverallRating) continue;
+    const scheduleId = item.scheduleItemId?.trim();
+    if (scheduleId) ids.add(scheduleId);
+  }
+  return ids;
 }
 

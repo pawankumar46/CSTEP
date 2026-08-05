@@ -1,3 +1,5 @@
+import type { RegistrationDay, SessionRegistration } from "@/types";
+
 export interface FeedbackSessionOption {
   id: string;
   title: string;
@@ -83,6 +85,54 @@ export function formatFeedbackSessionTime(value: string): string {
 
 export function formatFeedbackSessionTimeRange(startTime: string, endTime: string): string {
   return `${formatFeedbackSessionTime(startTime)} – ${formatFeedbackSessionTime(endTime)}`;
+}
+
+/** Map `GET /registrations/registration/my/` day rows into feedback day tabs. */
+export function mapRegistrationDaysToFeedbackDateOptions(
+  days: RegistrationDay[],
+): FeedbackDateOption[] {
+  return [...days]
+    .filter((day) => Boolean(day.date?.trim()))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((day) => ({
+      value: day.date.trim(),
+      label: formatFeedbackEventDateLong(day.date.trim()),
+      dayId: day.dayId.trim() || undefined,
+    }));
+}
+
+/** Map registered session rows into feedback session list (schedule item id as `id`). */
+export function mapRegistrationSessionsToFeedbackSessions(
+  sessions: SessionRegistration[],
+): FeedbackSessionOption[] {
+  return [...sessions]
+    .filter((session) => session.sessionTitle.trim() && session.scheduleItemId.trim())
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+    .map((session) => ({
+      id: session.scheduleItemId,
+      title: session.sessionTitle.trim(),
+      time: formatFeedbackSessionTimeRange(session.startTime, session.endTime),
+    }));
+}
+
+/** Build feedback date + session maps from a user's registration for an event. */
+export function buildFeedbackOptionsFromRegistrationDays(days: RegistrationDay[]): {
+  dateOptions: FeedbackDateOption[];
+  sessionsByDate: Record<string, FeedbackSessionOption[]>;
+  dayIdByDate: Record<string, string>;
+} {
+  const dateOptions = mapRegistrationDaysToFeedbackDateOptions(days);
+  const sessionsByDate: Record<string, FeedbackSessionOption[]> = {};
+  const dayIdByDate: Record<string, string> = {};
+
+  for (const day of days) {
+    if (!day.date?.trim()) continue;
+    const date = day.date.trim();
+    sessionsByDate[date] = mapRegistrationSessionsToFeedbackSessions(day.sessions);
+    if (day.dayId.trim()) dayIdByDate[date] = day.dayId.trim();
+  }
+
+  return { dateOptions, sessionsByDate, dayIdByDate };
 }
 
 /** Map `GET /events/event-days/dropdown/` rows into feedback day tabs (sorted by date). */
