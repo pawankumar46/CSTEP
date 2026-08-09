@@ -170,7 +170,7 @@ function HeroEventSlide({
               size="lg"
               variant={registerLabel ? "outline" : "default"}
             />
-            <EventCountdown eventStart={countdownStart} eventStatus={event.status} />
+            <EventCountdown eventStart={countdownStart} />
           </div>
         </div>
 

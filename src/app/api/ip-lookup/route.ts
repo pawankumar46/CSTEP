@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       {
         ip: clientIp,
         region: null,
+        country: null,
         latitude: null,
         longitude: null,
         error: message,

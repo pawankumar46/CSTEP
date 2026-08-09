@@ -37,7 +37,7 @@ export function readPublicEnv(name: string): string | undefined {
   }
 }
 
-/** Django / REST API origin. Set NEXT_PUBLIC_API_URL in .env.local */
+/** Django / REST API origin. Set NEXT_PUBLIC_API_URL in .env.local (http or https — used as-is). */
 export function getApiBaseUrl(): string {
   const url = readPublicEnv("NEXT_PUBLIC_API_URL");
   if (!url) {
@@ -53,6 +53,7 @@ export function getApiBaseUrl(): string {
     );
   }
 
+  // Preserve the protocol exactly as configured — never upgrade http → https.
   return normalized;
 }
 

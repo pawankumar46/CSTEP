@@ -25,10 +25,5 @@ export const mockChatMessages = [
   { id: "msg-5", userId: "user-005", userName: "Vikram Patel", message: "Very informative presentation!", timestamp: "09:30 AM" },
 ];
 
-export const mockNotifications = [
-  { id: "notif-1", title: "Registration Confirmed", message: "Your registration for ICAS has been accepted", type: "success" as const, read: false, createdAt: "2025-06-01T10:00:00Z" },
-  { id: "notif-2", title: "Travel Arranged", message: "Your flight booking has been confirmed for Sep 21", type: "info" as const, read: false, createdAt: "2025-06-02T14:30:00Z" },
-  { id: "notif-3", title: "Session Reminder", message: "Session 1 starts in 30 minutes", type: "info" as const, read: true, createdAt: "2025-06-03T08:30:00Z" },
-  { id: "notif-4", title: "Registration Update", message: "Your registration status has been updated to Accepted", type: "success" as const, read: true, createdAt: "2025-06-04T11:00:00Z" },
-  { id: "notif-5", title: "Feedback Received", message: "New 5-star feedback on Session 1", type: "success" as const, read: true, createdAt: "2025-06-05T14:30:00Z" },
-];
+/** @deprecated Prefer `@/mock/notifications`. */
+export { mockUserNotifications as mockNotifications } from "@/mock/notifications";

@@ -197,7 +197,9 @@ export function EventAnalyticsOverview() {
   } = useAnalyticsStore();
 
   useLiveAnalyticsSocket(selectedEventId);
-  const liveStreamingPartial = useLiveAnalyticsStore((s) => s.snapshot?.streamingSummary ?? null);
+  const liveSnapshot = useLiveAnalyticsStore((s) => s.snapshot);
+  const liveStreamingPartial = liveSnapshot?.streamingSummary ?? null;
+  const liveFeedback = liveSnapshot?.feedback ?? null;
 
   useEffect(() => {
     void fetchAnalytics();
@@ -269,6 +271,18 @@ export function EventAnalyticsOverview() {
     clearStreamingSummary,
     clearStreamingParticipationTrend,
   ]);
+
+  useEffect(() => {
+    if (!selectedEventId) return;
+
+    const intervalId = window.setInterval(() => {
+      void fetchStreamingSummary(selectedEventId);
+    }, 15_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [selectedEventId, fetchStreamingSummary]);
 
   useEffect(() => {
     setAttendanceDateFilter("all");
@@ -592,9 +606,9 @@ export function EventAnalyticsOverview() {
           </div>
 
           <EventFeedbackCharts
-            eventFeedback={eventFeedbackAnalytics}
-            eventFeedbackLoading={eventFeedbackAnalyticsLoading}
-            eventFeedbackError={eventFeedbackAnalyticsError}
+            eventFeedback={liveFeedback ?? eventFeedbackAnalytics}
+            eventFeedbackLoading={!liveFeedback && eventFeedbackAnalyticsLoading}
+            eventFeedbackError={liveFeedback ? null : eventFeedbackAnalyticsError}
           />
 
           {streamingSummaryLoading && !liveStreamingSummary ? (

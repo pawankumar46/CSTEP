@@ -31,7 +31,11 @@ export interface SessionParticipationTimeRow {
   sessionName: string;
   sessionDurationMinutes: number;
   uniqueParticipants: number;
-  buckets: Record<ParticipationDurationBucket, number>;
+  /**
+   * Live WS: minute keys matching session duration (`"5"`, `"10"`, … `"60"`).
+   * Mock fixtures may use range labels (`"0-5"`, `"5-10"`, …).
+   */
+  buckets: Record<string, number>;
 }
 
 export interface SessionParticipationRateRow {
@@ -290,19 +294,21 @@ export function getSessionParticipationForDay(
 
 export function sumParticipationTimeTotals(
   rows: SessionParticipationTimeRow[],
+  bucketLabels: readonly string[] = PARTICIPATION_DURATION_BUCKETS,
 ): {
   sessionDurationMinutes: number;
   uniqueParticipants: number;
-  buckets: Record<ParticipationDurationBucket, number>;
+  buckets: Record<string, number>;
 } {
-  const buckets = emptyBuckets();
+  const buckets: Record<string, number> = {};
+  for (const key of bucketLabels) buckets[key] = 0;
   let sessionDurationMinutes = 0;
   let uniqueParticipants = 0;
   for (const row of rows) {
     sessionDurationMinutes += row.sessionDurationMinutes;
     uniqueParticipants += row.uniqueParticipants;
-    for (const key of PARTICIPATION_DURATION_BUCKETS) {
-      buckets[key] += row.buckets[key] ?? 0;
+    for (const key of bucketLabels) {
+      if (key in row.buckets) buckets[key] += row.buckets[key] ?? 0;
     }
   }
   return { sessionDurationMinutes, uniqueParticipants, buckets };
@@ -311,10 +317,11 @@ export function sumParticipationTimeTotals(
 /** Flatten duration buckets for a simple bar preview (optional charts later). */
 export function buildDurationBucketChart(
   rows: SessionParticipationTimeRow[],
+  bucketLabels: readonly string[] = PARTICIPATION_DURATION_BUCKETS,
 ): DistributionDataPoint[] {
-  const totals = sumParticipationTimeTotals(rows);
-  return PARTICIPATION_DURATION_BUCKETS.map((name) => ({
+  const totals = sumParticipationTimeTotals(rows, bucketLabels);
+  return bucketLabels.map((name) => ({
     name,
-    value: totals.buckets[name],
+    value: totals.buckets[name] ?? 0,
   }));
 }

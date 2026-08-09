@@ -1,9 +1,17 @@
 /**
  * Live Analytics WebSocket — connection contract.
- * @example wss://{api-host}/ws/analytics/{eventId}/?token={access_token}
+ * @example ws(s)://{api-host}/ws/analytics/{eventId}/?token={accessToken}&visuals=statewise_login,...
+ * Path: `event_id`. Query: `token`, `visuals` (comma-separated). No post-connect subscribe message.
+ *
+ * Server push shape:
+ * `{ "type": "update", "data": { event_id, generated_at, statewise_login, … } }`
  */
 
-import type { DistributionDataPoint, StreamingSummary } from "@/types";
+import type { DistributionDataPoint, EventFeedbackAnalytics, StreamingSummary } from "@/types";
+import type {
+  SessionParticipationRateRow,
+  SessionParticipationTimeRow,
+} from "@/lib/participation-session-analytics";
 
 export type LiveAnalyticsConnectionStatus =
   | "idle"
@@ -18,14 +26,35 @@ export interface LiveAnalyticsModeSeries {
   virtual: DistributionDataPoint[];
 }
 
-/** Best-effort mapped snapshot from WS JSON (shape may evolve with BE). */
+export interface LiveAnalyticsNoShowDay {
+  dayId: string;
+  dayNumber: number;
+  registered: number;
+  attended: number;
+  noShow: number;
+}
+
+export interface LiveAnalyticsParticipationSnapshot {
+  timeRows: SessionParticipationTimeRow[];
+  /** Dynamic minute-bucket column labels from WS (e.g. "5", "10", …). */
+  timeBucketLabels: string[];
+  rateRows: SessionParticipationRateRow[];
+  rateSlotLabels: string[];
+}
+
+/** Mapped snapshot from WS `type: "update"` payloads. */
 export interface LiveAnalyticsSnapshot {
   receivedAt: string;
   eventId?: string;
+  generatedAt?: string;
   statewiseLogin: LiveAnalyticsModeSeries;
   countrywiseLoginVirtual: DistributionDataPoint[];
+  daywiseLogin: DistributionDataPoint[];
   sessionMaxVirtual: DistributionDataPoint[];
+  noShow: LiveAnalyticsNoShowDay[];
+  feedback: EventFeedbackAnalytics | null;
+  participation: LiveAnalyticsParticipationSnapshot | null;
   streamingSummary: Partial<StreamingSummary> | null;
-  /** Unrecognized / full payload retained for debugging and future fields. */
+  /** Full payload retained for debugging. */
   raw: unknown;
 }

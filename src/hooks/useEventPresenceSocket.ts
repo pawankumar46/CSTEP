@@ -6,31 +6,23 @@ import {
   getAccessToken,
 } from "@/lib/auth-session";
 import {
-  isLiveAnalyticsControlMessage,
-  mapLiveAnalyticsPayload,
-} from "@/lib/live-analytics-mappers";
-import { buildLiveAnalyticsWebSocketUrl } from "@/lib/live-analytics-ws";
-import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
+  buildEventPresenceWebSocketUrl,
+  EVENT_PRESENCE_HEARTBEAT_MS,
+} from "@/lib/event-presence-ws";
 
 const RECONNECT_BASE_MS = 1500;
 const RECONNECT_MAX_MS = 20000;
 
 /**
- * Live analytics WebSocket for the selected event.
- * URL: `{ws|wss}://{API_HOST}/ws/analytics/{eventId}/?token=…&visuals=…`
- * Visuals are query params only — no post-connect subscribe/ping messages.
+ * Presence WebSocket while the user is watching the live stream.
+ * URL: `{ws|wss}://{host}/ws/events/{eventId}/?token=…`
+ * Sends `{"type":"heartbeat"}` on connect and every 15s while the tab is visible.
  */
-export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
-  const setConnecting = useLiveAnalyticsStore((s) => s.setConnecting);
-  const setConnected = useLiveAnalyticsStore((s) => s.setConnected);
-  const setDisconnected = useLiveAnalyticsStore((s) => s.setDisconnected);
-  const setError = useLiveAnalyticsStore((s) => s.setError);
-  const setSnapshot = useLiveAnalyticsStore((s) => s.setSnapshot);
-  const reset = useLiveAnalyticsStore((s) => s.reset);
-
+export function useEventPresenceSocket(eventId: string | null | undefined) {
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const closedByUserRef = useRef(false);
 
   useEffect(() => {
@@ -43,7 +35,32 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
       }
     };
 
+    const clearHeartbeat = () => {
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
+    };
+
+    const sendHeartbeat = () => {
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      if (typeof document !== "undefined" && document.hidden) return;
+      try {
+        socket.send(JSON.stringify({ type: "heartbeat" }));
+      } catch {
+        // ignore send races during close
+      }
+    };
+
+    const startHeartbeat = () => {
+      clearHeartbeat();
+      sendHeartbeat();
+      heartbeatTimerRef.current = setInterval(sendHeartbeat, EVENT_PRESENCE_HEARTBEAT_MS);
+    };
+
     const closeSocket = () => {
+      clearHeartbeat();
       const socket = socketRef.current;
       socketRef.current = null;
       if (!socket) return;
@@ -64,7 +81,6 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
       closedByUserRef.current = true;
       clearReconnectTimer();
       closeSocket();
-      reset();
       return;
     }
 
@@ -72,23 +88,17 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
       if (closedByUserRef.current) return;
 
       const token = getAccessToken();
-      if (!token) {
-        setError("Sign in required for live analytics.");
-        return;
-      }
+      if (!token) return;
 
       clearReconnectTimer();
       closeSocket();
 
       let url: string;
       try {
-        url = buildLiveAnalyticsWebSocketUrl(eventId, token);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Invalid live analytics URL");
+        url = buildEventPresenceWebSocketUrl(eventId, token);
+      } catch {
         return;
       }
-
-      setConnecting(eventId);
 
       try {
         const socket = new WebSocket(url);
@@ -96,42 +106,26 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
 
         socket.onopen = () => {
           reconnectAttemptRef.current = 0;
-          setConnected();
+          startHeartbeat();
         };
 
-        socket.onmessage = (event) => {
-          try {
-            const parsed: unknown =
-              typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-            if (isLiveAnalyticsControlMessage(parsed)) return;
-            setSnapshot(mapLiveAnalyticsPayload(parsed));
-          } catch (err) {
-            setError(
-              err instanceof Error
-                ? `Invalid live analytics message: ${err.message}`
-                : "Invalid live analytics message",
-            );
-          }
+        socket.onmessage = () => {
+          // Presence socket is outbound heartbeats; ignore server payloads for now.
         };
 
         socket.onerror = () => {
-          setError("Live analytics connection error");
+          // Reconnect handled in onclose
         };
 
         socket.onclose = (event) => {
+          clearHeartbeat();
           socketRef.current = null;
-          if (closedByUserRef.current) {
-            setDisconnected();
+          if (closedByUserRef.current) return;
+
+          if (event.code === 4001 || event.code === 4004) {
             return;
           }
 
-          if (event.code === 4001 || event.code === 4401 || event.code === 1008) {
-            setError("Live analytics authentication failed. Sign in again.");
-            setDisconnected();
-            return;
-          }
-
-          setDisconnected();
           const attempt = reconnectAttemptRef.current;
           reconnectAttemptRef.current = attempt + 1;
           const delay = Math.min(
@@ -142,12 +136,16 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
             connect();
           }, delay);
         };
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to open live analytics socket");
+      } catch {
+        // ignore connect failures; reconnect path covers retries
       }
     };
 
     connect();
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) sendHeartbeat();
+    };
 
     const onSessionRefreshed = () => {
       if (closedByUserRef.current || !eventId) return;
@@ -155,21 +153,15 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
       connect();
     };
 
+    document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener(AUTH_SESSION_REFRESHED_EVENT, onSessionRefreshed);
 
     return () => {
       closedByUserRef.current = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener(AUTH_SESSION_REFRESHED_EVENT, onSessionRefreshed);
       clearReconnectTimer();
       closeSocket();
     };
-  }, [
-    eventId,
-    reset,
-    setConnected,
-    setConnecting,
-    setDisconnected,
-    setError,
-    setSnapshot,
-  ]);
+  }, [eventId]);
 }

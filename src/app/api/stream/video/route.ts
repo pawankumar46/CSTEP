@@ -61,6 +61,9 @@ async function resolveDriveStreamUrl(fileId: string): Promise<string> {
 
 export async function GET(request: NextRequest) {
   const fileId = request.nextUrl.searchParams.get("fileId") ?? LIVE_STREAM_FILE_ID;
+  if (!fileId) {
+    return NextResponse.json({ message: "fileId is required" }, { status: 400 });
+  }
   const range = request.headers.get("range");
 
   try {

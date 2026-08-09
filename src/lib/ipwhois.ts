@@ -18,6 +18,7 @@ export function mapIpWhoisToClientLocation(data: IpWhoisLocationFields): ClientL
   return {
     ip: pickString(data.ip),
     region: pickString(data.region),
+    country: pickString(data.country),
     latitude: pickNumber(data.latitude),
     longitude: pickNumber(data.longitude),
   };

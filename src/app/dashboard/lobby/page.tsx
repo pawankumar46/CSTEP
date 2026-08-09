@@ -409,7 +409,8 @@ function LobbyContent() {
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {filteredRegistrations.length} registered participant{filteredRegistrations.length === 1 ? "" : "s"}
+              {registrationsPagination.total} registered participant
+              {registrationsPagination.total === 1 ? "" : "s"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canManage && selectedCount > 0 && (

@@ -15,6 +15,7 @@ import {
   type SessionParticipationTimeRow,
 } from "@/lib/participation-session-analytics";
 import { cn } from "@/lib/utils";
+import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
 
 const DAY_FILTER_OPTIONS = PARTICIPATION_ANALYTICS_DAY_DATES.map((date) => ({
   value: date,
@@ -26,61 +27,78 @@ function cellValue(value: number | undefined): string {
   return String(value);
 }
 
-const thClass =
-  "border-b bg-muted/30 px-0.5 py-1.5 text-center text-[10px] font-medium leading-tight text-muted-foreground sm:px-1 sm:text-[11px]";
-const tdClass =
-  "border-b px-0.5 py-1.5 text-center text-[10px] tabular-nums leading-tight sm:px-1 sm:text-[11px]";
-const sessionThClass =
-  "border-b bg-muted/30 px-1 py-1.5 text-left text-[10px] font-medium leading-tight text-muted-foreground sm:text-[11px]";
-const sessionTdClass =
-  "border-b px-1 py-1.5 text-left text-[10px] font-medium leading-tight sm:text-[11px]";
+/** Blank when this session has no such minute mark (shorter than that duration). */
+function bucketCell(row: SessionParticipationTimeRow, label: string): string {
+  if (!(label in row.buckets)) return "";
+  return cellValue(row.buckets[label]);
+}
 
-function FitTable({
+const thClass =
+  "border-b bg-muted/30 px-1 py-1.5 text-center text-[10px] font-medium leading-tight text-muted-foreground sm:text-[11px]";
+const tdClass =
+  "border-b px-1 py-1.5 text-center text-[10px] tabular-nums leading-tight sm:text-[11px]";
+const bucketThClass = cn(thClass, "w-14 min-w-[2.75rem] whitespace-nowrap");
+const bucketTdClass = cn(tdClass, "w-14 min-w-[2.75rem] text-muted-foreground");
+const sessionThClass =
+  "sticky left-0 z-10 min-w-[200px] border-b border-r bg-muted/30 px-2 py-1.5 text-left text-[10px] font-medium leading-tight text-muted-foreground sm:text-[11px]";
+const sessionTdClass =
+  "sticky left-0 z-10 min-w-[200px] border-b border-r bg-card px-2 py-1.5 text-left text-[11px] font-medium leading-snug";
+
+function ScrollTable({
   children,
-  className,
+  minWidth,
 }: {
   children: React.ReactNode;
-  className?: string;
+  minWidth: number;
 }) {
   return (
-    <div className="w-full overflow-hidden rounded-md border">
-      <table className={cn("w-full table-fixed caption-bottom", className)}>{children}</table>
+    <div className="max-w-full overflow-x-auto overscroll-x-contain">
+      <table
+        className="w-full border-collapse rounded-md border text-left"
+        style={{ minWidth }}
+      >
+        {children}
+      </table>
     </div>
   );
 }
 
 function ParticipationTimeTableView({
   rows,
+  bucketLabels,
 }: {
   rows: SessionParticipationTimeRow[];
+  bucketLabels: readonly string[];
 }) {
-  const totals = useMemo(() => sumParticipationTimeTotals(rows), [rows]);
-  const colCount = 3 + PARTICIPATION_DURATION_BUCKETS.length;
+  const totals = useMemo(
+    () => sumParticipationTimeTotals(rows, bucketLabels),
+    [rows, bucketLabels],
+  );
+  const colCount = 3 + bucketLabels.length;
+  const minWidth = 280 + 56 + 56 + bucketLabels.length * 44;
 
   return (
-    <FitTable>
+    <ScrollTable minWidth={minWidth}>
       <colgroup>
-        <col className="w-[18%]" />
-        <col className="w-[8%]" />
-        <col className="w-[8%]" />
-        {PARTICIPATION_DURATION_BUCKETS.map((bucket) => (
-          <col key={bucket} />
+        <col className="w-[40%]" />
+        <col className="w-14" />
+        <col className="w-14" />
+        {bucketLabels.map((bucket) => (
+          <col key={bucket} className="w-14" />
         ))}
       </colgroup>
       <thead>
         <tr>
           <th className={sessionThClass}>Session</th>
-          <th className={thClass}>
+          <th className={cn(thClass, "w-14")}>
             Dur.
             <span className="block font-normal opacity-80">(min)</span>
           </th>
-          <th className={thClass}>
-            Unique
-            <span className="block font-normal opacity-80">#</span>
-          </th>
-          {PARTICIPATION_DURATION_BUCKETS.map((bucket) => (
-            <th key={bucket} className={thClass} title={`${bucket} mins`}>
+          <th className={cn(thClass, "w-14")}>Unique</th>
+          {bucketLabels.map((bucket) => (
+            <th key={bucket} className={bucketThClass} title={`${bucket} min`}>
               {bucket}
+              <span className="block font-normal opacity-70">min</span>
             </th>
           ))}
         </tr>
@@ -89,7 +107,7 @@ function ParticipationTimeTableView({
         {rows.length === 0 ? (
           <tr>
             <td colSpan={colCount} className="h-16 text-center text-sm text-muted-foreground">
-              No participation time data for this day yet.
+              No participation time data yet.
             </td>
           </tr>
         ) : (
@@ -97,23 +115,23 @@ function ParticipationTimeTableView({
             {rows.map((row) => (
               <tr key={row.sessionName}>
                 <td className={sessionTdClass} title={row.sessionName}>
-                  <span className="line-clamp-2 break-words">{row.sessionName}</span>
+                  <span className="block whitespace-normal break-words">{row.sessionName}</span>
                 </td>
                 <td className={tdClass}>{row.sessionDurationMinutes}</td>
-                <td className={tdClass}>{row.uniqueParticipants}</td>
-                {PARTICIPATION_DURATION_BUCKETS.map((bucket) => (
-                  <td key={bucket} className={cn(tdClass, "text-muted-foreground")}>
-                    {cellValue(row.buckets[bucket])}
+                <td className={tdClass}>{cellValue(row.uniqueParticipants)}</td>
+                {bucketLabels.map((bucket) => (
+                  <td key={bucket} className={bucketTdClass}>
+                    {bucketCell(row, bucket)}
                   </td>
                 ))}
               </tr>
             ))}
-            <tr className="bg-muted/40">
-              <td className={cn(sessionTdClass, "bg-muted/40")}>TOTAL</td>
-              <td className={cn(tdClass, "font-medium")}>{totals.sessionDurationMinutes}</td>
-              <td className={cn(tdClass, "font-medium")}>{totals.uniqueParticipants}</td>
-              {PARTICIPATION_DURATION_BUCKETS.map((bucket) => (
-                <td key={bucket} className={cn(tdClass, "font-medium")}>
+            <tr className="bg-muted/20">
+              <td className={cn(sessionTdClass, "bg-muted/30 font-semibold")}>Total</td>
+              <td className={cn(tdClass, "font-semibold")}>{totals.sessionDurationMinutes}</td>
+              <td className={cn(tdClass, "font-semibold")}>{cellValue(totals.uniqueParticipants)}</td>
+              {bucketLabels.map((bucket) => (
+                <td key={bucket} className={cn(bucketTdClass, "font-semibold")}>
                   {cellValue(totals.buckets[bucket])}
                 </td>
               ))}
@@ -121,7 +139,7 @@ function ParticipationTimeTableView({
           </>
         )}
       </tbody>
-    </FitTable>
+    </ScrollTable>
   );
 }
 
@@ -133,25 +151,26 @@ function ParticipationRateTableView({
   slotLabels: string[];
 }) {
   const colCount = 2 + slotLabels.length;
+  const minWidth = 320 + 64 + Math.max(slotLabels.length, 1) * 72;
 
   return (
-    <FitTable>
+    <ScrollTable minWidth={minWidth}>
       <colgroup>
-        <col className="w-[20%]" />
-        <col className="w-[8%]" />
+        <col />
+        <col className="w-20" />
         {slotLabels.map((slot) => (
-          <col key={slot} />
+          <col key={slot} className="w-24" />
         ))}
       </colgroup>
       <thead>
         <tr>
           <th className={sessionThClass}>Session</th>
-          <th className={thClass}>
+          <th className={cn(thClass, "w-20 whitespace-nowrap")}>
             Dur.
             <span className="block font-normal opacity-80">(min)</span>
           </th>
           {slotLabels.map((slot) => (
-            <th key={slot} className={thClass} title={slot}>
+            <th key={slot} className={cn(bucketThClass, "w-24")} title={slot}>
               {slot}
             </th>
           ))}
@@ -161,18 +180,18 @@ function ParticipationRateTableView({
         {rows.length === 0 ? (
           <tr>
             <td colSpan={colCount} className="h-16 text-center text-sm text-muted-foreground">
-              No participation rate data for this day yet.
+              No participation rate data yet.
             </td>
           </tr>
         ) : (
           rows.map((row) => (
             <tr key={row.sessionName}>
               <td className={sessionTdClass} title={row.sessionName}>
-                <span className="line-clamp-2 break-words">{row.sessionName}</span>
+                <span className="block whitespace-normal break-words">{row.sessionName}</span>
               </td>
               <td className={tdClass}>{row.sessionDurationMinutes}</td>
               {slotLabels.map((slot) => (
-                <td key={slot} className={cn(tdClass, "text-muted-foreground")}>
+                <td key={slot} className={cn(bucketTdClass, "w-24")}>
                   {cellValue(row.slots[slot])}
                 </td>
               ))}
@@ -180,7 +199,7 @@ function ParticipationRateTableView({
           ))
         )}
       </tbody>
-    </FitTable>
+    </ScrollTable>
   );
 }
 
@@ -198,7 +217,7 @@ function SectionCard({
   className?: string;
 }) {
   return (
-    <Card className={cn("min-w-0 overflow-hidden shadow-sm", className)}>
+    <Card className={cn("min-w-0 shadow-sm", className)}>
       <CardHeader className="space-y-2 pb-3">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
@@ -210,55 +229,71 @@ function SectionCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="min-w-0 overflow-hidden pt-0">{children}</CardContent>
+      <CardContent className="min-w-0 pt-0">{children}</CardContent>
     </Card>
   );
 }
 
 /**
  * Live Event Insights — session Participation Time + Participation Rate tables.
- * Day toggle: 19 Aug / 20 Aug / 21 Aug. Placeholder data until BE APIs land.
+ * Prefers live WebSocket rows; falls back to day-toggle mock fixtures.
  */
 export function SessionParticipationAnalytics() {
   const [selectedDay, setSelectedDay] = useState<ParticipationAnalyticsDayDate>("2026-08-20");
-  const dayData = useMemo(() => getSessionParticipationForDay(selectedDay), [selectedDay]);
+  const liveParticipation = useLiveAnalyticsStore((s) => s.snapshot?.participation ?? null);
+  const mockDay = useMemo(() => getSessionParticipationForDay(selectedDay), [selectedDay]);
+
+  const usingLive = Boolean(liveParticipation && liveParticipation.timeRows.length > 0);
+  const timeRows = usingLive ? liveParticipation!.timeRows : mockDay.timeRows;
+  const timeBucketLabels = usingLive
+    ? liveParticipation!.timeBucketLabels
+    : [...PARTICIPATION_DURATION_BUCKETS];
+  const rateRows = usingLive ? liveParticipation!.rateRows : mockDay.rateRows;
+  const rateSlotLabels = usingLive
+    ? (liveParticipation!.rateSlotLabels.length > 0
+        ? liveParticipation!.rateSlotLabels
+        : ["Max"])
+    : mockDay.rateSlotLabels;
 
   return (
-    <div className="min-w-0 space-y-3 overflow-hidden">
+    <div className="min-w-0 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Session participation
         </h3>
-        <ChartFilterGroup
-          options={DAY_FILTER_OPTIONS}
-          value={selectedDay}
-          onChange={setSelectedDay}
-        />
+        {!usingLive && (
+          <ChartFilterGroup
+            options={DAY_FILTER_OPTIONS}
+            value={selectedDay}
+            onChange={setSelectedDay}
+          />
+        )}
       </div>
 
       <div className="grid min-w-0 gap-4">
         <SectionCard
           icon={Timer}
           title="Participation Time"
-          description="How long unique participants stayed in each session (duration buckets in minutes). Sample layout until the API is available."
+          description="Participant counts at each 5-minute mark up to that session’s duration. Scroll horizontally for longer sessions."
         >
-          <ParticipationTimeTableView rows={dayData.timeRows} />
+          <ParticipationTimeTableView rows={timeRows} bucketLabels={timeBucketLabels} />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Participation time — live API coming soon
+            {usingLive
+              ? "Live from analytics WebSocket — columns match session duration (5, 10, … min)"
+              : "Sample layout until live participation time arrives"}
           </p>
         </SectionCard>
 
         <SectionCard
           icon={Clock3}
           title="Participation Rate"
-          description="Participant count at each 15-minute clock slot during sessions. Sample layout until the API is available."
+          description="Participant count per slot (or max concurrent) during sessions."
         >
-          <ParticipationRateTableView
-            rows={dayData.rateRows}
-            slotLabels={dayData.rateSlotLabels}
-          />
+          <ParticipationRateTableView rows={rateRows} slotLabels={rateSlotLabels} />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Participation rate — live API coming soon
+            {usingLive
+              ? "Live from analytics WebSocket"
+              : "Sample layout until live participation rate arrives"}
           </p>
         </SectionCard>
       </div>

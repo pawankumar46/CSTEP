@@ -29,9 +29,10 @@ CSTEP is a **Next.js** web application for conference and event operations: dele
 | Area | Description |
 |------|-------------|
 | **Public site** | Landing page, event info, sign up / login, event registration |
-| **Live streaming** | `/streaming` — video player with optional side banners; Google Drive or HLS sources |
+| **Live streaming** | `/streaming` — HLS from event broadcast sessions; multi-camera switcher when several sessions exist; optional env fallback for dev |
 | **Profile** | Delegates request travel, medical, translation, and accommodation support |
-| **Dashboard** | Role-based admin tools for lobby, assistance requests (accept / hold / reject), events, users, analytics |
+| **Dashboard** | Role-based admin tools for lobby, assistance requests (accept / hold / reject), events, users, analytics; notification bell for moderators / event admins |
+| **Notifications** | Bell on dashboard (staff) and home navbar (users). REST `/notification/notification/…` + live WS `/ws/notifications/?token=` |
 | **Video management** | Broadcast session setup and stream URL management (event administrators) |
 
 The app uses **Zustand** for client state, **React Hook Form + Zod** for forms, **TanStack Table** for data grids, and **Axios** (`apiClient`) for authenticated backend calls.
@@ -45,7 +46,7 @@ The app uses **Zustand** for client state, **React Hook Form + Zod** for forms, 
 - **State:** Zustand
 - **Forms / validation:** react-hook-form, Zod
 - **HTTP:** Axios with JWT interceptors and token refresh
-- **Streaming:** hls.js, Google Drive embed / proxied video
+- **Streaming:** hls.js; live playback from broadcast session HLS URLs (Google Drive proxy legacy-only)
 - **Charts:** Recharts; India state choropleth + country globe via `d3-geo` + `public/maps/india-states.geojson` / `world-countries.geojson`
 - **Export:** jsPDF, xlsx
 
@@ -91,16 +92,16 @@ Create `.env.local` from `.env.example`:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | Yes | Django API base URL (e.g. `*******`) |
-| `NEXT_PUBLIC_WS_URL` | Recommended | Live analytics WebSocket origin (e.g. `wss://your-api.example.com`). Used as `{WS_URL}/ws/analytics/{eventId}/?token=…`. If unset, derived from `NEXT_PUBLIC_API_URL` |
+| `NEXT_PUBLIC_API_URL` | Yes | Django API base URL — use `http://` or `https://` exactly as your server supports (not auto-upgraded) |
+| `NEXT_PUBLIC_WS_URL` | Recommended | WebSocket origin (`ws://` or `wss://`) for live analytics, event presence, event chat, and notifications (`…/ws/notifications/?token=`). If unset, derived from `NEXT_PUBLIC_API_URL` protocol |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Public frontend URL for share links and redirects |
-| `NEXT_PUBLIC_LIVE_STREAM_URL` | Optional | Live stream source (Google Drive preview, `.mp4`, or `.m3u8`) |
-| `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Google Drive file ID fallback |
+| `NEXT_PUBLIC_LIVE_STREAM_URL` | Optional | Dev fallback when no active broadcast session (`.m3u8` HLS or direct video) |
+| `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Legacy Google Drive proxy (`/api/stream/video`) only — not used for public Watch Live |
 | `NEXT_PUBLIC_STREAM_LEFT_BANNER_URL` | Optional | Left banner image on streaming page |
 | `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right banner image on streaming page |
 | `NEXT_PUBLIC_BRAND_LOGO_DARK_SRC` | Optional | Dark theme logo path |
 
-`next.config.ts` forwards these into the client bundle at build time. After changing any `NEXT_PUBLIC_*` variable in production, **redeploy** so the build picks them up.
+After changing any `NEXT_PUBLIC_*` variable in `.env.local`, **restart the dev server** (`npm run clean && npm run dev` if the old protocol still appears). In production, **redeploy** so the build picks up new values.
 
 ---
 
@@ -150,14 +151,14 @@ c-step/
 │   │   ├── layout/            # Navbar, sidebar, dashboard shell
 │   │   ├── profile/           # Profile support forms
 │   │   ├── providers/         # Auth, theme providers
-│   │   ├── shared/            # DataTable, ExportMenu, guards, etc.
-│   │   ├── streaming/         # VideoPlayer, StreamAccessGuard
+│   │   ├── shared/            # DataTable, ExportMenu, NotificationDropdown, guards, etc.
+│   │   ├── streaming/         # VideoPlayer, StreamCameraPicker, LiveChatPanel, StreamAccessGuard
 │   │   └── ui/                # shadcn-style UI primitives
 │   ├── features/
 │   │   ├── dashboard/         # Role dashboards + Zod schemas (admin-*)
 │   │   ├── profile/           # Profile Zod schemas
 │   │   └── registration/      # Registration Zod schemas
-│   ├── hooks/                 # useRoleGuard, useEventRegistration, useLiveAnalyticsSocket, etc.
+│   ├── hooks/                 # useRoleGuard, useEventRegistration, useLiveAnalyticsSocket, useEventChatSocket, useEventPresenceSocket, useNotifications, useNotificationSocket, etc.
 │   ├── lib/                   # Utilities, mappers, env, API client
 │   │   ├── api-client.ts      # Axios instance + JWT interceptors
 │   │   ├── auth-mappers.ts    # Auth request/response mapping
@@ -177,6 +178,11 @@ c-step/
 │   │   ├── ipwhois-api-contract.ts # ipwhois.io location field contract
 │   │   ├── ipwhois.ts         # Server fetch to https://ipwho.is
 │   │   ├── live-analytics-ws.ts # Live analytics WebSocket URL builder
+│   │   ├── notification-api-contract.ts # Notifications REST / WS shapes
+│   │   ├── notification-ws.ts # Notifications WebSocket URL builder
+│   │   ├── event-presence-ws.ts # Event presence WebSocket URL + heartbeat interval
+│   │   ├── event-chat-ws.ts     # Event live chat WebSocket URL + windows
+│   │   ├── event-chat-mappers.ts # Chat history / reaction / permission helpers
 │   │   ├── live-analytics-api-contract.ts
 │   │   ├── live-analytics-mappers.ts
 │   │   ├── participation-session-analytics.ts # Session participation time/rate tables + day fixtures
@@ -366,8 +372,10 @@ await apiClient.post("/registrations/registration/", payload);
 
 | Client call | Next route | Purpose |
 |-------------|------------|---------|
-| `fetch("/api/broadcast-sessions")` | `app/api/broadcast-sessions/route.ts` | List/create broadcast sessions |
-| `fetch("/api/broadcast-sessions/:id/url?target=...")` | `app/api/broadcast-sessions/[id]/url/route.ts` | Resolve HLS/RTMP URLs |
+| `fetch("/api/broadcast-sessions?eventId=")` | `app/api/broadcast-sessions/route.ts` | List broadcast sessions for an event (proxies Django `GET /events/event/:id/broadcast_sessions/`) |
+| `fetch("/api/broadcast-sessions?eventIds=")` | same | List sessions across multiple events |
+| `fetch("/api/broadcast-sessions")` POST | same | Create session (proxies Django event-scoped create) |
+| `fetch("/api/broadcast-sessions/:id/url?target=&eventId=")` | `app/api/broadcast-sessions/[id]/url/route.ts` | Resolve ingest/playback URL from session payload |
 | `GET /api/stream/video?fileId=...` | `app/api/stream/video/route.ts` | Proxy Google Drive video for `<video>` tag |
 | `GET /api/stream/resolve` | `app/api/stream/resolve/route.ts` | Resolve stream metadata |
 | `GET /api/ip-lookup` | `app/api/ip-lookup/route.ts` | Client location via [ipwhois.io](https://ipwhois.io/documentation#overview): `{ ip, region, latitude, longitude }` |
@@ -408,7 +416,8 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/events/event/` | Create event |
 | `PATCH` | `/events/event/:id/` | Update event |
 | `DELETE` | `/events/event/:id/` | Delete event |
-| `POST` | `/events/event/:id/join/` | Record join location after login/registration (`{ ip_address, latitude, longitude, location_accuracy, state }`; `state` ← ipwhois `region`) |
+| `POST` | `/events/event/:id/join/` | Record join location on **Watch Live** (and after login/registration). Body: `{ ip_address, latitude, longitude, location_accuracy: 0, state, country }` — lat/long rounded to **5** decimal places |
+| `POST` | `/events/event/:id/leave/` | Mark viewer left when exiting `/streaming` (Exit / feedback leave) or closing/refreshing the tab (`pagehide` + keepalive fetch) |
 | `GET` | `/events/event-days/dropdown/?event=` | Event day options (feedback tabs, attendance-mode edit); `{ id, day_number, date, label, allowed_attendance_modes }` |
 | `GET` | `/events/schedule-items/?day=` | Schedule items for a day (feedback session list; paginated `results[]`) |
 | `GET` | `/events/feedback/` | Paginated feedback (`page`, `page_size=10`, `event`, optional `event_date`, `user`, `is_overall_rating`). Response: `count`, `total_pages`, `current_page`, `next`, `previous`, `results[]`. Dashboard `/dashboard/feedback` uses server Next/Previous |
@@ -439,7 +448,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/registrations/registration/?event=&page=&page_size=10` | Paginated lobby registrations (`count`, `next`, `previous`, `results[]`). Optional `search` (submitted from lobby search on Enter). FE uses `page_size=10` and Next/Previous from `next`/`previous` |
+| `GET` | `/registrations/registration/?event=&page=&page_size=10` | Paginated lobby registrations (`count`, `next`, `previous`, `results[]`). Optional `search` (submitted from lobby search on Enter). FE uses `page_size=10` and Next/Previous from `next`/`previous`. Manage Lobby shows **`count`** as “N registered participants” (not page size) |
 | `GET` | `/registrations/travel-assistance/?event=&page=` | Travel rows |
 | `GET` | `/registrations/medical-assistance/?event=&page=` | Medical rows |
 | `GET` | `/registrations/translation-assistance/?event=&page=` | Translation rows |
@@ -466,14 +475,16 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/registrations/insights/` | Attendance donut (`event_id`). Uses `attendance_mode` + `attendance_mode_by_date`; UI shows Physical / Virtual / Mixed only |
 | `GET` | `/analytics/registrations/demographics/` | Gender / state / country / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_country`, `by_designation`. Overview **by state** → India map (`IndiaStateRegistrationsMap`); **by country** → rotatable globe (`CountryRegistrationsGlobe`) |
 | `GET` | `/analytics/events/feedback/` | Live Event Insights feedback charts (`event`, optional `day`). Response: `overall` (`feedback_by_date[]`, totals), `by_day[]` (`event_date`, `day_number`, count), `by_session[]` |
-| `GET` | `/analytics/streaming/summary/` | Live Event Insights streaming cards + details (`event_id`). Response: `currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time fields, `live_broadcast` |
+| `GET` | `/analytics/streaming/summary/` | Live Event Insights streaming cards + details (`event_id`). Response: `currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time fields, `live_broadcast`. Polled every **15s** on the analytics overview while an event is selected |
 | `GET` | `/analytics/streaming/participation-trend/` | Participation Trend chart (`event_id`, `mode=all\|physical\|virtual`, `interval_minutes=15`, optional `date=YYYY-MM-DD`). Response: `{ mode, results: [{ bucket_start, count }] }` (empty `results` when no activity) |
-| `WS` | `/ws/analytics/{eventId}/?token=` | Live Event Insights WebSocket. Base from `NEXT_PUBLIC_WS_URL` (fallback: derive from `NEXT_PUBLIC_API_URL`). Client: `useLiveAnalyticsSocket` → `useLiveAnalyticsStore` |
+| `WS` | `/ws/analytics/{eventId}/?token=&visuals=` | Live Event Insights WebSocket. Path `eventId`; query `token` + comma-separated `visuals` (no post-connect message). Server pushes `{ type: "update", data: { statewise_login, countrywise_login, daywise_login, session_wise_max_virtual, no_show, session_wise_feedback, daywise_feedback, participation_rate, participation_time } }`. Client: `useLiveAnalyticsSocket` |
+| `WS` | `/ws/events/{eventId}/?token=` | Viewer presence while on `/streaming`. Client sends `{"type":"heartbeat"}` on connect and every 15s (skips when tab hidden). Client: `useEventPresenceSocket` |
+| `WS` | `/ws/events/{eventId}/chat/?token=` | Live stream chat. Client sends `message` / `edit` / `delete` / `reaction`; server pushes `history`, `message`, `message_edited`, `message_deleted`, `reaction_counts`, or socket-local `error`. Client: `useEventChatSocket` + `LiveChatPanel` on `/streaming` |
 | `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
-**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **login insights** (WebSocket `/ws/analytics/{eventId}/?token=` — statewise / countrywise / session max virtual) + **session participation time/rate tables** (day toggle 19–21 Aug — placeholder) + **event feedback** (by day bar chart; by sessions scrollable bar cards with truncated titles in **Live Event Insights**) + **Attendance Mode users** call live Django endpoints. Participation Time (viewer join/leave) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
+**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **Live Event Insights** from WebSocket `/ws/analytics/{eventId}/?token=&visuals=` (`type: "update"` payload — login maps, session max virtual, no-show, feedback, participation time with per-session 5-min duration buckets, participation rate) + REST fallbacks for feedback when WS feedback is empty. Participation Time (viewer join/leave cards elsewhere) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
 
 Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 
@@ -489,15 +500,26 @@ Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 - optional `days__day__date` (`2026-08-19` / `2026-08-20` / `2026-08-21`)
 - optional `days__attendance_mode` (`PHYSICAL` / `VIRTUAL`; omitted for All)
 
+#### Notifications — `notification.service.ts`
+
+| Method | Endpoint | Notes |
+|--------|----------|--------|
+| `GET` | `/notification/notification/` | List for signed-in user (`id`, `notification_type`, `title`, `body`, `is_read`, `event`, `created_at`). Optional `?unread=true` |
+| `GET` | `/notification/notification/unread-count/` | `{ unread_count }` |
+| `POST` | `/notification/notification/:id/read/` | Mark one read |
+| `POST` | `/notification/notification/read-all/` | Mark all read → `{ marked_read }` |
+| `WS` | `/ws/notifications/?token=` | Push `{ notification: { … } }`. Client: `useNotificationSocket` + `useNotifications` → `NotificationDropdown` |
+
 #### Broadcast (via Next proxy) — `broadcast.service.ts`
 
 Client calls Next.js routes; server forwards to Django with the user's `Authorization` header.
 
 | Client | Description |
 |--------|-------------|
-| `GET /api/broadcast-sessions` | List broadcast sessions |
-| `POST /api/broadcast-sessions` | Create session |
-| `GET /api/broadcast-sessions/:id/url?target=playback.hls` | Get stream URL (HLS, RTMP, etc.) |
+| `GET /api/broadcast-sessions?eventId=:id` | List sessions for event → Django `GET /events/event/:id/broadcast_sessions/` (`playback_url`, `ingest_url`, plus nested ingest/playback URLs) |
+| `GET /api/broadcast-sessions?eventIds=1,2` | List sessions for multiple events |
+| `POST /api/broadcast-sessions` | Create session for `eventId` |
+| `GET /api/broadcast-sessions/:id/url?target=playback.hls&eventId=` | Optional URL lookup (video management prefers URLs already on the session) |
 
 ---
 
@@ -525,7 +547,9 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 3. **Other country codes:** Skip OTP; auto-login → `POST /auth/login/` with the new email/password
 4. Event register → `POST /registrations/registration/` (base users land on `/event-register` when not yet registered). For ICAS, **19 Aug** is selectable as **Physical only**; 20–21 Aug keep Physical/Virtual from the API.
 5. Optional profile support → `POST /registrations/request-*`
-6. When login or registration lands on `/` or `/dashboard`, the app resolves IP geo via [ipwhois.io](https://ipwhois.io/documentation#overview) (`GET /api/ip-lookup`), optionally reads browser GPS accuracy, and `POST /events/event/:id/join/` with `{ ip_address, latitude, longitude, location_accuracy, state }` (`state` ← `region`)
+6. When login or registration lands on `/` or `/dashboard`, or when the user clicks **Watch Live**, the app resolves IP geo via [ipwhois.io](https://ipwhois.io/documentation#overview) (`GET /api/ip-lookup`), optionally reads browser GPS, and `POST /events/event/:id/join/` with `{ ip_address, latitude, longitude, location_accuracy: 0, state, country }` (`state` ← `region`; lat/long rounded to 5 decimals)
+7. Leaving `/streaming` (Exit after feedback, or tab close/refresh) calls `POST /events/event/:id/leave/` once (async on in-app exit; keepalive fetch on `pagehide`)
+8. While on `/streaming`, `useEventPresenceSocket` keeps `…/ws/events/{eventId}/?token=` open and sends `{"type":"heartbeat"}` every 15s (paused when the tab is hidden)
 
 ### 2. Lobby: add user (two-step wizard)
 
@@ -536,10 +560,14 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 
 ### 3. Live streaming
 
-1. Stream URL from env (`NEXT_PUBLIC_LIVE_STREAM_URL`) or active broadcast HLS via `resolveLivePlaybackUrl()`
-2. `VideoPlayer` tries proxied Drive video (`/api/stream/video`) first, falls back to iframe embed
-3. `StreamAccessGuard` enforces auth + registration + live event phase
-4. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
+1. **Watch Live** → `/streaming` loads cameras from `getLiveBroadcastCameras(eventId)` → Django `GET /events/event/:id/broadcast_sessions/`
+2. Viewer playback uses each session’s top-level **`playback_url`** (e.g. YouTube watch link); `playback_urls.hls` remains available for encoder/admin copy actions
+3. Default feed is primary + active session; if multiple sessions exist, `StreamCameraPicker` shows Camera 1 / Camera 2 / … and switches playback on click
+3. Event administrators create/manage sessions in **Video management** (`/dashboard/video-management`)
+4. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
+5. `StreamAccessGuard` enforces auth + registration + live event phase
+6. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
+7. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — history + reactions on connect; send/edit/delete/react over the socket (owner edit 15 min, owner delete 60 min, moderator+ delete anytime)
 
 ### 4. Assistance moderation
 
@@ -570,7 +598,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 1. Set all `NEXT_PUBLIC_*` variables in the hosting dashboard.
 2. Redeploy after env changes.
 3. Ensure Django CORS allows your frontend origin.
-4. For streaming, confirm Google Drive file is shared as **“Anyone with the link”** if using Drive embed.
+4. For streaming, create an active broadcast session in video management; HLS playback is resolved at runtime (no Google Drive default).
 
 ---
 
@@ -584,7 +612,8 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 | Registration payload | `registration-mappers.ts`, `registration.service.ts` |
 | Assistance forms | `event-support-mappers.ts`, `lobby.service.ts`, `date-input.ts`, `features/dashboard/admin-*.schema.ts` |
 | Analytics | `analytics.service.ts`, `analytics-mappers.ts`, `useLiveAnalyticsSocket`, `useLiveAnalyticsStore`, `app/dashboard/analytics/`, `AttendanceModeAnalytics.tsx`, `EventFeedbackCharts.tsx`, `LiveLoginInsightsCharts.tsx`, `SessionParticipationAnalytics.tsx`, `IndiaStateRegistrationsMap.tsx`, `CountryRegistrationsGlobe.tsx` |
-| Streaming | `VideoPlayer.tsx`, `stream-utils.ts`, `streaming/page.tsx` |
+| Streaming | `VideoPlayer.tsx`, `StreamCameraPicker.tsx`, `LiveChatPanel.tsx`, `useEventChatSocket.ts`, `stream-utils.ts`, `streaming/page.tsx` |
+| Notifications | `NotificationDropdown.tsx`, `useNotifications.ts`, `useNotificationSocket.ts`, `notification.service.ts`, `notification-ws.ts`, `useNotificationStore.ts` |
 
 ---
 

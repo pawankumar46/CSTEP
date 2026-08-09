@@ -5,7 +5,7 @@ import Hls from "hls.js";
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Loader2, RefreshCw, LayoutPanelLeft, RectangleHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
+import { isGoogleDriveStreamUrl, parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
 import { LIVE_STREAM_FILE_ID } from "@/lib/constants";
 import { THEATER_PLAYER_CLASS, type StreamViewMode } from "@/lib/stream-view";
 
@@ -80,12 +80,16 @@ export function VideoPlayer({
     setIsBuffering(true);
     setPlaybackError(false);
     setNeedsUserPlay(false);
-    setSource(parseStreamUrl(streamUrl, LIVE_STREAM_FILE_ID));
+    const driveFallback =
+      streamUrl && isGoogleDriveStreamUrl(streamUrl) ? LIVE_STREAM_FILE_ID : undefined;
+    setSource(parseStreamUrl(streamUrl, driveFallback));
   }, [streamUrl, reloadKey]);
 
   const isHlsStream = source?.type === "hls-stream";
+  const isIframeEmbed = source?.type === "iframe-embed" && Boolean(source.embedUrl);
   const usesIframe =
-    source?.type === "google-drive-file" && Boolean(source.embedUrl) && useIframeFallback;
+    isIframeEmbed ||
+    (source?.type === "google-drive-file" && Boolean(source.embedUrl) && useIframeFallback);
   const usesVideo =
     (source?.type === "direct-video" && Boolean(source.directUrl)) ||
     (isHlsStream && Boolean(source.directUrl)) ||
@@ -359,8 +363,11 @@ export function VideoPlayer({
                   key={`${iframePlaybackUrl}-${reloadKey}`}
                   src={iframePlaybackUrl}
                   title={title}
-                  className="pointer-events-none absolute inset-0 h-full w-full border-0"
-                  allow="autoplay; encrypted-media; fullscreen"
+                  className={cn(
+                    "absolute inset-0 h-full w-full border-0",
+                    isIframeEmbed ? "pointer-events-auto" : "pointer-events-none",
+                  )}
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                   referrerPolicy="no-referrer-when-downgrade"
                   onLoad={() => {
                     setIframeReady(true);
@@ -372,7 +379,7 @@ export function VideoPlayer({
               )}
               <div
                 className="absolute inset-x-0 bottom-0 z-[15] bg-black pointer-events-none"
-                style={{ height: DRIVE_EMBED_CHROME }}
+                style={{ height: isIframeEmbed ? 0 : DRIVE_EMBED_CHROME }}
                 aria-hidden
               />
             </div>

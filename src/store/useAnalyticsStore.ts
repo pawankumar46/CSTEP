@@ -73,7 +73,7 @@ interface AnalyticsState {
   fetchPermissions: () => Promise<void>;
 }
 
-export const useAnalyticsStore = create<AnalyticsState>((set) => ({
+export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
   analytics: null,
   eventAnalytics: null,
   registrationCounts: null,
@@ -209,13 +209,18 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   },
 
   fetchStreamingSummary: async (eventId) => {
-    set({ streamingSummaryLoading: true, streamingSummaryError: null });
+    const hasData = Boolean(get().streamingSummary);
+    if (!hasData) {
+      set({ streamingSummaryLoading: true, streamingSummaryError: null });
+    } else {
+      set({ streamingSummaryError: null });
+    }
     try {
       const streamingSummary = await analyticsService.getStreamingSummary(eventId);
       set({ streamingSummary, streamingSummaryLoading: false });
     } catch (err) {
       set({
-        streamingSummary: null,
+        ...(hasData ? {} : { streamingSummary: null }),
         streamingSummaryError:
           err instanceof Error ? err.message : "Failed to fetch streaming summary",
         streamingSummaryLoading: false,

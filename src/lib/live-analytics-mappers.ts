@@ -1,5 +1,20 @@
-import type { LiveAnalyticsModeSeries, LiveAnalyticsSnapshot } from "@/lib/live-analytics-api-contract";
-import type { DistributionDataPoint, StreamingSummary } from "@/types";
+import type {
+  LiveAnalyticsModeSeries,
+  LiveAnalyticsNoShowDay,
+  LiveAnalyticsParticipationSnapshot,
+  LiveAnalyticsSnapshot,
+} from "@/lib/live-analytics-api-contract";
+import {
+  type SessionParticipationRateRow,
+  type SessionParticipationTimeRow,
+} from "@/lib/participation-session-analytics";
+import type {
+  DistributionDataPoint,
+  EventFeedbackAnalytics,
+  EventFeedbackDayStat,
+  EventFeedbackSessionStat,
+  StreamingSummary,
+} from "@/types";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -16,6 +31,11 @@ function pickNumber(value: unknown): number | null {
 
 function pickString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function pickId(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return pickString(value);
 }
 
 function mapShareRows(raw: unknown): DistributionDataPoint[] {
@@ -36,14 +56,21 @@ function mapShareRows(raw: unknown): DistributionDataPoint[] {
       ?? pickString(row.session)
       ?? pickString(row.title)
       ?? pickString(row.session_name)
-      ?? pickString(row.schedule_item_title);
+      ?? pickString(row.schedule_item__title)
+      ?? pickString(row.schedule_item_title)
+      ?? (pickNumber(row.day_number) != null ? `Day ${pickNumber(row.day_number)}` : null)
+      ?? (pickNumber(row.event_date__day_number) != null
+        ? `Day ${pickNumber(row.event_date__day_number)}`
+        : null);
     const value =
-      pickNumber(row.count)
+      pickNumber(row.max_participants)
+      ?? pickNumber(row.count)
       ?? pickNumber(row.value)
       ?? pickNumber(row.max)
       ?? pickNumber(row.max_count)
       ?? pickNumber(row.peak)
       ?? pickNumber(row.participants)
+      ?? pickNumber(row.avg_rating)
       ?? 0;
     if (!name) continue;
     points.push({ name, value });
@@ -56,7 +83,7 @@ function mapCountRecord(raw: unknown): DistributionDataPoint[] {
   if (!record) return [];
   return Object.entries(record)
     .map(([name, value]) => ({ name, value: pickNumber(value) ?? 0 }))
-    .filter((row) => row.name && row.value > 0)
+    .filter((row) => row.name)
     .sort((a, b) => b.value - a.value);
 }
 
@@ -81,7 +108,6 @@ function mapModeSeries(raw: unknown): LiveAnalyticsModeSeries {
   const physical = mapDistribution(root.physical ?? root.PHYSICAL);
   const virtual = mapDistribution(root.virtual ?? root.VIRTUAL);
 
-  // Flat list without mode nesting → treat as "all"
   if (all.length === 0 && physical.length === 0 && virtual.length === 0) {
     const flat = mapDistribution(raw);
     return { all: flat, physical: [], virtual: [] };
@@ -94,15 +120,10 @@ function mapModeSeries(raw: unknown): LiveAnalyticsModeSeries {
   };
 }
 
-function firstDefined(...values: unknown[]): unknown {
-  for (const value of values) {
-    if (value != null) return value;
-  }
-  return undefined;
-}
-
 function mapStreamingPartial(root: Record<string, unknown>): Partial<StreamingSummary> | null {
-  const streaming = asRecord(root.streaming) ?? asRecord(root.streaming_summary) ?? root;
+  const streaming = asRecord(root.streaming) ?? asRecord(root.streaming_summary);
+  if (!streaming) return null;
+
   const currentlyWatching =
     pickNumber(streaming.currently_watching)
     ?? pickNumber(streaming.currently_watching_count);
@@ -148,38 +169,221 @@ function mapStreamingPartial(root: Record<string, unknown>): Partial<StreamingSu
   };
 }
 
+function mapNoShow(raw: unknown): LiveAnalyticsNoShowDay[] {
+  if (!Array.isArray(raw)) return [];
+  const rows: LiveAnalyticsNoShowDay[] = [];
+  for (const item of raw) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const dayNumber = pickNumber(row.day_number) ?? 0;
+    rows.push({
+      dayId: pickId(row.day_id) ?? String(dayNumber),
+      dayNumber,
+      registered: pickNumber(row.registered) ?? 0,
+      attended: pickNumber(row.attended) ?? 0,
+      noShow: pickNumber(row.no_show) ?? 0,
+    });
+  }
+  return rows.sort((a, b) => a.dayNumber - b.dayNumber);
+}
+
+function mapFeedback(eventId: string | undefined, data: Record<string, unknown>): EventFeedbackAnalytics | null {
+  const byDayRaw = Array.isArray(data.daywise_feedback) ? data.daywise_feedback : [];
+  const bySessionRaw = Array.isArray(data.session_wise_feedback) ? data.session_wise_feedback : [];
+  if (byDayRaw.length === 0 && bySessionRaw.length === 0) return null;
+
+  const byDay: EventFeedbackDayStat[] = [];
+  for (const item of byDayRaw) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const dayNumber = pickNumber(row.event_date__day_number) ?? pickNumber(row.day_number) ?? 0;
+    byDay.push({
+      eventDayId: pickId(row.event_date_id) ?? pickId(row.day_id) ?? String(dayNumber),
+      dayNumber,
+      totalFeedback: pickNumber(row.count) ?? 0,
+      averageRating: pickNumber(row.avg_rating) ?? 0,
+    });
+  }
+
+  const bySession: EventFeedbackSessionStat[] = [];
+  for (const item of bySessionRaw) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const title =
+      pickString(row.schedule_item__title)
+      ?? pickString(row.title)
+      ?? pickString(row.session_name)
+      ?? "Session";
+    bySession.push({
+      scheduleItemId: pickId(row.schedule_item_id) ?? title,
+      title,
+      totalFeedback: pickNumber(row.count) ?? 0,
+      averageRating: pickNumber(row.avg_rating) ?? 0,
+    });
+  }
+
+  const totalFeedback =
+    byDay.reduce((sum, row) => sum + row.totalFeedback, 0)
+    || bySession.reduce((sum, row) => sum + row.totalFeedback, 0);
+  const ratingSum = bySession.reduce(
+    (sum, row) => sum + row.averageRating * row.totalFeedback,
+    0,
+  );
+  const averageRating = totalFeedback > 0 ? ratingSum / totalFeedback : 0;
+
+  return {
+    eventId: eventId ?? "",
+    overall: {
+      totalFeedback,
+      averageRating,
+      ratingDistribution: {},
+      feedbackByDate: [],
+    },
+    byDay,
+    bySession,
+  };
+}
+
+function mapParticipationTime(raw: unknown): {
+  rows: SessionParticipationTimeRow[];
+  bucketLabels: string[];
+} {
+  const root = asRecord(raw);
+  const list = Array.isArray(raw) ? raw : Array.isArray(root?.rows) ? root!.rows : [];
+  const labelSet = new Set<string>();
+  const rows: SessionParticipationTimeRow[] = [];
+
+  for (const item of list) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const name = pickString(row.session_name) ?? pickString(row.name);
+    if (!name) continue;
+    const rawBuckets = asRecord(row.buckets) ?? {};
+    const buckets: Record<string, number> = {};
+    for (const [key, value] of Object.entries(rawBuckets)) {
+      labelSet.add(key);
+      buckets[key] = pickNumber(value) ?? 0;
+    }
+    rows.push({
+      sessionName: name,
+      sessionDurationMinutes: pickNumber(row.session_duration_min) ?? 0,
+      uniqueParticipants: pickNumber(row.unique_participants) ?? 0,
+      buckets,
+    });
+  }
+
+  // Columns = 5-min marks up to each session's duration (union across rows).
+  const bucketLabels = [...labelSet].sort((a, b) => Number(a) - Number(b));
+  return { rows, bucketLabels };
+}
+
+function mapParticipationRate(raw: unknown): {
+  rows: SessionParticipationRateRow[];
+  slotLabels: string[];
+} {
+  const root = asRecord(raw);
+  const list = Array.isArray(raw) ? raw : Array.isArray(root?.rows) ? root!.rows : [];
+  const labelSet = new Set<string>();
+  const rows: SessionParticipationRateRow[] = [];
+
+  for (const item of list) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const name = pickString(row.session_name) ?? pickString(row.name);
+    if (!name) continue;
+
+    const slots: Record<string, number> = {};
+    const points = Array.isArray(row.points) ? row.points : [];
+    for (const point of points) {
+      if (typeof point === "number") continue;
+      const p = asRecord(point);
+      if (!p) continue;
+      const label =
+        pickString(p.label)
+        ?? pickString(p.time)
+        ?? pickString(p.slot)
+        ?? (pickNumber(p.minute) != null ? String(pickNumber(p.minute)) : null)
+        ?? (pickNumber(p.offset_min) != null ? `+${pickNumber(p.offset_min)}m` : null);
+      const value =
+        pickNumber(p.count)
+        ?? pickNumber(p.value)
+        ?? pickNumber(p.participants)
+        ?? pickNumber(p.concurrent)
+        ?? 0;
+      if (!label) continue;
+      labelSet.add(label);
+      slots[label] = value;
+    }
+
+    const maxConcurrent = pickNumber(row.max_concurrent);
+    if (maxConcurrent != null) {
+      labelSet.add("Max");
+      slots.Max = maxConcurrent;
+    }
+
+    rows.push({
+      sessionName: name,
+      sessionDurationMinutes: pickNumber(row.session_duration_min) ?? 0,
+      slots,
+    });
+  }
+
+  const slotLabels = [...labelSet].sort((a, b) => {
+    if (a === "Max") return 1;
+    if (b === "Max") return -1;
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return a.localeCompare(b);
+  });
+
+  return { rows, slotLabels };
+}
+
+function mapParticipation(data: Record<string, unknown>): LiveAnalyticsParticipationSnapshot | null {
+  const hasTime = data.participation_time != null;
+  const hasRate = data.participation_rate != null;
+  if (!hasTime && !hasRate) return null;
+
+  const time = mapParticipationTime(data.participation_time);
+  const rate = mapParticipationRate(data.participation_rate);
+
+  return {
+    timeRows: time.rows,
+    timeBucketLabels: time.bucketLabels,
+    rateRows: rate.rows,
+    rateSlotLabels: rate.slotLabels.length > 0 ? rate.slotLabels : ["Max"],
+  };
+}
+
+/**
+ * Subscribe ack / non-update control — not a chart payload; skip snapshot updates.
+ */
+export function isLiveAnalyticsControlMessage(raw: unknown): boolean {
+  const root = asRecord(raw);
+  if (!root) return false;
+  const type = pickString(root.type)?.toLowerCase();
+  if (type === "update") return false;
+  const action = pickString(root.action)?.toLowerCase();
+  if (action === "ping" || action === "subscribe") return true;
+  const data = asRecord(root.data);
+  return Boolean(data && Array.isArray(data.subscribed));
+}
+
 /**
  * Map a live analytics WebSocket JSON payload into UI-ready series.
- * Accepts several likely BE key names until the contract is finalized.
+ * Expects `{ type: "update", data: { … } }` from Django.
  */
 export function mapLiveAnalyticsPayload(raw: unknown): LiveAnalyticsSnapshot {
   const root = asRecord(raw) ?? {};
   const data = asRecord(root.data) ?? root;
 
-  const statewiseRaw = firstDefined(
-    data.statewise_login,
-    data.statewise_logins,
-    data.logins_by_state,
-    data.by_state,
-    data.state_login,
-  );
-  const countrywiseRaw = firstDefined(
-    data.countrywise_login,
-    data.countrywise_logins,
-    data.logins_by_country,
-    data.by_country,
-    data.country_login,
-    asRecord(data.countrywise_login)?.virtual,
-  );
-  const sessionMaxRaw = firstDefined(
-    data.session_max_virtual,
-    data.session_wise_max_virtual,
-    data.session_max_virtual_participants,
-    data.by_session_max_virtual,
-    data.max_virtual_by_session,
-    data.session_wise_max_virtual_participant_count,
-  );
+  const eventId =
+    pickId(data.event_id)
+    ?? pickString(data.eventId)
+    ?? (pickNumber(data.event) != null ? String(pickNumber(data.event)) : undefined);
 
+  const countrywiseRaw = data.countrywise_login;
   const countryRoot = asRecord(countrywiseRaw);
   const countryVirtual = countryRoot
     ? mapDistribution(countryRoot.virtual ?? countryRoot.all ?? countrywiseRaw)
@@ -187,13 +391,15 @@ export function mapLiveAnalyticsPayload(raw: unknown): LiveAnalyticsSnapshot {
 
   return {
     receivedAt: new Date().toISOString(),
-    eventId:
-      pickString(data.event_id)
-      ?? pickString(data.eventId)
-      ?? (pickNumber(data.event) != null ? String(pickNumber(data.event)) : undefined),
-    statewiseLogin: mapModeSeries(statewiseRaw),
+    eventId,
+    generatedAt: pickString(data.generated_at) ?? undefined,
+    statewiseLogin: mapModeSeries(data.statewise_login),
     countrywiseLoginVirtual: countryVirtual,
-    sessionMaxVirtual: mapDistribution(sessionMaxRaw),
+    daywiseLogin: mapDistribution(data.daywise_login),
+    sessionMaxVirtual: mapDistribution(data.session_wise_max_virtual),
+    noShow: mapNoShow(data.no_show),
+    feedback: mapFeedback(eventId, data),
+    participation: mapParticipation(data),
     streamingSummary: mapStreamingPartial(data),
     raw,
   };
@@ -204,7 +410,11 @@ export function emptyLiveAnalyticsSnapshot(): LiveAnalyticsSnapshot {
     receivedAt: new Date().toISOString(),
     statewiseLogin: emptyModeSeries(),
     countrywiseLoginVirtual: [],
+    daywiseLogin: [],
     sessionMaxVirtual: [],
+    noShow: [],
+    feedback: null,
+    participation: null,
     streamingSummary: null,
     raw: null,
   };

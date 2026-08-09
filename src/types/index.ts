@@ -667,11 +667,16 @@ export interface Permission {
 
 export interface Notification {
   id: string;
+  /** Django `notification_type` (e.g. REGISTRATION_CONFIRMED). */
+  notificationType?: string;
   title: string;
   message: string;
   type: "info" | "success" | "warning" | "error";
   read: boolean;
   createdAt: string;
+  eventId?: string | null;
+  /** Optional deep link when the notification is clicked. */
+  href?: string;
 }
 
 export interface Speaker {
@@ -714,6 +719,26 @@ export interface ChatMessage {
   userName: string;
   message: string;
   timestamp: string;
+}
+
+/** Live event chat message from WebSocket / Django chat API. */
+export interface LiveChatMessage {
+  id: string;
+  eventId: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  createdAt: string;
+  editedAt: string | null;
+  isDeleted: boolean;
+}
+
+export type ChatReactionType = "like" | "love" | "clap";
+
+export interface ChatReactionCounts {
+  like: number;
+  love: number;
+  clap: number;
 }
 
 export interface StreamState {
@@ -835,6 +860,11 @@ export interface BroadcastSessionSummary {
   broadcasterName: string;
   name: string;
   isPrimary: boolean;
+  streamKey: string;
+  ingestUrl?: string;
+  playbackUrl?: string;
+  ingestUrls: BroadcastStreamUrls;
+  playbackUrls: BroadcastStreamUrls;
   isActive: boolean;
   startedAt: string | null;
   endedAt: string | null;
@@ -842,9 +872,11 @@ export interface BroadcastSessionSummary {
 }
 
 export type BroadcastUrlTarget =
+  | "ingest.url"
   | "ingest.rtmp"
   | "ingest.rtsp"
   | "ingest.webrtc"
+  | "playback.url"
   | "playback.hls"
   | "playback.rtsp"
   | "playback.webrtc"
@@ -866,12 +898,14 @@ export interface BroadcastSession {
   name: string;
   isPrimary: boolean;
   streamKey: string;
+  ingestUrl?: string;
+  playbackUrl?: string;
   ingestUrls: BroadcastStreamUrls;
   playbackUrls: BroadcastStreamUrls;
   isActive: boolean;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
-  /** Convenience: HLS playback URL for viewers */
+  /** Primary viewer playback link from API `playback_url`. */
   liveVideoUrl?: string;
 }

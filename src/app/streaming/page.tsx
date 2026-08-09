@@ -1,25 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
-  Pause, Play, VolumeX, Share2, Heart, ThumbsUp, HandMetal,
-  Send, Users, Home,
+  Pause, Play, VolumeX, Share2, Users, Home,
 } from "lucide-react";
 import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
+import { StreamCameraPicker } from "@/components/streaming/StreamCameraPicker";
+import { LiveChatPanel } from "@/components/streaming/LiveChatPanel";
 import { StreamingExitFeedbackDialog } from "@/components/streaming/StreamingExitFeedbackDialog";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useMinRole } from "@/hooks/useRoleGuard";
+import { useEventRegistration } from "@/hooks/useEventRegistration";
+import { useEventPresenceSocket } from "@/hooks/useEventPresenceSocket";
 import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
-import { mockChatMessages } from "@/mock/feedback";
-import { resolveLivePlaybackUrl } from "@/services/broadcast.service";
-import { isGoogleDriveStreamUrl } from "@/lib/stream-utils";
+import {
+  getLiveBroadcastCameras,
+  pickDefaultLiveCamera,
+  type LiveBroadcastCamera,
+} from "@/services/broadcast.service";
+import { leaveEvent, leaveEventOnUnload } from "@/services/event.service";
+import { isGoogleDriveStreamUrl, isYouTubeStreamUrl } from "@/lib/stream-utils";
 import {
   APP_NAME,
   LIVE_STREAM_URL,
@@ -32,52 +37,96 @@ import type { StreamViewMode } from "@/lib/stream-view";
 import { cn } from "@/lib/utils";
 import { UserInitials } from "@/components/shared/UserInitials";
 
-const REACTIONS = [
-  { icon: ThumbsUp, label: "Like", emoji: "👍" },
-  { icon: Heart, label: "Love", emoji: "❤️" },
-  { icon: HandMetal, label: "Clap", emoji: "👏" },
-];
-
 export default function StreamingPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isModerator = useMinRole("moderator");
-  const event = mockEvents.find((e) => e.status === "live") || mockEvents[2];
+  const { upcomingEvent } = useEventRegistration();
+  const event = upcomingEvent ?? mockEvents.find((e) => e.status === "live") ?? mockEvents[2];
+  const liveEventId = upcomingEvent?.id;
+  useEventPresenceSocket(liveEventId);
 
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [viewerCount, setViewerCount] = useState(2890);
-  const [chatMessages, setChatMessages] = useState(mockChatMessages);
-  const [newMessage, setNewMessage] = useState("");
-  const [reactions, setReactions] = useState<Record<string, number>>({ "👍": 42, "❤️": 28, "👏": 15 });
   const [linkCopied, setLinkCopied] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [viewMode, setViewMode] = useState<StreamViewMode>("default");
-  const [streamUrl, setStreamUrl] = useState<string | undefined>(LIVE_STREAM_URL || undefined);
-  const isDriveEmbed = Boolean(streamUrl && isGoogleDriveStreamUrl(streamUrl));
+  const [cameras, setCameras] = useState<LiveBroadcastCamera[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | undefined>();
+  const [streamLoading, setStreamLoading] = useState(true);
+  const isEmbeddedStream = Boolean(
+    streamUrl && (isGoogleDriveStreamUrl(streamUrl) || isYouTubeStreamUrl(streamUrl)),
+  );
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowLeaveRef = useRef(false);
+  const leaveSentRef = useRef(false);
 
-  useEffect(() => {
-    if (LIVE_STREAM_URL && isGoogleDriveStreamUrl(LIVE_STREAM_URL)) {
+  const notifyLeave = useCallback((mode: "async" | "unload" = "async") => {
+    const eventId = liveEventId?.trim();
+    if (!eventId || leaveSentRef.current) return;
+    leaveSentRef.current = true;
+
+    if (mode === "unload") {
+      leaveEventOnUnload(eventId);
       return;
     }
 
+    void leaveEvent(eventId).catch(() => {
+      // Leave is best-effort; still allow navigation away.
+    });
+  }, [liveEventId]);
+
+  useEffect(() => {
+    leaveSentRef.current = false;
+  }, [liveEventId]);
+
+  useEffect(() => {
     let cancelled = false;
 
-    const loadStreamUrl = async () => {
-      const hlsUrl = await resolveLivePlaybackUrl();
-      if (!cancelled && hlsUrl) {
-        setStreamUrl(hlsUrl);
+    const loadCameras = async () => {
+      setStreamLoading(true);
+
+      if (!liveEventId) {
+        if (cancelled) return;
+        setCameras([]);
+        setSelectedCameraId(null);
+        setStreamUrl(LIVE_STREAM_URL || undefined);
+        setStreamLoading(false);
+        return;
+      }
+
+      try {
+        const liveCameras = await getLiveBroadcastCameras(liveEventId);
+        if (cancelled) return;
+
+        const defaultCamera = pickDefaultLiveCamera(liveCameras);
+        setCameras(liveCameras);
+        setSelectedCameraId(defaultCamera?.id ?? null);
+        setStreamUrl(defaultCamera?.playbackUrl ?? LIVE_STREAM_URL ?? undefined);
+      } catch {
+        if (cancelled) return;
+        setCameras([]);
+        setSelectedCameraId(null);
+        setStreamUrl(LIVE_STREAM_URL || undefined);
+      } finally {
+        if (!cancelled) setStreamLoading(false);
       }
     };
 
-    void loadStreamUrl();
+    void loadCameras();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [liveEventId]);
+
+  const selectCamera = (camera: LiveBroadcastCamera) => {
+    setSelectedCameraId(camera.id);
+    setStreamUrl(camera.playbackUrl);
+    setIsPaused(false);
+  };
 
   useEffect(() => {
     return () => {
@@ -94,30 +143,17 @@ export default function StreamingPage() {
       setFeedbackOpen(true);
     };
 
+    const onPageHide = () => {
+      notifyLeave("unload");
+    };
+
     window.addEventListener("popstate", onPopState);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
       window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("pagehide", onPageHide);
     };
-  }, []);
-
-  const sendMessage = () => {
-    if (!newMessage.trim()) return;
-    setChatMessages([
-      ...chatMessages,
-      {
-        id: `chat-${Date.now()}`,
-        userId: user?.id || "guest",
-        userName: user ? `${user.firstName} ${user.lastName}` : "Guest",
-        message: newMessage,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
-    setNewMessage("");
-  };
-
-  const addReaction = (emoji: string) => {
-    setReactions((prev) => ({ ...prev, [emoji]: (prev[emoji] || 0) + 1 }));
-  };
+  }, [notifyLeave]);
 
   const shareLink = async () => {
     try {
@@ -135,6 +171,7 @@ export default function StreamingPage() {
   };
 
   const leaveStreaming = () => {
+    notifyLeave("async");
     allowLeaveRef.current = true;
     setFeedbackOpen(false);
     router.push(ROUTES.home);
@@ -142,74 +179,64 @@ export default function StreamingPage() {
 
   const isTheaterView = viewMode === "theater";
 
+  const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId);
+  const playerTitle = selectedCamera
+    ? `${event.name} · ${selectedCamera.name}`
+    : event.name;
+
   const player = (
-    <StreamPlayerFrame
-      streamUrl={streamUrl}
-      isLive
-      isPaused={isPaused}
-      isMuted={isMuted}
-      thumbnailUrl={event.imageUrl}
-      title={event.name}
-      leftBannerUrl={STREAM_LEFT_BANNER_URL}
-      rightBannerUrl={STREAM_RIGHT_BANNER_URL}
-      leftBannerAlt="India Clean Air Summit 2026"
-      rightBannerAlt="India Clean Air Summit 2026"
-      viewMode={viewMode}
-      onViewModeChange={setViewMode}
-      onPause={() => setIsPaused(true)}
-      onResume={() => setIsPaused(false)}
-      onMute={() => setIsMuted(!isMuted)}
-    />
+    <div className="space-y-3">
+      <div className="relative">
+        <StreamPlayerFrame
+          streamUrl={streamUrl}
+          isLive
+          isPaused={isPaused}
+          isMuted={isMuted}
+          thumbnailUrl={event.imageUrl}
+          title={playerTitle}
+          leftBannerUrl={STREAM_LEFT_BANNER_URL}
+          rightBannerUrl={STREAM_RIGHT_BANNER_URL}
+          leftBannerAlt="India Clean Air Summit 2026"
+          rightBannerAlt="India Clean Air Summit 2026"
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onPause={() => setIsPaused(true)}
+          onResume={() => setIsPaused(false)}
+          onMute={() => setIsMuted(!isMuted)}
+        />
+        {streamLoading ? (
+          <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-black/60 pointer-events-none">
+            <p className="text-sm font-medium text-white">Connecting to live stream…</p>
+          </div>
+        ) : !streamUrl ? (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/70 p-6 text-center pointer-events-none">
+            <p className="text-sm font-medium text-white">No live stream is available right now.</p>
+            <p className="text-xs text-white/80 max-w-sm">
+              When an event goes live, playback will start from the active broadcast session.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <StreamCameraPicker
+        cameras={cameras}
+        selectedId={selectedCameraId}
+        onSelect={selectCamera}
+      />
+    </div>
   );
 
   const chatPanel = (
-    <Card
+    <LiveChatPanel
+      eventId={liveEventId}
+      userId={user?.id}
+      userRole={user?.role}
       className={cn(
-        "flex flex-col min-h-0",
         isTheaterView
-          ? "h-full min-h-[min(360px,52vh)] xl:min-h-[min(520px,calc(100vh-22rem))]"
-          : "min-h-[320px] lg:sticky lg:top-20 lg:min-h-[480px]",
+          ? "h-full min-h-[min(360px,52vh)] max-h-[min(520px,calc(100vh-22rem))] xl:max-h-none"
+          : "h-[min(70vh,32rem)] lg:sticky lg:top-20 lg:h-[min(calc(100vh-6rem),36rem)]",
       )}
-    >
-      <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="text-sm flex items-center justify-between gap-2">
-          Live Chat
-          <div className="flex gap-0.5 shrink-0">
-            {REACTIONS.map((r) => (
-              <Button key={r.label} size="sm" variant="ghost" className="h-7 px-1.5 text-xs" onClick={() => addReaction(r.emoji)}>
-                {r.emoji} {reactions[r.emoji] || 0}
-              </Button>
-            ))}
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-3 min-h-0 px-4 pb-4">
-        <div className="flex-1 min-h-[160px] overflow-y-auto space-y-2 pr-1">
-          {chatMessages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-sm leading-snug"
-            >
-              <span className="font-medium text-primary">{msg.userName}: </span>
-              <span>{msg.message}</span>
-            </motion.div>
-          ))}
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          />
-          <Button size="icon" onClick={sendMessage} aria-label="Send message">
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    />
   );
 
   const moderatorControls = isModerator ? (
@@ -222,7 +249,7 @@ export default function StreamingPage() {
           {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
           {isPaused ? "Resume Stream" : "Pause Stream"}
         </Button>
-        {!isDriveEmbed && (
+        {!isEmbeddedStream && (
           <Button size="sm" variant="outline" onClick={() => setIsMuted(!isMuted)}>
             <VolumeX className="h-4 w-4 mr-1" />
             {isMuted ? "Unmute" : "Mute Stream"}
@@ -370,7 +397,7 @@ export default function StreamingPage() {
                 {agendaCard}
               </div>
 
-              <div className="xl:col-span-5 min-h-0 flex flex-col">
+              <div className="xl:col-span-5 min-h-0 flex flex-col h-full max-h-[min(520px,calc(100vh-22rem))] xl:max-h-[min(520px,calc(100vh-22rem))]">
                 {chatPanel}
               </div>
             </div>
