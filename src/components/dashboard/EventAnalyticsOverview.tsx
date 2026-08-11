@@ -50,7 +50,6 @@ import {
   type RegistrationTrendGranularity,
 } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
-import { MOCK_PARTICIPATION_TIME_SESSIONS } from "@/mock/analytics-participation-time";
 import { useLiveAnalyticsSocket } from "@/hooks/useLiveAnalyticsSocket";
 import { getAllEvents } from "@/services/event.service";
 import { useAnalyticsStore } from "@/store/useAnalyticsStore";
@@ -381,15 +380,17 @@ export function EventAnalyticsOverview() {
   );
 
   const participationTimeSessions = useMemo(() => {
+    // After a live WS update, trust participation_duration even when [] (no dummy rows).
+    if (liveSnapshot?.raw != null) {
+      return liveSnapshot.participationDurationSessions ?? [];
+    }
     if (!eventAnalytics) return [];
-    const fromApi = eventAnalytics.participationTimeSessions ?? [];
-    return fromApi.length > 0 ? fromApi : MOCK_PARTICIPATION_TIME_SESSIONS;
-  }, [eventAnalytics]);
+    return eventAnalytics.participationTimeSessions ?? [];
+  }, [liveSnapshot?.raw, liveSnapshot?.participationDurationSessions, eventAnalytics]);
 
-  const participationTimeIsPlaceholder = useMemo(() => {
-    if (!eventAnalytics) return false;
-    return (eventAnalytics.participationTimeSessions ?? []).length === 0;
-  }, [eventAnalytics]);
+  const showParticipationDuration =
+    Boolean(eventAnalytics)
+    || liveSnapshot?.raw != null;
 
   const registrationInsights = useMemo(() => {
     if (!eventAnalytics) return mapApiRegistrationInsights({});
@@ -646,11 +647,10 @@ export function EventAnalyticsOverview() {
             </>
           ) : null}
 
-          {eventAnalytics && (
+          {showParticipationDuration && (
             <ParticipationTimeTable
               sessions={participationTimeSessions}
-              exportSlug={`${exportSlugPrefix}-participation-time`}
-              usingPlaceholder={participationTimeIsPlaceholder}
+              exportSlug={`${exportSlugPrefix}-participation-duration`}
             />
           )}
         </AnalyticsCollapsibleSection>

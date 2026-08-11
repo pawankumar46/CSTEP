@@ -194,7 +194,10 @@ export function LiveLoginInsightsCharts() {
   );
   const sessionMaxVirtualData = useMemo(() => {
     const live = snapshot?.sessionMaxVirtual ?? [];
-    return live.length > 0 ? live : EMPTY_SESSION_PLACEHOLDER;
+    if (live.length === 0) return EMPTY_SESSION_PLACEHOLDER;
+    const sorted = [...live].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+    const withData = sorted.filter((row) => row.value > 0);
+    return withData.length > 0 ? withData : sorted;
   }, [snapshot?.sessionMaxVirtual]);
   const noShowRows = snapshot?.noShow ?? [];
 

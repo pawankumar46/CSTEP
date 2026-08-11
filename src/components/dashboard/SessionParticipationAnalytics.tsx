@@ -243,13 +243,16 @@ export function SessionParticipationAnalytics() {
   const liveParticipation = useLiveAnalyticsStore((s) => s.snapshot?.participation ?? null);
   const mockDay = useMemo(() => getSessionParticipationForDay(selectedDay), [selectedDay]);
 
-  const usingLive = Boolean(liveParticipation && liveParticipation.timeRows.length > 0);
-  const timeRows = usingLive ? liveParticipation!.timeRows : mockDay.timeRows;
-  const timeBucketLabels = usingLive
+  const usingLiveTime = (liveParticipation?.timeRows.length ?? 0) > 0;
+  const usingLiveRate = (liveParticipation?.rateRows.length ?? 0) > 0;
+  const usingAnyLive = usingLiveTime || usingLiveRate;
+
+  const timeRows = usingLiveTime ? liveParticipation!.timeRows : mockDay.timeRows;
+  const timeBucketLabels = usingLiveTime
     ? liveParticipation!.timeBucketLabels
     : [...PARTICIPATION_DURATION_BUCKETS];
-  const rateRows = usingLive ? liveParticipation!.rateRows : mockDay.rateRows;
-  const rateSlotLabels = usingLive
+  const rateRows = usingLiveRate ? liveParticipation!.rateRows : mockDay.rateRows;
+  const rateSlotLabels = usingLiveRate
     ? (liveParticipation!.rateSlotLabels.length > 0
         ? liveParticipation!.rateSlotLabels
         : ["Max"])
@@ -261,7 +264,7 @@ export function SessionParticipationAnalytics() {
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Session participation
         </h3>
-        {!usingLive && (
+        {!usingAnyLive && (
           <ChartFilterGroup
             options={DAY_FILTER_OPTIONS}
             value={selectedDay}
@@ -278,7 +281,7 @@ export function SessionParticipationAnalytics() {
         >
           <ParticipationTimeTableView rows={timeRows} bucketLabels={timeBucketLabels} />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            {usingLive
+            {usingLiveTime
               ? "Live from analytics WebSocket — columns match session duration (5, 10, … min)"
               : "Sample layout until live participation time arrives"}
           </p>
@@ -291,7 +294,7 @@ export function SessionParticipationAnalytics() {
         >
           <ParticipationRateTableView rows={rateRows} slotLabels={rateSlotLabels} />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            {usingLive
+            {usingLiveRate
               ? "Live from analytics WebSocket"
               : "Sample layout until live participation rate arrives"}
           </p>

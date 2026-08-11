@@ -11,6 +11,7 @@ export const LIVE_ANALYTICS_VISUALS = [
   "daywise_feedback",
   "participation_rate",
   "participation_time",
+  "participation_duration",
 ] as const;
 
 export type LiveAnalyticsVisual = (typeof LIVE_ANALYTICS_VISUALS)[number];

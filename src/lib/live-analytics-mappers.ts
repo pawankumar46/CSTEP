@@ -13,6 +13,7 @@ import type {
   EventFeedbackAnalytics,
   EventFeedbackDayStat,
   EventFeedbackSessionStat,
+  ParticipationTimeSession,
   StreamingSummary,
 } from "@/types";
 
@@ -75,7 +76,11 @@ function mapShareRows(raw: unknown): DistributionDataPoint[] {
     if (!name) continue;
     points.push({ name, value });
   }
-  return points;
+  return points.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+}
+
+function mapSessionMaxVirtual(raw: unknown): DistributionDataPoint[] {
+  return mapShareRows(raw);
 }
 
 function mapCountRecord(raw: unknown): DistributionDataPoint[] {
@@ -340,7 +345,51 @@ function mapParticipationRate(raw: unknown): {
   return { rows, slotLabels };
 }
 
+function mapParticipationDurationSessions(raw: unknown): ParticipationTimeSession[] {
+  if (raw == null) return [];
+
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(asRecord(raw)?.rows)
+      ? (asRecord(raw)!.rows as unknown[])
+      : Array.isArray(asRecord(raw)?.results)
+        ? (asRecord(raw)!.results as unknown[])
+        : null;
+  if (!list) return [];
+
+  return list.map((item, index) => {
+    const row = asRecord(item) ?? {};
+    const leftAt = row.left_at ?? row.logged_out_at ?? row.loggedOutAt ?? row.logout_at;
+    const joinedAt =
+      pickString(row.joined_at)
+      ?? pickString(row.logged_in_at)
+      ?? pickString(row.loggedInAt)
+      ?? pickString(row.login_at)
+      ?? "";
+    const userId = pickId(row.user_id) ?? pickId(row.id);
+    return {
+      id: userId ? `${userId}-${joinedAt || index}` : `participation-duration-${index}`,
+      userName:
+        pickString(row.full_name)
+        ?? pickString(row.user_name)
+        ?? pickString(row.userName)
+        ?? pickString(row.name)
+        ?? "Guest",
+      email: pickString(row.email) ?? undefined,
+      loggedInAt: joinedAt,
+      loggedOutAt: leftAt == null || leftAt === "" ? null : String(leftAt),
+      durationSeconds:
+        pickNumber(row.watch_duration_seconds)
+        ?? pickNumber(row.duration_seconds)
+        ?? pickNumber(row.durationSeconds)
+        ?? pickNumber(row.duration)
+        ?? 0,
+    };
+  });
+}
+
 function mapParticipation(data: Record<string, unknown>): LiveAnalyticsParticipationSnapshot | null {
+  // Session 5-min buckets — `participation_time` only (not viewer duration rows).
   const hasTime = data.participation_time != null;
   const hasRate = data.participation_rate != null;
   if (!hasTime && !hasRate) return null;
@@ -396,10 +445,11 @@ export function mapLiveAnalyticsPayload(raw: unknown): LiveAnalyticsSnapshot {
     statewiseLogin: mapModeSeries(data.statewise_login),
     countrywiseLoginVirtual: countryVirtual,
     daywiseLogin: mapDistribution(data.daywise_login),
-    sessionMaxVirtual: mapDistribution(data.session_wise_max_virtual),
+    sessionMaxVirtual: mapSessionMaxVirtual(data.session_wise_max_virtual),
     noShow: mapNoShow(data.no_show),
     feedback: mapFeedback(eventId, data),
     participation: mapParticipation(data),
+    participationDurationSessions: mapParticipationDurationSessions(data.participation_duration),
     streamingSummary: mapStreamingPartial(data),
     raw,
   };
@@ -415,6 +465,7 @@ export function emptyLiveAnalyticsSnapshot(): LiveAnalyticsSnapshot {
     noShow: [],
     feedback: null,
     participation: null,
+    participationDurationSessions: [],
     streamingSummary: null,
     raw: null,
   };
