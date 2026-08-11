@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Loader2, RefreshCw, LayoutPanelLeft, RectangleHorizontal } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Loader2, RefreshCw, LayoutPanelLeft, RectangleHorizontal, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { isGoogleDriveStreamUrl, parseStreamUrl, type StreamSource } from "@/lib/stream-utils";
+import {
+  getMeetingPlatformLabel,
+  isGoogleDriveStreamUrl,
+  parseStreamUrl,
+  type StreamSource,
+} from "@/lib/stream-utils";
 import { LIVE_STREAM_FILE_ID } from "@/lib/constants";
 import { THEATER_PLAYER_CLASS, type StreamViewMode } from "@/lib/stream-view";
 
@@ -53,6 +58,7 @@ export function VideoPlayer({
   const [isBuffering, setIsBuffering] = useState(true);
   const [needsUserPlay, setNeedsUserPlay] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const [meetingIframeFailed, setMeetingIframeFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -72,6 +78,7 @@ export function VideoPlayer({
       setUseIframeFallback(false);
       setPlaybackError(false);
       setNeedsUserPlay(false);
+      setMeetingIframeFailed(false);
       return;
     }
 
@@ -80,6 +87,7 @@ export function VideoPlayer({
     setIsBuffering(true);
     setPlaybackError(false);
     setNeedsUserPlay(false);
+    setMeetingIframeFailed(false);
     const driveFallback =
       streamUrl && isGoogleDriveStreamUrl(streamUrl) ? LIVE_STREAM_FILE_ID : undefined;
     setSource(parseStreamUrl(streamUrl, driveFallback));
@@ -87,9 +95,15 @@ export function VideoPlayer({
 
   const isHlsStream = source?.type === "hls-stream";
   const isIframeEmbed = source?.type === "iframe-embed" && Boolean(source.embedUrl);
+  const usesExternalMeeting =
+    (source?.type === "external-meeting" || meetingIframeFailed)
+    && Boolean(source?.embedUrl ?? source?.originalUrl);
   const usesIframe =
-    isIframeEmbed ||
-    (source?.type === "google-drive-file" && Boolean(source.embedUrl) && useIframeFallback);
+    !usesExternalMeeting
+    && (
+      isIframeEmbed
+      || (source?.type === "google-drive-file" && Boolean(source.embedUrl) && useIframeFallback)
+    );
   const usesVideo =
     (source?.type === "direct-video" && Boolean(source.directUrl)) ||
     (isHlsStream && Boolean(source.directUrl)) ||
@@ -98,6 +112,8 @@ export function VideoPlayer({
   const playbackUrl = usesVideo ? source?.directUrl : undefined;
   const iframePlaybackUrl =
     usesIframe && source?.embedUrl && !isPaused ? source.embedUrl : undefined;
+  const meetingOpenUrl = source?.originalUrl ?? source?.embedUrl;
+  const meetingPlatformLabel = getMeetingPlatformLabel(source?.meetingPlatform);
 
   const tryPlayVideo = useCallback(async () => {
     const video = videoRef.current;
@@ -229,6 +245,12 @@ export function VideoPlayer({
     if (!usesIframe || iframeReady || !iframePlaybackUrl) return;
 
     const timeout = window.setTimeout(() => {
+      if (source?.meetingPlatform === "microsoft-teams") {
+        setMeetingIframeFailed(true);
+        setPlaybackError(false);
+        setIsBuffering(false);
+        return;
+      }
       setPlaybackError(true);
       setIsBuffering(false);
     }, IFRAME_LOAD_TIMEOUT_MS);
@@ -236,7 +258,12 @@ export function VideoPlayer({
     return () => window.clearTimeout(timeout);
   }, [usesIframe, iframeReady, iframePlaybackUrl]);
 
-  const showThumbnail = !streamUrl || playbackError || (!usesIframe && !usesVideo);
+  const showThumbnail = !streamUrl || playbackError || (!usesIframe && !usesVideo && !usesExternalMeeting);
+
+  const openMeetingStream = () => {
+    if (!meetingOpenUrl) return;
+    window.open(meetingOpenUrl, "_blank", "noopener,noreferrer");
+  };
 
   const toggleFullscreen = () => {
     const container = containerRef.current;
@@ -266,6 +293,7 @@ export function VideoPlayer({
   };
 
   const handleRetry = () => {
+    setMeetingIframeFailed(false);
     setReloadKey((key) => key + 1);
   };
 
@@ -367,11 +395,18 @@ export function VideoPlayer({
                     "absolute inset-0 h-full w-full border-0",
                     isIframeEmbed ? "pointer-events-auto" : "pointer-events-none",
                   )}
-                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture; microphone; camera; display-capture"
                   referrerPolicy="no-referrer-when-downgrade"
                   onLoad={() => {
                     setIframeReady(true);
                     setIsBuffering(false);
+                  }}
+                  onError={() => {
+                    if (source?.meetingPlatform === "microsoft-teams") {
+                      setMeetingIframeFailed(true);
+                      setPlaybackError(false);
+                      setIsBuffering(false);
+                    }
                   }}
                 />
               ) : (
@@ -383,6 +418,43 @@ export function VideoPlayer({
                 aria-hidden
               />
             </div>
+          </div>
+          {isPaused && (
+            <button
+              type="button"
+              className="absolute inset-0 z-[25] flex flex-col items-center justify-center gap-3 bg-black/60"
+              onClick={onResume}
+              aria-label="Resume stream"
+            >
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+                <Play className="h-8 w-8 text-white fill-white" />
+              </span>
+              <span className="text-sm text-white/90">Stream paused</span>
+            </button>
+          )}
+        </>
+      )}
+
+      {usesExternalMeeting && meetingOpenUrl && !playbackError && (
+        <>
+          <img
+            src={thumbnailUrl}
+            alt={title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/55 p-6 text-center">
+            <div className="space-y-1">
+              <p className="text-lg font-semibold text-white">{meetingPlatformLabel}</p>
+              <p className="max-w-sm text-sm text-white/80">
+                {source?.meetingPlatform === "google-meet"
+                  ? "Google Meet live streams open in a new tab for the best viewing experience."
+                  : "This Teams link opens in a new tab. Sign in with your Microsoft account if prompted."}
+              </p>
+            </div>
+            <Button size="lg" onClick={openMeetingStream}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              {source?.meetingPlatform === "microsoft-teams" ? "Join live meeting" : "Watch live"}
+            </Button>
           </div>
           {isPaused && (
             <button
@@ -431,7 +503,7 @@ export function VideoPlayer({
         </>
       )}
 
-      {isLive && !isPaused && !playbackError && (usesVideo || (usesIframe && iframeReady)) && (
+      {isLive && !isPaused && !playbackError && (usesVideo || usesExternalMeeting || (usesIframe && iframeReady)) && (
         <div className="absolute top-4 left-4 z-10 flex items-center gap-2 pointer-events-none">
           <span className="flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
             <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
@@ -440,7 +512,7 @@ export function VideoPlayer({
         </div>
       )}
 
-      {(showViewControls || !usesIframe) && (
+      {(showViewControls || (!usesIframe && !usesExternalMeeting)) && (
         <div
           className={cn(
             "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",

@@ -471,7 +471,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/analytics/registrations/counts/` | Overview registration status cards (`event_id` query). Response: `total`, `accepted`, `pending`, `on_hold`, `rejected` (`undecided_mode` ignored in UI) |
-| `GET` | `/analytics/registrations/trend/` | Registrations-by-day chart (`event_id`, `granularity=daily\|weekly\|monthly`). Response: `{ granularity, results: [{ date, count }] }` |
+| `GET` | `/analytics/registrations/trend/` | Registrations-over-time chart (`event_id`, `granularity=daily\|weekly\|monthly`). Response: `{ granularity, results: [{ date, count }] }`. Weekly buckets render as compact axis labels (e.g. `20 Jul`) in `RegistrationInsightsCharts` |
 | `GET` | `/analytics/registrations/insights/` | Attendance donut (`event_id`). Uses `attendance_mode` + `attendance_mode_by_date`; UI shows Physical / Virtual / Mixed only |
 | `GET` | `/analytics/registrations/demographics/` | Gender / state / country / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_country`, `by_designation`. Overview **by state** → India map (`IndiaStateRegistrationsMap`); **by country** → rotatable globe (`CountryRegistrationsGlobe`) |
 | `GET` | `/analytics/events/feedback/` | Live Event Insights feedback charts (`event`, optional `day`). Response: `overall` (`feedback_by_date[]`, totals), `by_day[]` (`event_date`, `day_number`, count), `by_session[]` |
@@ -561,7 +561,7 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 ### 3. Live streaming
 
 1. **Watch Live** → `/streaming` loads cameras from `getLiveBroadcastCameras(eventId)` → Django `GET /events/event/:id/broadcast_sessions/`
-2. Viewer playback uses each session’s top-level **`playback_url`** (e.g. YouTube watch link); `playback_urls.hls` remains available for encoder/admin copy actions
+2. Viewer playback uses each session’s top-level **`playback_url`** (YouTube, Google Meet, Microsoft Teams live links, HLS, or direct video). Teams links are embedded with `?embed=true` when supported; Google Meet opens in a new tab because Meet blocks iframe embedding. Pasted iframe HTML is also accepted. `playback_urls.hls` remains available for encoder/admin copy actions
 3. Default feed is primary + active session; if multiple sessions exist, `StreamCameraPicker` shows Camera 1 / Camera 2 / … and switches playback on click
 3. Event administrators create/manage sessions in **Video management** (`/dashboard/video-management`)
 4. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
@@ -611,9 +611,22 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 | Auth changes | `auth.service.ts`, `auth-mappers.ts`, `useAuthStore.ts` |
 | Registration payload | `registration-mappers.ts`, `registration.service.ts` |
 | Assistance forms | `event-support-mappers.ts`, `lobby.service.ts`, `date-input.ts`, `features/dashboard/admin-*.schema.ts` |
-| Analytics | `analytics.service.ts`, `analytics-mappers.ts`, `useLiveAnalyticsSocket`, `useLiveAnalyticsStore`, `app/dashboard/analytics/`, `AttendanceModeAnalytics.tsx`, `EventFeedbackCharts.tsx`, `LiveLoginInsightsCharts.tsx`, `SessionParticipationAnalytics.tsx`, `IndiaStateRegistrationsMap.tsx`, `CountryRegistrationsGlobe.tsx` |
+| Analytics | `analytics.service.ts`, `analytics-mappers.ts`, `RegistrationInsightsCharts.tsx`, `useLiveAnalyticsSocket`, `useLiveAnalyticsStore`, `app/dashboard/analytics/`, `AttendanceModeAnalytics.tsx`, `EventFeedbackCharts.tsx`, `LiveLoginInsightsCharts.tsx`, `SessionParticipationAnalytics.tsx`, `IndiaStateRegistrationsMap.tsx`, `CountryRegistrationsGlobe.tsx` |
 | Streaming | `VideoPlayer.tsx`, `StreamCameraPicker.tsx`, `LiveChatPanel.tsx`, `useEventChatSocket.ts`, `stream-utils.ts`, `streaming/page.tsx` |
 | Notifications | `NotificationDropdown.tsx`, `useNotifications.ts`, `useNotificationSocket.ts`, `notification.service.ts`, `notification-ws.ts`, `useNotificationStore.ts` |
+
+---
+
+## Changelog
+
+### 2026-08-11
+
+- **Analytics UI:** Fixed overlapping x-axis labels on the **Registrations Over Time** weekly chart — shorter week-start labels (`20 Jul`) and angled ticks in `RegistrationInsightsCharts`.
+- **Live Event Insights:** Removed All / Physical / Virtual mode filters from **Login insights** (`LiveLoginInsightsCharts`); statewise login always shows combined data.
+- **Streaming:** `playback_url` now supports **Google Meet** and **Microsoft Teams** live links in `stream-utils` / `VideoPlayer`. Teams Live Event embed URLs play inline when supported; `teams.live.com/meet/...` and regular join links open in a new tab (Microsoft blocks iframe embedding).
+- **Home page:** Replaced **Event Agenda** PDF (`public/docs/icas-agenda.pdf`) with updated ICAS 2026 tentative agenda (19–21 August 2026).
+- **My Registrations:** Day columns now read attendance from `days[]` on `GET /registrations/registration/my/` and show per-day session counts (e.g. 7 sessions on 20 Aug).
+- **Streaming:** Event Agenda on `/streaming` shows ICAS 2026 sessions for **20 Aug** and **21 Aug** with day tabs (`icas-stream-agenda.ts`, `StreamingEventAgenda`). Removed Current Speaker card; layout is Event Information + Event Agenda only, with agenda scrolling inside the card.
 
 ---
 

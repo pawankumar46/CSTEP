@@ -15,7 +15,7 @@ export const CONFERENCE_DOCUMENTS: ConferenceDocument[] = [
   {
     id: "event-agenda",
     title: "Event Agenda",
-    description: "Schedule and sessions for the conference.",
+    description: "Updated tentative schedule for 19–21 August 2026.",
     href: "/docs/icas-agenda.pdf",
   },
 ];

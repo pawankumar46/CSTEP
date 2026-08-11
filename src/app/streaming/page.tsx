@@ -8,6 +8,7 @@ import {
 import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
 import { StreamCameraPicker } from "@/components/streaming/StreamCameraPicker";
 import { LiveChatPanel } from "@/components/streaming/LiveChatPanel";
+import { StreamingEventAgenda } from "@/components/streaming/StreamingEventAgenda";
 import { StreamingExitFeedbackDialog } from "@/components/streaming/StreamingExitFeedbackDialog";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -17,14 +18,14 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useMinRole } from "@/hooks/useRoleGuard";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
 import { useEventPresenceSocket } from "@/hooks/useEventPresenceSocket";
-import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
+import { mockEvents } from "@/mock/events";
 import {
   getLiveBroadcastCameras,
   pickDefaultLiveCamera,
   type LiveBroadcastCamera,
 } from "@/services/broadcast.service";
 import { leaveEvent, leaveEventOnUnload } from "@/services/event.service";
-import { isGoogleDriveStreamUrl, isYouTubeStreamUrl } from "@/lib/stream-utils";
+import { isEmbeddedPlaybackStreamUrl } from "@/lib/stream-utils";
 import {
   APP_NAME,
   LIVE_STREAM_URL,
@@ -35,7 +36,6 @@ import { getAppUrl } from "@/lib/env";
 import { ROUTES } from "@/lib/routes";
 import type { StreamViewMode } from "@/lib/stream-view";
 import { cn } from "@/lib/utils";
-import { UserInitials } from "@/components/shared/UserInitials";
 
 export default function StreamingPage() {
   const router = useRouter();
@@ -56,9 +56,7 @@ export default function StreamingPage() {
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | undefined>();
   const [streamLoading, setStreamLoading] = useState(true);
-  const isEmbeddedStream = Boolean(
-    streamUrl && (isGoogleDriveStreamUrl(streamUrl) || isYouTubeStreamUrl(streamUrl)),
-  );
+  const isEmbeddedStream = Boolean(streamUrl && isEmbeddedPlaybackStreamUrl(streamUrl));
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowLeaveRef = useRef(false);
   const leaveSentRef = useRef(false);
@@ -283,45 +281,11 @@ export default function StreamingPage() {
     </Card>
   );
 
-  const speakerCard = (
-    <Card className={cn(isTheaterView && "h-full shadow-sm")}>
-      <CardHeader className={cn(isTheaterView ? "py-3 px-4" : undefined)}>
-        <CardTitle className={cn(isTheaterView ? "text-sm" : "text-base")}>Current Speaker</CardTitle>
-      </CardHeader>
-      <CardContent className={cn(isTheaterView && "px-4 pb-4 pt-0")}>
-        <div className="flex items-center gap-3">
-          <UserInitials name={mockSpeakers[0].name} size={isTheaterView ? "md" : "lg"} />
-          <div className="min-w-0">
-            <p className="font-medium text-sm leading-snug">{mockSpeakers[0].name}</p>
-            <p className="text-xs text-muted-foreground line-clamp-2">{mockSpeakers[0].title}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const agendaCard = (
-    <Card className={cn(isTheaterView && "flex flex-col min-h-0 flex-1 shadow-sm")}>
-      <CardHeader className={cn(isTheaterView ? "py-3 px-4 shrink-0" : undefined)}>
-        <CardTitle className={cn(isTheaterView ? "text-sm" : "text-base")}>Event Agenda</CardTitle>
-      </CardHeader>
-      <CardContent
-        className={cn(
-          "space-y-2.5",
-          isTheaterView && "px-4 pb-4 pt-0 flex-1 min-h-0 overflow-y-auto max-h-[220px] xl:max-h-none",
-        )}
-      >
-        {mockSchedule.slice(0, 4).map((item) => (
-          <div key={item.id} className="flex gap-2.5 text-sm border-b border-border/60 pb-2.5 last:border-0 last:pb-0">
-            <span className="text-[11px] text-primary font-mono w-14 shrink-0 pt-0.5">{item.time}</span>
-            <div className="min-w-0">
-              <p className="font-medium text-sm leading-snug">{item.title}</p>
-              <p className="text-xs text-muted-foreground truncate">{item.speaker}</p>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+  const infoCardsGrid = (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {eventInfoCard}
+      <StreamingEventAgenda className="min-h-0" />
+    </div>
   );
 
   const exitButton = (
@@ -329,34 +293,6 @@ export default function StreamingPage() {
       <Home className="h-4 w-4 mr-2" />
       Exit
     </Button>
-  );
-
-  const infoCardsGrid = (
-    <div className={cn(
-      "grid gap-4",
-      isTheaterView ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3",
-    )}>
-      {eventInfoCard}
-      {speakerCard}
-      {!isTheaterView && (
-        <Card className="sm:col-span-2 lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base">Event Agenda</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {mockSchedule.slice(0, 4).map((item) => (
-              <div key={item.id} className="flex gap-3 text-sm">
-                <span className="text-xs text-primary font-mono w-16 shrink-0">{item.time}</span>
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.speaker}</p>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-    </div>
   );
 
   return (
@@ -390,11 +326,10 @@ export default function StreamingPage() {
             <div className="grid gap-4 xl:grid-cols-12 xl:items-stretch xl:min-h-[min(520px,calc(100vh-22rem))]">
               <div className="xl:col-span-7 flex flex-col gap-4 min-h-0">
                 {moderatorControls}
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] min-h-0 flex-1">
                   {eventInfoCard}
-                  {speakerCard}
+                  <StreamingEventAgenda compact />
                 </div>
-                {agendaCard}
               </div>
 
               <div className="xl:col-span-5 min-h-0 flex flex-col h-full max-h-[min(520px,calc(100vh-22rem))] xl:max-h-[min(520px,calc(100vh-22rem))]">

@@ -1,22 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Globe2, MapPin, UserX, Users } from "lucide-react";
 import { CountryRegistrationsGlobe } from "@/components/dashboard/CountryRegistrationsGlobe";
 import { IndiaStateRegistrationsMap } from "@/components/dashboard/IndiaStateRegistrationsMap";
-import { ChartFilterGroup } from "@/components/shared/ChartFilterGroup";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { LiveAnalyticsConnectionStatus } from "@/lib/live-analytics-api-contract";
 import { cn } from "@/lib/utils";
 import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
-import type { DistributionDataPoint, StreamingParticipationMode } from "@/types";
-
-const LOGIN_MODE_OPTIONS: { value: StreamingParticipationMode; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "physical", label: "Physical" },
-  { value: "virtual", label: "Virtual" },
-];
+import type { DistributionDataPoint } from "@/types";
 
 const EMPTY_SESSION_PLACEHOLDER: DistributionDataPoint[] = [
   { name: "Session 1", value: 0 },
@@ -29,43 +22,30 @@ function InsightCard({
   icon: Icon,
   title,
   description,
-  filters,
   children,
   className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
-  filters?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <Card className={cn("flex h-full flex-col overflow-hidden shadow-sm", className)}>
       <CardHeader className="space-y-2 pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <Icon className="h-4 w-4 text-primary" aria-hidden />
-            </div>
-            <div className="min-w-0 space-y-1">
-              <CardTitle className="text-base font-semibold tracking-tight">{title}</CardTitle>
-              <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
-            </div>
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Icon className="h-4 w-4 text-primary" aria-hidden />
           </div>
-          {filters}
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="text-base font-semibold tracking-tight">{title}</CardTitle>
+            <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 pt-0">{children}</CardContent>
     </Card>
-  );
-}
-
-function VirtualOnlyBadge() {
-  return (
-    <Badge variant="secondary" className="shrink-0 text-xs font-normal">
-      Virtual
-    </Badge>
   );
 }
 
@@ -187,13 +167,12 @@ function NoShowTable({
   );
 }
 
-function pickModeSeries(
-  series: { all: DistributionDataPoint[]; physical: DistributionDataPoint[]; virtual: DistributionDataPoint[] } | undefined,
-  mode: StreamingParticipationMode,
+function getCombinedLoginSeries(
+  series:
+    | { all: DistributionDataPoint[]; physical: DistributionDataPoint[]; virtual: DistributionDataPoint[] }
+    | undefined,
 ): DistributionDataPoint[] {
   if (!series) return [];
-  if (mode === "physical") return series.physical;
-  if (mode === "virtual") return series.virtual;
   return series.all.length > 0 ? series.all : [...series.physical, ...series.virtual];
 }
 
@@ -201,16 +180,13 @@ function pickModeSeries(
  * Live Event Insights — login visuals fed by `/ws/analytics/{eventId}/`.
  */
 export function LiveLoginInsightsCharts() {
-  const [stateLoginMode, setStateLoginMode] =
-    useState<StreamingParticipationMode>("all");
-
   const status = useLiveAnalyticsStore((s) => s.status);
   const error = useLiveAnalyticsStore((s) => s.error);
   const snapshot = useLiveAnalyticsStore((s) => s.snapshot);
 
   const stateLoginData = useMemo(
-    () => pickModeSeries(snapshot?.statewiseLogin, stateLoginMode),
-    [snapshot?.statewiseLogin, stateLoginMode],
+    () => getCombinedLoginSeries(snapshot?.statewiseLogin),
+    [snapshot?.statewiseLogin],
   );
   const countryLoginData = useMemo(
     () => snapshot?.countrywiseLoginVirtual ?? [],
@@ -243,15 +219,7 @@ export function LiveLoginInsightsCharts() {
         <InsightCard
           icon={MapPin}
           title="Statewise Login"
-          description="Logins from India by state. Filter by Physical, Virtual, or All."
-          filters={
-            <ChartFilterGroup
-              options={LOGIN_MODE_OPTIONS}
-              value={stateLoginMode}
-              onChange={setStateLoginMode}
-              className="justify-end"
-            />
-          }
+          description="Logins from India by state."
         >
           <IndiaStateRegistrationsMap data={stateLoginData} />
           {!hasLiveState && (
@@ -264,8 +232,7 @@ export function LiveLoginInsightsCharts() {
         <InsightCard
           icon={Globe2}
           title="Countrywise Login"
-          description="Virtual logins by country on the globe."
-          filters={<VirtualOnlyBadge />}
+          description="Logins by country on the globe."
         >
           <CountryRegistrationsGlobe data={countryLoginData} />
           {!hasLiveCountry && (
@@ -279,7 +246,6 @@ export function LiveLoginInsightsCharts() {
           icon={Users}
           title="Session Wise Max Virtual Participants"
           description="Peak concurrent virtual participants per session."
-          filters={<VirtualOnlyBadge />}
           className="lg:col-span-2 xl:col-span-1"
         >
           <SessionMaxVirtualChart data={sessionMaxVirtualData} />

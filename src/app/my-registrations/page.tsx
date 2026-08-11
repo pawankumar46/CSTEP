@@ -26,6 +26,7 @@ import { ICAS_CONFERENCE, isIcasEventName } from "@/lib/icas-conference";
 import {
   ATTENDANCE_MODE_EXPORT_DAY_DATES,
   lobbyAttendanceModeForDate,
+  registeredSessionsForDate,
 } from "@/lib/registration-export";
 import { formatDateTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
@@ -113,13 +114,23 @@ function MyRegistrationsContent() {
         header: formatRegistrationIntervalDayLabel(date),
         cell: ({ row }: { row: { original: Registration } }) => {
           const mode = lobbyAttendanceModeForDate(row.original, date);
-          if (mode === "—") {
+          const sessionCount = registeredSessionsForDate(row.original, date);
+          if (mode === "—" && sessionCount === 0) {
             return <span className="text-muted-foreground">—</span>;
           }
           return (
-            <Badge variant="outline" className="font-normal">
-              {mode}
-            </Badge>
+            <div className="space-y-1">
+              {mode !== "—" && (
+                <Badge variant="outline" className="font-normal">
+                  {mode}
+                </Badge>
+              )}
+              {sessionCount > 0 && (
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  {sessionCount} session{sessionCount === 1 ? "" : "s"}
+                </p>
+              )}
+            </div>
           );
         },
       })),

@@ -183,6 +183,24 @@ function extractRegistrationDateEntriesFromApi(
       .filter((entry): entry is { date: string; attendanceMode?: AttendanceMode } => entry != null);
   }
 
+  const days = raw.days;
+  if (Array.isArray(days) && days.length > 0) {
+    const mapped = days
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const entry = item as Record<string, unknown>;
+        const date = String(entry.date ?? "");
+        if (!date) return null;
+        const modeRaw = entry.attendance_mode ?? entry.mode;
+        const hasMode = modeRaw != null && String(modeRaw).trim() !== "";
+        return hasMode
+          ? { date, attendanceMode: mapApiAttendanceMode(modeRaw) }
+          : { date };
+      })
+      .filter((entry): entry is { date: string; attendanceMode?: AttendanceMode } => entry != null);
+    return mapped;
+  }
+
   if (raw.participation_date) {
     return [{ date: String(raw.participation_date) }];
   }

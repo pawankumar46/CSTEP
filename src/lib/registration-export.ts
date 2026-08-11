@@ -28,11 +28,21 @@ function attendanceModeForDate(row: AttendanceModeUserRow, date: string): string
   return day.attendanceMode === "virtual" ? "Virtual" : "Physical";
 }
 
-/** Lobby list: mode for a conference day from `registration_dates`, or —. */
+/** Lobby list: mode for a conference day from `registration_dates` or nested `days`, or —. */
 export function lobbyAttendanceModeForDate(row: Registration, date: string): string {
   const entry = row.registrationDates?.find((item) => item.date === date);
-  if (!entry) return "—";
-  return entry.attendanceMode === "virtual" ? "Virtual" : "Physical";
+  if (entry) {
+    return entry.attendanceMode === "virtual" ? "Virtual" : "Physical";
+  }
+  const day = row.days?.find((item) => item.date === date);
+  if (!day) return "—";
+  return day.attendanceMode === "virtual" ? "Virtual" : "Physical";
+}
+
+export function registeredSessionsForDate(row: Registration, date: string): number {
+  const day = row.days?.find((item) => item.date === date);
+  if (day) return day.sessions.length;
+  return row.sessionRegistrations?.filter((session) => session.date === date).length ?? 0;
 }
 
 export const LOBBY_EXPORT_COLUMNS: ExportColumn<Registration>[] = [

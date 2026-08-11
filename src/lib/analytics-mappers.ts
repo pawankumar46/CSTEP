@@ -1138,20 +1138,6 @@ function parseTrendDate(isoDate: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function getTrendOrdinalSuffix(day: number): string {
-  if (day >= 11 && day <= 13) return "th";
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-}
-
 function formatTrendBucketLabel(
   isoDate: string,
   granularity: RegistrationTrendGranularity,
@@ -1163,9 +1149,7 @@ function formatTrendBucketLabel(
     return new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric" }).format(date);
   }
   if (granularity === "weekly") {
-    const day = date.getDate();
-    const month = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(date);
-    return `${day}${getTrendOrdinalSuffix(day)} ${month} (week beginning)`;
+    return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
   }
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
 }

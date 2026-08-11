@@ -452,22 +452,23 @@ export function RegistrationInsightsCharts({
                       top: 18,
                       right: 8,
                       left: -18,
-                      bottom: trendGranularity === "weekly" ? 36 : 0,
+                      bottom: trendGranularity === "weekly" ? 8 : 0,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/50" />
                     <XAxis
                       dataKey="name"
                       tick={{
-                        fontSize: trendGranularity === "weekly" ? 10 : 11,
+                        fontSize: 11,
                         fill: "hsl(var(--muted-foreground))",
                       }}
                       axisLine={false}
                       tickLine={false}
                       interval={0}
-                      angle={0}
-                      textAnchor="middle"
-                      height={trendGranularity === "weekly" ? 56 : 30}
+                      angle={trendGranularity === "weekly" ? -35 : 0}
+                      textAnchor={trendGranularity === "weekly" ? "end" : "middle"}
+                      dy={trendGranularity === "weekly" ? 4 : 0}
+                      height={trendGranularity === "weekly" ? 48 : 30}
                     />
                     <YAxis hide allowDecimals={false} />
                     <Tooltip content={<PeopleTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.35)" }} />
