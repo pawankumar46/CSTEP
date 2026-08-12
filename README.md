@@ -623,7 +623,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ### 2026-08-12
 
 - **Streaming access:** Base users can watch live by default (same as staff) — no registration or “stream not live” gate. Set `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=false` to restore strict checks.
-- **Streaming:** Live player uses top-level **`playbackUrl`** per broadcast session; static left/right banners; viewer count placeholder set to 2.
+- **Streaming:** Live player uses top-level **`playbackUrl`** per broadcast session; static left/right banners; viewer count placeholder set to 2. Mobile player height restored (16:9 shell; banners stay desktop-only).
 
 ### 2026-08-11
 
