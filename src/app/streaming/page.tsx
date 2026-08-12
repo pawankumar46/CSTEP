@@ -48,7 +48,7 @@ export default function StreamingPage() {
 
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [viewerCount, setViewerCount] = useState(2890);
+  const [viewerCount, setViewerCount] = useState(2);
   const [linkCopied, setLinkCopied] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [viewMode, setViewMode] = useState<StreamViewMode>("default");

@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/lib/auth-session";
+import { resolveViewerPlaybackUrl } from "@/lib/broadcast-mappers";
 import { readBroadcastUrl } from "@/lib/broadcast-server";
 import type {
   BroadcastSessionSummary,
@@ -48,6 +49,51 @@ export function pickDefaultLiveCamera(
   );
 }
 
+function findCameraByLabel(
+  cameras: LiveBroadcastCamera[],
+  label: string,
+): LiveBroadcastCamera | null {
+  const normalized = label.trim().toLowerCase();
+  return (
+    cameras.find((camera) => camera.name.trim().toLowerCase() === normalized) ??
+    cameras.find((camera) => camera.name.trim().toLowerCase().includes(normalized)) ??
+    null
+  );
+}
+
+function cameraNumber(name: string): number | null {
+  const match = name.trim().match(/camera\s*(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+/** Camera 1 = main, Camera 2 = left, Camera 3 = right (by session name). */
+export function pickStreamLayoutCameras(cameras: LiveBroadcastCamera[]): {
+  main: LiveBroadcastCamera | null;
+  left: LiveBroadcastCamera | null;
+  right: LiveBroadcastCamera | null;
+} {
+  const byNumber = (n: number) =>
+    cameras.find((camera) => cameraNumber(camera.name) === n) ?? null;
+
+  return {
+    main:
+      findCameraByLabel(cameras, "Camera 1") ??
+      byNumber(1) ??
+      pickDefaultLiveCamera(cameras),
+    left: findCameraByLabel(cameras, "Camera 2") ?? byNumber(2) ?? null,
+    right: findCameraByLabel(cameras, "Camera 3") ?? byNumber(3) ?? null,
+  };
+}
+
+/** @deprecated Use pickStreamLayoutCameras */
+export function pickSideBannerCameras(cameras: LiveBroadcastCamera[]): {
+  left: LiveBroadcastCamera | null;
+  right: LiveBroadcastCamera | null;
+} {
+  const { left, right } = pickStreamLayoutCameras(cameras);
+  return { left, right };
+}
+
 export const getBroadcastSessions = async (eventId: string): Promise<BroadcastSessionSummary[]> => {
   const response = await fetch(
     `/api/broadcast-sessions?eventId=${encodeURIComponent(eventId)}`,
@@ -72,14 +118,19 @@ export const getLiveBroadcastCameras = async (
 
   const sessions = await getBroadcastSessions(eventId);
   return sessions
-    .filter((session) => Boolean(session.playbackUrl?.trim()))
-    .map((session) => ({
-      id: session.id,
-      name: session.name.trim() || `Camera ${session.id}`,
-      playbackUrl: session.playbackUrl!.trim(),
-      isPrimary: session.isPrimary,
-      isActive: session.isActive,
-    }))
+    .map((session) => {
+      const playbackUrl = resolveViewerPlaybackUrl(session);
+      if (!playbackUrl) return null;
+
+      return {
+        id: session.id,
+        name: session.name.trim() || `Camera ${session.id}`,
+        playbackUrl,
+        isPrimary: session.isPrimary,
+        isActive: session.isActive,
+      };
+    })
+    .filter((camera): camera is LiveBroadcastCamera => camera !== null)
     .sort(sortLiveCameras);
 };
 

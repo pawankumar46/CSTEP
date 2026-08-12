@@ -32,6 +32,8 @@ export interface VideoPlayerProps {
   viewMode?: StreamViewMode;
   onViewModeChange?: (mode: StreamViewMode) => void;
   fill?: boolean;
+  /** Side-banner player: muted, no controls/overlays, object-cover. */
+  compact?: boolean;
   className?: string;
 }
 
@@ -48,6 +50,7 @@ export function VideoPlayer({
   viewMode = "default",
   onViewModeChange,
   fill = false,
+  compact = false,
   className,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -119,7 +122,7 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video) return false;
 
-    video.muted = isMuted;
+    video.muted = compact ? true : isMuted;
     try {
       await video.play();
       setNeedsUserPlay(false);
@@ -127,16 +130,16 @@ export function VideoPlayer({
       setIsBuffering(false);
       return true;
     } catch {
-      setNeedsUserPlay(true);
+      if (!compact) setNeedsUserPlay(true);
       return false;
     }
-  }, [isMuted]);
+  }, [compact, isMuted]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !playbackUrl || isHlsStream) return;
 
-    video.muted = isMuted;
+    video.muted = compact ? true : isMuted;
 
     if (isPaused) {
       video.pause();
@@ -144,7 +147,7 @@ export function VideoPlayer({
     }
 
     void tryPlayVideo();
-  }, [isPaused, isMuted, playbackUrl, tryPlayVideo, isHlsStream]);
+  }, [compact, isPaused, isMuted, playbackUrl, tryPlayVideo, isHlsStream]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -154,7 +157,7 @@ export function VideoPlayer({
     let cancelled = false;
 
     const startPlayback = async () => {
-      video.muted = isMuted;
+      video.muted = compact ? true : isMuted;
 
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = playbackUrl;
@@ -162,6 +165,9 @@ export function VideoPlayer({
         hls = new Hls({ enableWorker: true, lowLatencyMode: true });
         hls.loadSource(playbackUrl);
         hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (!isPaused && !cancelled) void tryPlayVideo();
+        });
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (data.fatal) {
             setPlaybackError(true);
@@ -187,22 +193,35 @@ export function VideoPlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [isHlsStream, playbackUrl, reloadKey, playbackError, isMuted, isPaused, tryPlayVideo]);
+  }, [compact, isHlsStream, playbackUrl, reloadKey, playbackError, isMuted, isPaused, tryPlayVideo]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !isHlsStream) return;
 
-    video.muted = isMuted;
+    video.muted = compact ? true : isMuted;
     if (isPaused) {
       video.pause();
       return;
     }
 
-    if (!playbackError) {
-      void tryPlayVideo();
-    }
-  }, [isPaused, isMuted, isHlsStream, playbackError, tryPlayVideo]);
+    if (!playbackError) void tryPlayVideo();
+  }, [compact, isPaused, isMuted, isHlsStream, playbackError, tryPlayVideo]);
+
+  useEffect(() => {
+    if (!compact || isPaused || !usesVideo || !playbackUrl) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = true;
+    void tryPlayVideo();
+    const retry = window.setInterval(() => {
+      if (video.paused && !isPaused) {
+        video.muted = true;
+        void video.play().catch(() => undefined);
+      }
+    }, 1500);
+    return () => window.clearInterval(retry);
+  }, [compact, isPaused, usesVideo, playbackUrl, tryPlayVideo]);
 
   useEffect(() => {
     if (!usesVideo || isPaused || !isBuffering || needsUserPlay || playbackError) return;
@@ -304,6 +323,7 @@ export function VideoPlayer({
       return;
     }
 
+    if (compact) video.muted = true;
     void tryPlayVideo();
   };
 
@@ -319,7 +339,8 @@ export function VideoPlayer({
     setIsBuffering(false);
   };
 
-  const showPlayOverlay = usesVideo && (needsUserPlay || isPaused) && !playbackError;
+  const showPlayOverlay =
+    !compact && usesVideo && (needsUserPlay || isPaused) && !playbackError;
 
   return (
     <div
@@ -345,7 +366,10 @@ export function VideoPlayer({
             ref={videoRef}
             key={`${source?.type}-${playbackUrl}-${reloadKey}`}
             src={isHlsStream ? undefined : playbackUrl}
-            className="absolute inset-0 h-full w-full object-contain bg-black"
+            className={cn(
+              "absolute inset-0 h-full w-full bg-black",
+              compact ? "object-cover" : "object-contain",
+            )}
             autoPlay
             playsInline
             controls={false}
@@ -384,9 +408,14 @@ export function VideoPlayer({
               <Loader2 className="h-10 w-10 animate-spin text-white" />
             </div>
           )}
-          <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-black">
-            <div className="relative h-full max-w-full aspect-video overflow-hidden">
-              {iframePlaybackUrl ? (
+          <div
+            className={cn(
+              "absolute inset-0 overflow-hidden bg-black",
+              compact ? "" : "flex items-center justify-center",
+            )}
+          >
+            {compact ? (
+              iframePlaybackUrl ? (
                 <iframe
                   key={`${iframePlaybackUrl}-${reloadKey}`}
                   src={iframePlaybackUrl}
@@ -411,15 +440,44 @@ export function VideoPlayer({
                 />
               ) : (
                 <div className="absolute inset-0 bg-black" aria-hidden />
-              )}
-              <div
-                className="absolute inset-x-0 bottom-0 z-[15] bg-black pointer-events-none"
-                style={{ height: isIframeEmbed ? 0 : DRIVE_EMBED_CHROME }}
-                aria-hidden
-              />
-            </div>
+              )
+            ) : (
+              <div className="relative h-full max-w-full aspect-video overflow-hidden">
+                {iframePlaybackUrl ? (
+                  <iframe
+                    key={`${iframePlaybackUrl}-${reloadKey}`}
+                    src={iframePlaybackUrl}
+                    title={title}
+                    className={cn(
+                      "absolute inset-0 h-full w-full border-0",
+                      isIframeEmbed ? "pointer-events-auto" : "pointer-events-none",
+                    )}
+                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture; microphone; camera; display-capture"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    onLoad={() => {
+                      setIframeReady(true);
+                      setIsBuffering(false);
+                    }}
+                    onError={() => {
+                      if (source?.meetingPlatform === "microsoft-teams") {
+                        setMeetingIframeFailed(true);
+                        setPlaybackError(false);
+                        setIsBuffering(false);
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-black" aria-hidden />
+                )}
+                <div
+                  className="absolute inset-x-0 bottom-0 z-[15] bg-black pointer-events-none"
+                  style={{ height: isIframeEmbed ? 0 : DRIVE_EMBED_CHROME }}
+                  aria-hidden
+                />
+              </div>
+            )}
           </div>
-          {isPaused && (
+          {isPaused && !compact && (
             <button
               type="button"
               className="absolute inset-0 z-[25] flex flex-col items-center justify-center gap-3 bg-black/60"
@@ -456,7 +514,7 @@ export function VideoPlayer({
               {source?.meetingPlatform === "microsoft-teams" ? "Join live meeting" : "Watch live"}
             </Button>
           </div>
-          {isPaused && (
+          {isPaused && !compact && (
             <button
               type="button"
               className="absolute inset-0 z-[25] flex flex-col items-center justify-center gap-3 bg-black/60"
@@ -503,7 +561,7 @@ export function VideoPlayer({
         </>
       )}
 
-      {isLive && !isPaused && !playbackError && (usesVideo || usesExternalMeeting || (usesIframe && iframeReady)) && (
+      {!compact && isLive && !isPaused && !playbackError && (usesVideo || usesExternalMeeting || (usesIframe && iframeReady)) && (
         <div className="absolute top-4 left-4 z-10 flex items-center gap-2 pointer-events-none">
           <span className="flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
             <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
@@ -512,7 +570,7 @@ export function VideoPlayer({
         </div>
       )}
 
-      {(showViewControls || (!usesIframe && !usesExternalMeeting)) && (
+      {!compact && (showViewControls || (!usesIframe && !usesExternalMeeting)) && (
         <div
           className={cn(
             "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-4",

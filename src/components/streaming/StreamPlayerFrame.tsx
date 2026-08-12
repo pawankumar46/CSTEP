@@ -53,7 +53,7 @@ export function StreamPlayerFrame({
   return (
     <div
       className={cn(
-        "flex w-full items-stretch overflow-hidden rounded-xl",
+        "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-stretch overflow-hidden rounded-xl",
         className,
       )}
     >
@@ -66,7 +66,7 @@ export function StreamPlayerFrame({
         />
       ) : null}
 
-      <div className={cn(PLAYER_SHELL_CLASS, "flex-1")}>
+      <div className={cn(PLAYER_SHELL_CLASS, "min-h-0")}>
         <VideoPlayer
           {...playerProps}
           viewMode={viewMode}

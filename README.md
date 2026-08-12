@@ -98,7 +98,8 @@ Create `.env.local` from `.env.example`:
 | `NEXT_PUBLIC_LIVE_STREAM_URL` | Optional | Dev fallback when no active broadcast session (`.m3u8` HLS or direct video) |
 | `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Legacy Google Drive proxy (`/api/stream/video`) only — not used for public Watch Live |
 | `NEXT_PUBLIC_STREAM_LEFT_BANNER_URL` | Optional | Left banner image on streaming page |
-| `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right banner image on streaming page |
+| `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right side fallback image when Camera 3 is unavailable |
+| `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS` | Optional | Default **open** — base users can watch live like staff. Set to `false` to require registration and live event phase. |
 | `NEXT_PUBLIC_BRAND_LOGO_DARK_SRC` | Optional | Dark theme logo path |
 
 After changing any `NEXT_PUBLIC_*` variable in `.env.local`, **restart the dev server** (`npm run clean && npm run dev` if the old protocol still appears). In production, **redeploy** so the build picks up new values.
@@ -561,11 +562,11 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 ### 3. Live streaming
 
 1. **Watch Live** → `/streaming` loads cameras from `getLiveBroadcastCameras(eventId)` → Django `GET /events/event/:id/broadcast_sessions/`
-2. Viewer playback uses each session’s top-level **`playback_url`** (YouTube, Google Meet, Microsoft Teams live links, HLS, or direct video). Teams links are embedded with `?embed=true` when supported; Google Meet opens in a new tab because Meet blocks iframe embedding. Pasted iframe HTML is also accepted. `playback_urls.hls` remains available for encoder/admin copy actions
-3. Default feed is primary + active session; if multiple sessions exist, `StreamCameraPicker` shows Camera 1 / Camera 2 / … and switches playback on click
+2. Viewer playback prefers **`playback_urls.hls`** (per-session encoder URL) when present, else top-level **`playback_url`** (YouTube, Meet, Teams, external HLS, etc.). Example event `11`: Camera 1/2/3 map to session names; side banners use Camera 2 (left) and Camera 3 (right). Teams embed uses `?embed=true` when supported; Meet opens in a new tab
+3. Default feed is primary + active session; if multiple sessions exist, `StreamCameraPicker` switches the center player. Left/right **static banner images** only (no live side feeds)
 3. Event administrators create/manage sessions in **Video management** (`/dashboard/video-management`)
 4. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
-5. `StreamAccessGuard` enforces auth + registration + live event phase
+5. `StreamAccessGuard` enforces auth + registration + live event phase for base users (staff bypass; temporary base-user access on preview/event days — see `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
 6. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
 7. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — history + reactions on connect; send/edit/delete/react over the socket (owner edit 15 min, owner delete 60 min, moderator+ delete anytime)
 
@@ -618,6 +619,11 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-08-12
+
+- **Streaming access:** Base users can watch live by default (same as staff) — no registration or “stream not live” gate. Set `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=false` to restore strict checks.
+- **Streaming:** Side panels use static left/right banner images only; center player loads cameras from `GET /events/event/:id/broadcast_sessions/` (prefers `playback_urls.hls` when set).
 
 ### 2026-08-11
 

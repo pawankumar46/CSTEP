@@ -1,8 +1,20 @@
 import { isBaseUserRole, isStaffRole } from "@/lib/auth-utils";
+import { readPublicEnv } from "@/lib/env";
 import { formatEventDateRange } from "@/lib/event-display";
 import type { Event, UserRole } from "@/types";
 
 export type EventStreamPhase = "upcoming" | "live" | "ended";
+
+/** Temporary stream access for base users. Open by default; set env to `false` to restore strict gates. */
+export function isTemporaryBaseUserStreamAccessActive(): boolean {
+  return readPublicEnv("NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS") !== "false";
+}
+
+export function canBypassStreamParticipantChecks(role?: UserRole): boolean {
+  if (!role) return false;
+  if (isStaffRole(role)) return true;
+  return isBaseUserRole(role) && isTemporaryBaseUserStreamAccessActive();
+}
 
 export interface WatchLiveAccess {
   phase: EventStreamPhase | null;
@@ -70,14 +82,24 @@ export function getWatchLiveAccess({
   }
 
   const phase = getEventStreamPhase(event);
+  const streamOpenToBaseUsers = isTemporaryBaseUserStreamAccessActive();
 
-  // Moderators and event admins are not date-gated on Watch Live.
-  if (isAuthenticated && role && isStaffRole(role)) {
+  // Staff and base users (when preview/event access is open) are not date-gated on Watch Live.
+  if (isAuthenticated && role && (isStaffRole(role) || (isBaseUserRole(role) && streamOpenToBaseUsers))) {
     return {
       phase,
       canWatchLive: true,
       disabledTitle: "",
       showSignInToWatch: false,
+    };
+  }
+
+  if (!isAuthenticated && streamOpenToBaseUsers) {
+    return {
+      phase,
+      canWatchLive: false,
+      disabledTitle: "Sign in to watch the live stream",
+      showSignInToWatch: true,
     };
   }
 
