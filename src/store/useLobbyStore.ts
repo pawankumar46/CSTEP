@@ -63,6 +63,7 @@ interface LobbyState {
   clearError: () => void;
   setSelectedEventId: (eventId: string | null) => void;
   fetchRegistrations: (eventId: string, page?: number, search?: string) => Promise<void>;
+  fetchAllRegistrationsForExport: (eventId: string) => Promise<Registration[]>;
   clearRegistrationsSearch: () => void;
   fetchTravelAssistance: (eventId: string, page?: number) => Promise<void>;
   fetchMedicalAssistance: (eventId: string, page?: number) => Promise<void>;
@@ -165,6 +166,16 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
         registrationsPagination: EMPTY_ASSISTANCE_PAGINATION,
         registrationsLoading: false,
       });
+    }
+  },
+
+  fetchAllRegistrationsForExport: async (eventId) => {
+    try {
+      return await lobbyService.getLobbyRegistrations(eventId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to export lobby registrations";
+      set({ error: message });
+      throw new Error(message);
     }
   },
 

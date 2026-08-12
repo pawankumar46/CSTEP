@@ -45,7 +45,7 @@ export function ExportMenu<T>({
   const isEmpty = data.length === 0;
   const exportTitle = title ?? humanizeFilename(filename);
   const canExportPage = !disabled && !isEmpty && !exportingAll;
-  const canExportAll = Boolean(fetchAllData) && !disabled && !exportingAll && !isEmpty;
+  const canExportAll = Boolean(fetchAllData) && !disabled && !exportingAll;
 
   const runExportAll = async (format: "excel" | "pdf") => {
     if (!fetchAllData) return;
@@ -68,7 +68,7 @@ export function ExportMenu<T>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled || isEmpty || exportingAll}>
+        <Button variant="outline" size="sm" disabled={disabled || exportingAll || (isEmpty && !fetchAllData)}>
           {exportingAll ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (

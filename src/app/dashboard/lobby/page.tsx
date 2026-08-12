@@ -62,6 +62,7 @@ function LobbyContent() {
     setSelectedEventId,
     fetchRegistrations,
     clearRegistrationsSearch,
+    fetchAllRegistrationsForExport,
     bulkUpdateStatus,
     updateRegistration,
     registerLobbyUser,
@@ -361,6 +362,11 @@ function LobbyContent() {
     selectedEvent ? `lobby-${selectedEvent.name}` : "lobby-registrations",
   );
 
+  const fetchAllLobbyRegistrations = useCallback(async () => {
+    if (!selectedEventId) return [];
+    return fetchAllRegistrationsForExport(selectedEventId);
+  }, [fetchAllRegistrationsForExport, selectedEventId]);
+
   if (eventsLoading && events.length === 0) return <DashboardSkeleton />;
 
   return (
@@ -472,6 +478,13 @@ function LobbyContent() {
                 title={selectedEvent ? `Manage Lobby — ${selectedEvent.name}` : "Manage Lobby"}
                 columns={LOBBY_EXPORT_COLUMNS}
                 data={filteredRegistrations}
+                fetchAllData={fetchAllLobbyRegistrations}
+                allFilename={`${exportFilename}-all`}
+                allTitle={
+                  selectedEvent
+                    ? `Manage Lobby — ${selectedEvent.name} (All registered users)`
+                    : "Manage Lobby (All registered users)"
+                }
               />
               <Select
                 value={statusFilter}
