@@ -1,5 +1,4 @@
 import { getAccessToken } from "@/lib/auth-session";
-import { resolveViewerPlaybackUrl } from "@/lib/broadcast-mappers";
 import { readBroadcastUrl } from "@/lib/broadcast-server";
 import type {
   BroadcastSessionSummary,
@@ -119,7 +118,7 @@ export const getLiveBroadcastCameras = async (
   const sessions = await getBroadcastSessions(eventId);
   return sessions
     .map((session) => {
-      const playbackUrl = resolveViewerPlaybackUrl(session);
+      const playbackUrl = session.playbackUrl?.trim();
       if (!playbackUrl) return null;
 
       return {

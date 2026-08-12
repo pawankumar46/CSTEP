@@ -64,17 +64,13 @@ export function mapApiBroadcastSession(raw: Record<string, unknown>): BroadcastS
     startedAt: nullableString(raw.started_at ?? raw.startedAt),
     endedAt: nullableString(raw.ended_at ?? raw.endedAt),
     createdAt: String(raw.created_at ?? raw.createdAt ?? ""),
-    liveVideoUrl: resolveViewerPlaybackUrl({ playbackUrl, playbackUrls }),
+    liveVideoUrl: playbackUrl,
   };
 }
 
-/** Viewer HLS: prefer encoder `playback_urls.hls`, else top-level `playback_url`. */
+/** Live viewer URL: top-level `playback_url` / `playbackUrl` for every camera session. */
 export function resolveViewerPlaybackUrl(session: {
   playbackUrl?: string | null;
-  playbackUrls?: BroadcastStreamUrls;
 }): string | undefined {
-  const hls = session.playbackUrls?.hls?.trim();
-  if (hls) return hls;
-  const url = session.playbackUrl?.trim();
-  return url || undefined;
+  return session.playbackUrl?.trim() || undefined;
 }
