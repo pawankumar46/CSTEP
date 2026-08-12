@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -65,9 +64,9 @@ export function ParticipationTimeTable({
         />
       </CardHeader>
       <CardContent className="px-4 pb-4 pt-0">
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader>
+        <div className="rounded-md border max-h-[calc(2.5rem*11)] overflow-auto">
+          <table className="w-full caption-bottom text-sm">
+            <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
@@ -85,7 +84,7 @@ export function ParticipationTimeTable({
                 </TableRow>
               ) : (
                 sessions.map((session) => (
-                  <TableRow key={session.id}>
+                  <TableRow key={session.id} className="h-10">
                     <TableCell className="font-medium whitespace-nowrap">
                       {session.userName}
                     </TableCell>
@@ -109,7 +108,7 @@ export function ParticipationTimeTable({
                 ))
               )}
             </TableBody>
-          </Table>
+          </table>
         </div>
       </CardContent>
     </Card>
