@@ -26,6 +26,7 @@ import type {
   AttendanceModeInsightSlice,
   AttendanceModeByDateInsight,
   AttendanceMode,
+  AttendanceMarkStatus,
   AttendanceModeUserDay,
   AttendanceModeUserRow,
   AttendanceModeUsersPage,
@@ -658,6 +659,13 @@ function mapAttendanceUserStatus(value: unknown): RegistrationStatus {
   return "pending";
 }
 
+function mapAttendanceMark(value: unknown): AttendanceMarkStatus | null {
+  const normalized = String(value ?? "").toUpperCase();
+  if (normalized === "PRESENT") return "present";
+  if (normalized === "ABSENT") return "absent";
+  return null;
+}
+
 function mapAttendanceUserDay(raw: unknown): AttendanceModeUserDay | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
@@ -665,10 +673,15 @@ function mapAttendanceUserDay(raw: unknown): AttendanceModeUserDay | null {
   if (mode !== "PHYSICAL" && mode !== "VIRTUAL") return null;
   const date = String(row.date ?? "").slice(0, 10);
   if (!date) return null;
+  const mark =
+    mapAttendanceMark(row.attendance_status)
+    ?? mapAttendanceMark(row.attendance_mark)
+    ?? mapAttendanceMark(row.mark);
   return {
     id: String(row.id ?? `${date}-${mode}`),
     date,
     attendanceMode: mode === "VIRTUAL" ? "virtual" : "physical",
+    attendanceMark: mark,
   };
 }
 

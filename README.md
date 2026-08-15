@@ -99,7 +99,7 @@ Create `.env.local` from `.env.example`:
 | `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Legacy Google Drive proxy (`/api/stream/video`) only — not used for public Watch Live |
 | `NEXT_PUBLIC_STREAM_LEFT_BANNER_URL` | Optional | Left banner image on streaming page |
 | `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right side fallback image when Camera 3 is unavailable |
-| `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS` | Optional | Default **open** — base users can watch live like staff. Set to `false` to require registration and live event phase. |
+| `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS` | Optional | Base-user Watch Live: unset = opens **20 Aug 2026 06:00 IST**; `true` = force open; `false` = keep locked |
 | `NEXT_PUBLIC_BRAND_LOGO_DARK_SRC` | Optional | Dark theme logo path |
 
 After changing any `NEXT_PUBLIC_*` variable in `.env.local`, **restart the dev server** (`npm run clean && npm run dev` if the old protocol still appears). In production, **redeploy** so the build picks up new values.
@@ -341,7 +341,7 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 | `/dashboard/users` | User admin (super admin) |
 | `/dashboard/analytics` | Analytics overview |
 | `/dashboard/analytics/attendance-mode` | Attendance mode analytics (event + virtual/physical filters, registration list) |
-| `/dashboard/feedback` | Feedback moderator view (`FeedbackModeratorPanel`) — summary table + paginated comment section |
+| `/dashboard/feedback` | Feedback moderator view — highlight counts + per-session/day averages from `/analytics/events/feedback/`; respondent details from `/events/feedback/` with filters and Export |
 | `/dashboard/recordings` | Recordings |
 
 Route guards: `RouteGuard`, `StreamAccessGuard`, `EventRegisterGuard` in `src/components/`.
@@ -421,8 +421,9 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/events/event/:id/leave/` | Mark viewer left when exiting `/streaming` (Exit / feedback leave) or closing/refreshing the tab (`pagehide` + keepalive fetch) |
 | `GET` | `/events/event-days/dropdown/?event=` | Event day options (feedback tabs, attendance-mode edit); `{ id, day_number, date, label, allowed_attendance_modes }` |
 | `GET` | `/events/schedule-items/?day=` | Schedule items for a day (feedback session list; paginated `results[]`) |
-| `GET` | `/events/feedback/` | Paginated feedback (`page`, `page_size=10`, `event`, optional `event_date`, `user`, `is_overall_rating`). Response: `count`, `total_pages`, `current_page`, `next`, `previous`, `results[]`. Dashboard `/dashboard/feedback` uses server Next/Previous |
-| `POST` | `/events/feedback/` | Session feedback: `{ event, event_date, schedule_item, rating, comment }`. Day overall (no session): `{ event, event_date, rating, comment }` |
+| `GET` | `/events/feedback/` | Paginated feedback. Supports `event`, `event_date` (day id), `user`, `rating`, `search`, `is_overall_rating`, `page`, `page_size`. Respondent Details uses server filters and fetches all matching pages for table/export |
+| `POST` | `/events/feedback/` | Session: `{ event, event_date, schedule_item, rating, comment }`. Day overall: `{ event, event_date, rating, comment, is_overall_rating: true }` |
+| `PUT` | `/events/feedback/:id/` | Update previously submitted feedback (same body as create, including `is_overall_rating: true` for overall) |
 
 #### Registrations — `registration.service.ts`, `lobby.service.ts`
 
@@ -434,6 +435,8 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `PATCH` | `/registrations/registration/:id/` | Update registration (lobby / staff edit) |
 | `DELETE` | `/registrations/registration/:id/` | Delete registration (own registration for base users) |
 | `PATCH` | `/registrations/registration/bulk-status/` | Bulk status: `{ ids, status }` |
+| `PATCH` | `/registrations/registration-day/:id/` | Toggle day attendance: `{ is_attended: true\|false }` (Lobby day badge click) |
+| `PATCH` | `/registrations/registration/bulk-attendance/` | **Under development.** Planned bulk present/absent: `{ ids, status: PRESENT\|ABSENT, date }`. UI ready; FE gated by `ATTENDANCE_MARK_API_READY` until BE ships |
 | `PATCH` | `/registrations/:id/` | Update registration preferences |
 
 **Delegate support requests (profile):**
@@ -475,13 +478,13 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/registrations/trend/` | Registrations-over-time chart (`event_id`, `granularity=daily\|weekly\|monthly`). Response: `{ granularity, results: [{ date, count }] }`. Weekly buckets render as compact axis labels (e.g. `20 Jul`) in `RegistrationInsightsCharts` |
 | `GET` | `/analytics/registrations/insights/` | Attendance donut (`event_id`). Uses `attendance_mode` + `attendance_mode_by_date`; UI shows Physical / Virtual / Mixed only |
 | `GET` | `/analytics/registrations/demographics/` | Gender / state / country / designation charts (`event_id`). Uses `by_gender`, `by_state`, `by_country`, `by_designation`. Overview **by state** → India map (`IndiaStateRegistrationsMap`); **by country** → rotatable globe (`CountryRegistrationsGlobe`) |
-| `GET` | `/analytics/events/feedback/` | Live Event Insights feedback charts (`event`, optional `day`). Response: `overall` (`feedback_by_date[]`, totals), `by_day[]` (`event_date`, `day_number`, count), `by_session[]` |
+| `GET` | `/analytics/events/feedback/` | Feedback analytics (`event`, optional `day`). Dashboard feedback uses `overall.total_feedback`, `average_rating`, `rating_distribution`, `by_day[]`, and `by_session[]`; `feedback_by_date` is ignored |
 | `GET` | `/analytics/streaming/summary/` | Live Event Insights streaming cards + details (`event_id`). Response: `currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time fields, `live_broadcast`. Polled every **15s** on the analytics overview while an event is selected |
 | `GET` | `/analytics/streaming/participation-trend/` | Participation Trend chart (`event_id`, `mode=all\|physical\|virtual`, `interval_minutes=15`, optional `date=YYYY-MM-DD`). Response: `{ mode, results: [{ bucket_start, count }] }` (empty `results` when no activity) |
 | `WS` | `/ws/analytics/{eventId}/?token=&visuals=` | Live Event Insights WebSocket. Path `eventId`; query `token` + comma-separated `visuals` (includes `participation_time` + `participation_duration`; no post-connect message). Server pushes `{ type: "update", data: { statewise_login, countrywise_login, daywise_login, session_wise_max_virtual, no_show, session_wise_feedback, daywise_feedback, participation_rate, participation_time, participation_duration } }`. Client: `useLiveAnalyticsSocket` |
 | `WS` | `/ws/events/{eventId}/?token=` | Viewer presence while on `/streaming`. Client sends `{"type":"heartbeat"}` on connect and every 15s (skips when tab hidden). Client: `useEventPresenceSocket` |
 | `WS` | `/ws/events/{eventId}/chat/?token=` | Live stream chat. Client sends `message` / `edit` / `delete` / `reaction`; server pushes `history`, `message`, `message_edited`, `message_deleted`, `reaction_counts`, or socket-local `error`. Client: `useEventChatSocket` + `LiveChatPanel` on `/streaming` |
-| `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
+| `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`, optional `search`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
@@ -500,6 +503,13 @@ Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 - `event_id`
 - optional `days__day__date` (`2026-08-19` / `2026-08-20` / `2026-08-21`)
 - optional `days__attendance_mode` (`PHYSICAL` / `VIRTUAL`; omitted for All)
+- optional `search` (name/email/phone — Enter to submit; clear button resets)
+
+Row interaction:
+- **Present:** click the Physical/Virtual chip in a day column (gray by default → green when present; red tint when absent).
+- **Absent:** select row checkboxes → **Mark Absent** (requires a specific participation day, not All days).
+
+Mark API (`PATCH /registrations/registration/bulk-attendance/`) is **under development** — gated by `ATTENDANCE_MARK_API_READY`; until then marks update locally as a preview.
 
 #### Notifications — `notification.service.ts`
 
@@ -561,14 +571,14 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 
 ### 3. Live streaming
 
-1. **Watch Live** → `/streaming` loads cameras from `getLiveBroadcastCameras(eventId)` → Django `GET /events/event/:id/broadcast_sessions/`
+1. **Watch Live** → `/streaming` loads cameras from `GET /events/event/:id/` → nested `broadcast_sessions[].playback_url` (`getLiveEventStream`)
 2. Viewer playback uses each session’s top-level **`playback_url`** / **`playbackUrl`** (YouTube, HLS `.m3u8`, Meet, Teams, etc.). Nested `playback_urls` is for admin copy only
 3. Default feed is primary + active session; if multiple sessions exist, `StreamCameraPicker` switches the center player. Left/right **static banner images** only (no live side feeds)
-3. Event administrators create/manage sessions in **Video management** (`/dashboard/video-management`)
-4. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
-5. `StreamAccessGuard` enforces auth + registration + live event phase for base users (staff bypass; temporary base-user access on preview/event days — see `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
-6. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
-7. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — history + reactions on connect; send/edit/delete/react over the socket (owner edit 15 min, owner delete 60 min, moderator+ delete anytime)
+4. Event administrators create/manage sessions in **Video management** (`/dashboard/video-management`)
+5. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
+6. `StreamAccessGuard` enforces auth; staff always allowed. Base users unlock Watch Live at **20 Aug 2026 06:00 IST** (override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
+7. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
+8. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — history + reactions on connect; send/edit/delete/react over the socket (owner edit 15 min, owner delete 60 min, moderator+ delete anytime)
 
 ### 4. Assistance moderation
 
@@ -619,6 +629,26 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-08-14
+
+- **Feedback overall payload:** Day overall create/update includes `"is_overall_rating": true`.
+- **Lobby list:** Maps `registration_dates[]` with `is_attended`; day mode badges show **green** when attended, **red** when not. Click badge to toggle via `PATCH /registrations/registration-day/:id/` `{ is_attended }`.
+- **Dashboard feedback API:** Highlight cards and per-session/day averages now use `GET /analytics/events/feedback/?event=11`; Respondent Details remains on `GET /events/feedback/`.
+- **Respondent Details filters:** Event, User, Event Date, Rating, and Search now send server query parameters to `/events/feedback/`; Export uses all matching responses.
+- **Dashboard feedback UI:** Highlight rating cards use a wider 5-column layout.
+
+### 2026-08-13
+
+- **Dashboard feedback:** Compact highlight rating cards; overall per-session list scrolls in fixed height.
+- **Feedback edit:** Submitted session/day ratings show **Edit**; updates use `PUT /events/feedback/:id/` (`event`, `event_date`, `schedule_item`, `rating`, `comment`). New ratings still use POST.
+- **Dashboard feedback:** Redesigned `/dashboard/feedback` — highlight count cards for 5★–1★, expandable per-session averages, respondent table with Users/Sessions/Date filters, rating chips, and Export.
+- **Attendance Mode analytics:** Present by clicking Physical/Virtual (gray → green); Absent via row checkboxes + Mark Absent. Mark API still gated until BE ships.
+- **Attendance Mode analytics:** Server search sends `search=` on `GET /analytics/registrations/users/`; clear button resets the query (Enter to submit).
+- **Streaming:** Header **Submit Feedback & Exit** (moved from below the player); opens the feedback dialog before leaving.
+- **Streaming:** Event Agenda on `/streaming` includes **19 Aug**, **20 Aug**, and **21 Aug** tabs (`icas-stream-agenda.ts`).
+- **Streaming access:** Base-user Watch Live is **disabled until 20 Aug 2026 06:00 IST** (tooltip: “Live stream opens on 20 August at 6:00 AM”). Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
+- **Streaming cameras:** Watch Live / `/streaming` loads feeds from `GET /events/event/:id/` → `broadcast_sessions[].playback_url` (e.g. event 11).
 
 ### 2026-08-12
 

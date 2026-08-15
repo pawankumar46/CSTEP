@@ -556,6 +556,20 @@ export const bulkUpdateLobbyStatus = async (
   }
 };
 
+/** Live: PATCH /registrations/registration-day/:id/ — `{ is_attended }`. */
+export const updateRegistrationDayAttendance = async (
+  registrationDayId: string,
+  isAttended: boolean,
+): Promise<void> => {
+  try {
+    await apiClient.patch(`/registrations/registration-day/${registrationDayId}/`, {
+      is_attended: isAttended,
+    });
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 export const updateLobbyStatus = async (
   id: string,
   status: RegistrationStatus,

@@ -1,6 +1,6 @@
-/** ICAS 2026 main-conference agenda for the streaming page (20–21 Aug). Source: ICAS-2026_Agenda.pdf */
+/** ICAS 2026 agenda for the streaming page (19–21 Aug). Source: ICAS-2026_Agenda.pdf */
 
-export type IcasStreamAgendaDay = "2026-08-20" | "2026-08-21";
+export type IcasStreamAgendaDay = "2026-08-19" | "2026-08-20" | "2026-08-21";
 
 export interface IcasStreamAgendaItem {
   id: string;
@@ -13,11 +13,95 @@ export interface IcasStreamAgendaItem {
 }
 
 export const ICAS_STREAM_AGENDA_DAYS: { date: IcasStreamAgendaDay; label: string }[] = [
+  { date: "2026-08-19", label: "19 Aug" },
   { date: "2026-08-20", label: "20 Aug" },
   { date: "2026-08-21", label: "21 Aug" },
 ];
 
 export const ICAS_STREAM_AGENDA: Record<IcasStreamAgendaDay, IcasStreamAgendaItem[]> = {
+  "2026-08-19": [
+    {
+      id: "d1-registration",
+      title: "Registration",
+      startTime: "08:30:00",
+      endTime: "09:15:00",
+      isBreak: true,
+    },
+    {
+      id: "d1-modelling",
+      title:
+        "Use of air quality modelling tools for local to regional scale air quality management",
+      startTime: "09:15:00",
+      endTime: "11:15:00",
+      speaker: "Facilitators: CSTEP and Indian Institute of Technology (IIT) Bombay",
+    },
+    {
+      id: "d1-tea-1",
+      title: "Tea break",
+      startTime: "11:15:00",
+      endTime: "11:30:00",
+      isBreak: true,
+    },
+    {
+      id: "d1-law",
+      title: "Air quality law and policy landscape in India",
+      startTime: "11:30:00",
+      endTime: "13:30:00",
+      speaker:
+        "Trainer: Prof. Sairam Bhatt (National Law School of India University); Facilitators: Ms Swagata Dey & Ms Sheetal Manokar (CSTEP)",
+    },
+    {
+      id: "d1-lunch",
+      title: "Lunch",
+      startTime: "13:30:00",
+      endTime: "14:15:00",
+      isBreak: true,
+    },
+    {
+      id: "d1-acsm",
+      title:
+        "Advanced Aerosol Chemical Speciation Monitor (ACSM) data analysis: QA/QC with the ACSM toolkit and wind/trajectory analysis using ZeFir from ACTRIS",
+      startTime: "14:15:00",
+      endTime: "16:15:00",
+      speaker:
+        "Trainer: Dr Laura-Helena Rivellini (CEA, France); Facilitator: Dr Kumar Sarang (CSTEP)",
+    },
+    {
+      id: "d1-tea-2",
+      title: "Tea break",
+      startTime: "16:15:00",
+      endTime: "16:45:00",
+      isBreak: true,
+    },
+    {
+      id: "d1-networking",
+      title: "Break for networking and venue preparation (poster set-up and viewing time)",
+      startTime: "16:45:00",
+      endTime: "18:30:00",
+      isBreak: true,
+    },
+    {
+      id: "d1-inaugural",
+      title: "Inaugural session",
+      startTime: "18:30:00",
+      endTime: "19:15:00",
+      speaker:
+        "Dr Shirish Sinha (Clean Air Fund); Dr Prashant Gargava (NGT); Ms Reena Gupta (Punjab Pollution Control Board, Invited)",
+    },
+    {
+      id: "d1-reports",
+      title: "Launch of reports and presentations",
+      startTime: "19:15:00",
+      endTime: "20:15:00",
+    },
+    {
+      id: "d1-dinner",
+      title: "Dinner",
+      startTime: "20:15:00",
+      endTime: "21:30:00",
+      isBreak: true,
+    },
+  ],
   "2026-08-20": [
     {
       id: "d2-welcome",

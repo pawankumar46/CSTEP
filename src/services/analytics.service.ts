@@ -22,6 +22,7 @@ import {
 import { mockAnalytics, mockAuditLogs, mockPermissions } from "@/mock/analytics";
 import type {
   AnalyticsData,
+  AttendanceMarkStatus,
   AttendanceMode,
   AttendanceModeUsersPage,
   AuditLog,
@@ -179,11 +180,13 @@ export interface GetAttendanceModeUsersParams {
   dayDate?: string;
   /** PHYSICAL / VIRTUAL app value — omit for all modes */
   attendanceMode?: AttendanceMode;
+  /** Name/email/phone search — sent as `search=` */
+  search?: string;
   page?: number;
   pageSize?: number;
 }
 
-/** Live: GET /analytics/registrations/users/?event_id=&days__day__date=&days__attendance_mode= */
+/** Live: GET /analytics/registrations/users/?event_id=&days__day__date=&days__attendance_mode=&search= */
 export const getAttendanceModeUsers = async (
   params: GetAttendanceModeUsersParams,
 ): Promise<AttendanceModeUsersPage> => {
@@ -200,6 +203,10 @@ export const getAttendanceModeUsers = async (
     }
     if (params.attendanceMode) {
       query["days__attendance_mode"] = params.attendanceMode.toUpperCase();
+    }
+    const trimmedSearch = params.search?.trim();
+    if (trimmedSearch) {
+      query.search = trimmedSearch;
     }
 
     const { data } = await apiClient.get<unknown>("/analytics/registrations/users/", {
@@ -232,6 +239,32 @@ export const getAllAttendanceModeUsers = async (
     rows.push(...next.rows);
   }
   return rows;
+};
+
+/** Pending: PATCH /registrations/registration/bulk-attendance/ — wire when Django ships. */
+export const ATTENDANCE_MARK_API_READY = false;
+
+/** Mark selected registrations present/absent for a day. No-op until `ATTENDANCE_MARK_API_READY`. */
+export const bulkMarkRegistrationAttendance = async (
+  ids: string[],
+  status: AttendanceMarkStatus,
+  date: string,
+): Promise<void> => {
+  if (!ATTENDANCE_MARK_API_READY) {
+    throw new Error(
+      "Attendance marking API is under development. Selection UI is ready; try again once the backend endpoint is live.",
+    );
+  }
+
+  try {
+    await apiClient.patch("/registrations/registration/bulk-attendance/", {
+      ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
+      status: status === "present" ? "PRESENT" : "ABSENT",
+      date,
+    });
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
 };
 
 export const getAnalytics = async (): Promise<AnalyticsData> => {

@@ -23,10 +23,11 @@ import { slugifyFilename } from "@/lib/export-utils";
 import {
   ATTENDANCE_MODE_EXPORT_DAY_DATES,
   LOBBY_EXPORT_COLUMNS,
-  lobbyAttendanceModeForDate,
+  lobbyAttendanceEntryForDate,
 } from "@/lib/registration-export";
 import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import { getRegistrationOptionLabel } from "@/lib/registration-options";
+import { cn } from "@/lib/utils";
 import type { RegistrationEditFormValues } from "@/features/dashboard/admin-registration.schema";
 import type { Registration, RegistrationStatus, UserRole } from "@/types";
 
@@ -64,6 +65,7 @@ function LobbyContent() {
     clearRegistrationsSearch,
     fetchAllRegistrationsForExport,
     bulkUpdateStatus,
+    updateRegistrationDayAttendance,
     updateRegistration,
     registerLobbyUser,
     signUpLobbyUser,
@@ -78,6 +80,7 @@ function LobbyContent() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState<RegistrationStatus | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [attendanceLoadingKey, setAttendanceLoadingKey] = useState<string | null>(null);
   const selectedIdsRef = useRef<string[]>([]);
   selectedIdsRef.current = selectedIds;
 
@@ -141,6 +144,23 @@ function LobbyContent() {
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedSet.has(id));
 
   const selectedCount = selectedIds.length;
+
+  const handleToggleDayAttendance = useCallback(
+    async (registrationId: string, registrationDayId: string, nextAttended: boolean) => {
+      const key = `${registrationId}:${registrationDayId}`;
+      setAttendanceLoadingKey(key);
+      try {
+        await updateRegistrationDayAttendance(
+          registrationId,
+          registrationDayId,
+          nextAttended,
+        );
+      } finally {
+        setAttendanceLoadingKey(null);
+      }
+    },
+    [updateRegistrationDayAttendance],
+  );
 
   const applyStatusAction = useCallback(async (status: RegistrationStatus, ids: string[]) => {
     if (!selectedEventId || ids.length === 0) return;
@@ -238,14 +258,71 @@ function LobbyContent() {
         id: `day-${date}`,
         header: formatRegistrationIntervalDayLabel(date),
         cell: ({ row }: { row: { original: Registration } }) => {
-          const mode = lobbyAttendanceModeForDate(row.original, date);
-          if (mode === "—") {
+          const entry = lobbyAttendanceEntryForDate(row.original, date);
+          if (!entry) {
             return <span className="text-muted-foreground">—</span>;
           }
+          const label = entry.attendanceMode === "virtual" ? "Virtual" : "Physical";
+          const attended = entry.isAttended === true;
+          const notAttended = entry.isAttended === false;
+          const loadingKey =
+            entry.id != null ? `${row.original.id}:${entry.id}` : null;
+          const isLoading = loadingKey != null && attendanceLoadingKey === loadingKey;
+          const canToggle = canManage && Boolean(entry.id);
+
+          if (!canToggle) {
+            return (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "font-normal",
+                  attended &&
+                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                  notAttended &&
+                    "border-destructive/40 bg-destructive/10 text-destructive",
+                )}
+              >
+                {label}
+              </Badge>
+            );
+          }
+
           return (
-            <Badge variant="outline" className="font-normal">
-              {mode}
-            </Badge>
+            <button
+              type="button"
+              disabled={isLoading || bulkLoading}
+              title={
+                attended
+                  ? `Mark ${label} as not attended`
+                  : `Mark ${label} as attended`
+              }
+              aria-label={
+                attended
+                  ? `Mark ${row.original.userName} not attended on ${date}`
+                  : `Mark ${row.original.userName} attended on ${date}`
+              }
+              onClick={() =>
+                void handleToggleDayAttendance(
+                  row.original.id,
+                  entry.id!,
+                  !attended,
+                )
+              }
+              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            >
+              <Badge
+                variant="outline"
+                className={cn(
+                  "font-normal cursor-pointer",
+                  attended &&
+                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                  notAttended &&
+                    "border-destructive/40 bg-destructive/10 text-destructive",
+                )}
+              >
+                {isLoading ? "…" : label}
+              </Badge>
+            </button>
           );
         },
       })),
@@ -349,7 +426,7 @@ function LobbyContent() {
         },
       },
     ];
-  }, [actionLoadingId, allVisibleIds, allVisibleSelected, applyStatusAction, bulkLoading, canManage, openSessionsDialog, pendingBulkAction, resolveActionIds, selectedIds, selectedSet]);
+  }, [actionLoadingId, allVisibleIds, allVisibleSelected, applyStatusAction, attendanceLoadingKey, bulkLoading, canManage, handleToggleDayAttendance, openSessionsDialog, pendingBulkAction, resolveActionIds, selectedIds, selectedSet]);
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);

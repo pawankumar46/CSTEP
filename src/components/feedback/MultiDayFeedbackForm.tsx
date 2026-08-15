@@ -70,6 +70,16 @@ export function MultiDayFeedbackForm({
   const [submittedDailyOverallDates, setSubmittedDailyOverallDates] = useState<Set<string>>(
     new Set(),
   );
+  const [editingSessionIds, setEditingSessionIds] = useState<Set<string>>(new Set());
+  const [editingDailyOverallDates, setEditingDailyOverallDates] = useState<Set<string>>(
+    new Set(),
+  );
+  const submittedSessionSnapshotRef = useRef<
+    Record<string, { rating: number; comments: string }>
+  >({});
+  const submittedDailySnapshotRef = useRef<
+    Record<string, { rating: number; comments: string }>
+  >({});
   const [sessionsByDate, setSessionsByDate] = useState<
     Record<string, FeedbackSessionOption[]>
   >({});
@@ -174,6 +184,29 @@ export function MultiDayFeedbackForm({
             formValues = mergeExistingFeedbackIntoForm(formValues, existing);
             setSubmittedSessionIds(getSubmittedFeedbackSessionIds(existing));
             setSubmittedDailyOverallDates(getSubmittedDailyOverallDates(existing));
+            setEditingSessionIds(new Set());
+            setEditingDailyOverallDates(new Set());
+
+            const sessionSnapshots: Record<string, { rating: number; comments: string }> = {};
+            const dailySnapshots: Record<string, { rating: number; comments: string }> = {};
+            for (const [sessionId, entry] of Object.entries(formValues.sessions)) {
+              if (entry.feedbackId) {
+                sessionSnapshots[sessionId] = {
+                  rating: entry.rating,
+                  comments: entry.comments,
+                };
+              }
+            }
+            for (const [date, entry] of Object.entries(formValues.dailyOverall)) {
+              if (entry.feedbackId) {
+                dailySnapshots[date] = {
+                  rating: entry.rating,
+                  comments: entry.comments,
+                };
+              }
+            }
+            submittedSessionSnapshotRef.current = sessionSnapshots;
+            submittedDailySnapshotRef.current = dailySnapshots;
           }
         }
 
@@ -275,6 +308,7 @@ export function MultiDayFeedbackForm({
         eventDayId: eventDayId || existing?.eventDayId || "",
         rating: existing?.rating ?? 0,
         comments: existing?.comments ?? "",
+        feedbackId: existing?.feedbackId,
       };
     }
     return { ...form, sessions: nextSessions };
@@ -324,6 +358,64 @@ export function MultiDayFeedbackForm({
     );
   };
 
+  const startEditSession = (sessionId: string) => {
+    setEditingSessionIds((prev) => new Set(prev).add(sessionId));
+    setFormError(null);
+  };
+
+  const cancelEditSession = (sessionId: string) => {
+    const snapshot = submittedSessionSnapshotRef.current[sessionId];
+    const current = getValues(`sessions.${sessionId}`);
+    if (snapshot && current) {
+      setValue(
+        "sessions",
+        {
+          ...getValues("sessions"),
+          [sessionId]: {
+            ...current,
+            rating: snapshot.rating,
+            comments: snapshot.comments,
+          },
+        },
+        { shouldValidate: true },
+      );
+    }
+    setEditingSessionIds((prev) => {
+      const next = new Set(prev);
+      next.delete(sessionId);
+      return next;
+    });
+  };
+
+  const startEditDailyOverall = (date: string) => {
+    setEditingDailyOverallDates((prev) => new Set(prev).add(date));
+    setFormError(null);
+  };
+
+  const cancelEditDailyOverall = (date: string) => {
+    const snapshot = submittedDailySnapshotRef.current[date];
+    const current = getValues(`dailyOverall.${date}`);
+    if (snapshot && current) {
+      setValue(
+        "dailyOverall",
+        {
+          ...getValues("dailyOverall"),
+          [date]: {
+            ...current,
+            rating: snapshot.rating,
+            comments: snapshot.comments,
+          },
+        },
+        { shouldValidate: true },
+      );
+    }
+    setEditingDailyOverallDates((prev) => {
+      const next = new Set(prev);
+      next.delete(date);
+      return next;
+    });
+  };
+
   if (daysLoading) {
     return (
       <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
@@ -349,15 +441,30 @@ export function MultiDayFeedbackForm({
           try {
             const pendingSessions = Object.fromEntries(
               Object.entries(data.sessions).filter(
-                ([sessionId]) => !submittedSessionIds.has(sessionId),
+                ([sessionId]) =>
+                  !submittedSessionIds.has(sessionId) || editingSessionIds.has(sessionId),
               ),
             );
             const pendingDailyOverall = Object.fromEntries(
               Object.entries(data.dailyOverall).filter(
-                ([date]) => !submittedDailyOverallDates.has(date),
+                ([date]) =>
+                  !submittedDailyOverallDates.has(date) || editingDailyOverallDates.has(date),
               ),
             );
-            await onSubmit({ ...data, sessions: pendingSessions, dailyOverall: pendingDailyOverall });
+            const hasPending =
+              Object.values(pendingSessions).some((session) => session.rating >= 1)
+              || Object.values(pendingDailyOverall).some((day) => day.rating >= 1);
+            if (!hasPending) {
+              setFormError(
+                "Nothing new to submit. Edit a submitted response or rate a new session.",
+              );
+              return;
+            }
+            await onSubmit({
+              ...data,
+              sessions: pendingSessions,
+              dailyOverall: pendingDailyOverall,
+            });
           } catch (err) {
             setFormError(
               err instanceof Error ? err.message : "Failed to submit feedback",
@@ -413,6 +520,8 @@ export function MultiDayFeedbackForm({
             eventDayId: tab.dayId ?? "",
           };
           const isDayOverallSubmitted = submittedDailyOverallDates.has(tab.value);
+          const isDayOverallEditing = editingDailyOverallDates.has(tab.value);
+          const isDayOverallLocked = isDayOverallSubmitted && !isDayOverallEditing;
           const daySessions = sessionsByDate[tab.value] ?? [];
           const sessionsLoading = Boolean(sessionsLoadingByDate[tab.value]);
           const sessionsError = sessionsErrorByDate[tab.value];
@@ -439,13 +548,16 @@ export function MultiDayFeedbackForm({
                     const entry = sessions[session.id];
                     if (!entry) return null;
                     const isSubmitted = submittedSessionIds.has(session.id);
+                    const isEditing = editingSessionIds.has(session.id);
+                    const isLocked = isSubmitted && !isEditing;
 
                     return (
                       <div
                         key={session.id}
                         className={cn(
                           "space-y-2 rounded-lg border p-3",
-                          isSubmitted && "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20",
+                          isSubmitted
+                            && "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20",
                         )}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -457,19 +569,41 @@ export function MultiDayFeedbackForm({
                                   Submitted
                                 </Badge>
                               )}
+                              {isSubmitted && !isEditing && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => startEditSession(session.id)}
+                                >
+                                  Edit
+                                </Button>
+                              )}
+                              {isEditing && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => cancelEditSession(session.id)}
+                                >
+                                  Cancel
+                                </Button>
+                              )}
                             </div>
                             <p className="text-xs text-muted-foreground">{session.time}</p>
                           </div>
                           <StarRatingInput
                             size="sm"
                             value={entry.rating}
-                            disabled={isSubmitted}
+                            disabled={isLocked}
                             onChange={(rating) => updateSession(session.id, "rating", rating)}
                           />
                         </div>
                         <Textarea
                           value={entry.comments}
-                          disabled={isSubmitted}
+                          disabled={isLocked}
                           onChange={(event) =>
                             updateSession(session.id, "comments", event.target.value)
                           }
@@ -499,19 +633,41 @@ export function MultiDayFeedbackForm({
                           Submitted
                         </Badge>
                       )}
+                      {isDayOverallSubmitted && !isDayOverallEditing && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => startEditDailyOverall(tab.value)}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      {isDayOverallEditing && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => cancelEditDailyOverall(tab.value)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">Overall for {tab.label}</p>
                   </div>
                   <StarRatingInput
                     size="sm"
                     value={dayOverall.rating}
-                    disabled={isDayOverallSubmitted}
+                    disabled={isDayOverallLocked}
                     onChange={(rating) => updateDailyOverall(tab.value, "rating", rating)}
                   />
                 </div>
                 <Textarea
                   value={dayOverall.comments}
-                  disabled={isDayOverallSubmitted}
+                  disabled={isDayOverallLocked}
                   onChange={(event) =>
                     updateDailyOverall(tab.value, "comments", event.target.value)
                   }

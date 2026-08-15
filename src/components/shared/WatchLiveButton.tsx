@@ -7,6 +7,7 @@ import { Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWatchLiveAccess } from "@/hooks/useWatchLiveAccess";
 import { joinEventFromClient } from "@/lib/location-permission";
+import { getLiveEventStream } from "@/services/broadcast.service";
 import { buildAuthUrl, ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import type { Event } from "@/types";
@@ -49,6 +50,10 @@ export function WatchLiveButton({
     setJoining(true);
     try {
       await joinEventFromClient(event?.id);
+      // Prefetch event cameras (GET /events/event/:id/ → broadcast_sessions.playback_url).
+      if (event?.id) {
+        await getLiveEventStream(event.id).catch(() => undefined);
+      }
     } finally {
       setJoining(false);
       onNavigate?.();

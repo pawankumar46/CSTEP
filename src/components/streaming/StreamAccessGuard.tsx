@@ -4,7 +4,12 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
-import { canBypassStreamParticipantChecks, getEventStreamPhase } from "@/lib/watch-live-access";
+import { isBaseUserRole } from "@/lib/auth-utils";
+import {
+  canBypassStreamParticipantChecks,
+  getEventStreamPhase,
+  isTemporaryBaseUserStreamAccessActive,
+} from "@/lib/watch-live-access";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 
@@ -14,9 +19,12 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
   const { isRegistered, checked, upcomingEvent } = useEventRegistration();
 
   const bypassStreamGates = user ? canBypassStreamParticipantChecks(user.role) : false;
+  const baseUserStreamLocked =
+    Boolean(user && isBaseUserRole(user.role) && !isTemporaryBaseUserStreamAccessActive());
   const needsRegistration = isAuthenticated && checked && !bypassStreamGates && !isRegistered;
   const streamPhase = upcomingEvent ? getEventStreamPhase(upcomingEvent) : null;
-  const streamNotLive = !bypassStreamGates && checked && streamPhase !== "live";
+  const streamNotLive =
+    !bypassStreamGates && !baseUserStreamLocked && checked && streamPhase !== "live";
 
   useEffect(() => {
     if (!hasHydrated || isLoading) return;
@@ -24,6 +32,11 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
 
     if (!isAuthenticated) {
       router.replace(buildAuthUrl(ROUTES.login, { redirect: ROUTES.streaming }));
+      return;
+    }
+
+    if (baseUserStreamLocked) {
+      router.replace(ROUTES.home);
       return;
     }
 
@@ -35,7 +48,17 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
     if (streamNotLive) {
       router.replace(ROUTES.home);
     }
-  }, [hasHydrated, isLoading, isAuthenticated, bypassStreamGates, checked, needsRegistration, streamNotLive, router]);
+  }, [
+    hasHydrated,
+    isLoading,
+    isAuthenticated,
+    bypassStreamGates,
+    baseUserStreamLocked,
+    checked,
+    needsRegistration,
+    streamNotLive,
+    router,
+  ]);
 
   const pendingRegistrationCheck = isAuthenticated && !bypassStreamGates && !checked;
 
@@ -47,7 +70,7 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated || needsRegistration || streamNotLive) {
+  if (!isAuthenticated || baseUserStreamLocked || needsRegistration || streamNotLive) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <DashboardSkeleton />

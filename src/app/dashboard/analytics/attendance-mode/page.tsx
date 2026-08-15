@@ -10,8 +10,8 @@ export default function AttendanceModeAnalyticsPage() {
         <div>
           <h1 className="text-2xl font-bold">Attendance Mode Analytics</h1>
           <p className="text-sm text-muted-foreground">
-            Select an event, attendance mode, and optional participation date to view virtual or
-            physical insights.
+            Select an event and filters. Click Physical/Virtual (gray → green) to mark present;
+            select rows and Mark Absent for no-shows.
           </p>
         </div>
 

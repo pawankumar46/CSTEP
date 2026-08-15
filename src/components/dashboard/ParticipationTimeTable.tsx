@@ -50,7 +50,7 @@ export function ParticipationTimeTable({
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0 px-4 py-3">
         <div className="space-y-1">
-          <CardTitle className="text-sm font-semibold">Participation Duration</CardTitle>
+          <CardTitle className="text-sm font-semibold">Participation Log</CardTitle>
           <CardDescription>
             Viewer name, email, join time, leave time, and watch duration.
           </CardDescription>

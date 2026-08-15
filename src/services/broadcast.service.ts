@@ -1,4 +1,6 @@
 import { getAccessToken } from "@/lib/auth-session";
+import { extractApiErrorMessage } from "@/lib/auth-mappers";
+import { apiClient } from "@/lib/api-client";
 import { readBroadcastUrl } from "@/lib/broadcast-server";
 import type {
   BroadcastSessionSummary,
@@ -28,6 +30,12 @@ export interface LiveBroadcastCamera {
   playbackUrl: string;
   isPrimary: boolean;
   isActive: boolean;
+}
+
+export interface LiveEventStreamPayload {
+  cameras: LiveBroadcastCamera[];
+  concurrentViewers: number | null;
+  videoMutedByDefault: boolean;
 }
 
 function sortLiveCameras(a: LiveBroadcastCamera, b: LiveBroadcastCamera): number {
@@ -109,11 +117,68 @@ export const getBroadcastSessions = async (eventId: string): Promise<BroadcastSe
   return response.json() as Promise<BroadcastSessionSummary[]>;
 };
 
-/** Active/playable cameras from GET /events/event/:id/broadcast_sessions/. */
+function mapEventBroadcastSessions(raw: unknown): LiveBroadcastCamera[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const session = item as Record<string, unknown>;
+      const playbackUrl = String(session.playback_url ?? session.playbackUrl ?? "").trim();
+      if (!playbackUrl) return null;
+
+      return {
+        id: String(session.id ?? ""),
+        name: String(session.name ?? "").trim() || `Camera ${session.id ?? ""}`,
+        playbackUrl,
+        isPrimary: Boolean(session.is_primary ?? session.isPrimary),
+        isActive: Boolean(session.is_active ?? session.isActive ?? true),
+      } satisfies LiveBroadcastCamera;
+    })
+    .filter((camera): camera is LiveBroadcastCamera => camera !== null)
+    .sort(sortLiveCameras);
+}
+
+/**
+ * Watch Live cameras from GET /events/event/:id/ → `broadcast_sessions[].playback_url`.
+ */
+export const getLiveEventStream = async (
+  eventId: string,
+): Promise<LiveEventStreamPayload> => {
+  if (!eventId.trim()) {
+    return { cameras: [], concurrentViewers: null, videoMutedByDefault: true };
+  }
+
+  try {
+    const { data } = await apiClient.get<Record<string, unknown>>(
+      `/events/event/${encodeURIComponent(eventId)}/`,
+    );
+    const concurrent = data.concurrent_viewers ?? data.concurrentViewers;
+    return {
+      cameras: mapEventBroadcastSessions(data.broadcast_sessions ?? data.broadcastSessions),
+      concurrentViewers:
+        typeof concurrent === "number" && Number.isFinite(concurrent) ? concurrent : null,
+      videoMutedByDefault: Boolean(
+        data.video_muted_by_default ?? data.videoMutedByDefault ?? true,
+      ),
+    };
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+/** Active/playable cameras — prefers event detail `broadcast_sessions`, falls back to sessions list. */
 export const getLiveBroadcastCameras = async (
   eventId: string,
 ): Promise<LiveBroadcastCamera[]> => {
   if (!eventId.trim()) return [];
+
+  try {
+    const { cameras } = await getLiveEventStream(eventId);
+    if (cameras.length > 0) return cameras;
+  } catch {
+    // Fall through to dedicated broadcast_sessions list.
+  }
 
   const sessions = await getBroadcastSessions(eventId);
   return sessions

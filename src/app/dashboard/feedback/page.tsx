@@ -1,40 +1,63 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { FeedbackModeratorPanel } from "@/components/feedback/FeedbackModeratorPanel";
+import {
+  FeedbackModeratorPanel,
+  type RespondentFeedbackFilters,
+} from "@/components/feedback/FeedbackModeratorPanel";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
+import { DEFAULT_FEEDBACK_EVENT_ID } from "@/lib/feedback-options";
+import { useAnalyticsStore } from "@/store/useAnalyticsStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
 
 export default function FeedbackPage() {
   const {
     feedback,
-    feedbackPagination,
+    respondentFeedback,
     isLoading,
+    respondentLoading,
     error,
-    fetchFeedbackPage,
+    respondentError,
+    fetchFeedback,
+    fetchRespondentFeedback,
   } = useFeedbackStore();
+  const {
+    eventFeedbackAnalytics,
+    eventFeedbackAnalyticsLoading,
+    eventFeedbackAnalyticsError,
+    fetchEventFeedbackAnalytics,
+  } = useAnalyticsStore();
 
   useEffect(() => {
-    void fetchFeedbackPage(1);
-  }, [fetchFeedbackPage]);
+    void fetchFeedback();
+    void fetchRespondentFeedback({ eventId: DEFAULT_FEEDBACK_EVENT_ID });
+    void fetchEventFeedbackAnalytics(DEFAULT_FEEDBACK_EVENT_ID);
+  }, [fetchEventFeedbackAnalytics, fetchFeedback, fetchRespondentFeedback]);
 
-  const handlePageChange = useCallback(
-    (page: number) => {
-      void fetchFeedbackPage(page);
+  const handleRespondentFiltersChange = useCallback(
+    (filters: RespondentFeedbackFilters) => {
+      void fetchRespondentFeedback(filters);
     },
-    [fetchFeedbackPage],
+    [fetchRespondentFeedback],
   );
 
-  if (isLoading && feedback.length === 0) return <DashboardSkeleton />;
+  if (
+    isLoading
+    && eventFeedbackAnalyticsLoading
+    && feedback.length === 0
+    && !eventFeedbackAnalytics
+  ) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Feedback</h1>
         <p className="text-muted-foreground">
-          Session ratings, daily summaries, and event-wide feedback from attendees.
+          Highlight cards, per-session averages, and respondent details from attendees.
           {!isLoading && !error
-            ? ` (${feedbackPagination.total} response${feedbackPagination.total === 1 ? "" : "s"})`
+            ? ` (${feedback.length} response${feedback.length === 1 ? "" : "s"})`
             : null}
         </p>
       </div>
@@ -45,22 +68,26 @@ export default function FeedbackPage() {
         </div>
       )}
 
-      {!error && feedbackPagination.total === 0 ? (
-        <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          No feedback has been submitted yet.
+      {eventFeedbackAnalyticsError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+          <p className="text-sm text-destructive">{eventFeedbackAnalyticsError}</p>
         </div>
-      ) : (
-        <FeedbackModeratorPanel
-          feedback={feedback}
-          serverPagination={{
-            page: feedbackPagination.page,
-            totalPages: feedbackPagination.totalPages,
-            hasNext: feedbackPagination.hasNext,
-            hasPrevious: feedbackPagination.hasPrevious,
-            onPageChange: handlePageChange,
-          }}
-        />
       )}
+
+      {respondentError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+          <p className="text-sm text-destructive">{respondentError}</p>
+        </div>
+      )}
+
+      <FeedbackModeratorPanel
+        feedback={feedback}
+        respondentFeedback={respondentFeedback}
+        respondentLoading={respondentLoading}
+        onRespondentFiltersChange={handleRespondentFiltersChange}
+        analytics={eventFeedbackAnalytics}
+        analyticsLoading={eventFeedbackAnalyticsLoading}
+      />
     </div>
   );
 }

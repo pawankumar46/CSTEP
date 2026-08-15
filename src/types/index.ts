@@ -235,10 +235,13 @@ export interface RegistrationDay {
   sessions: SessionRegistration[];
 }
 
-/** List payload `registration_dates[]` entry (`date` + `mode`). */
+/** List payload `registration_dates[]` entry (`date` + `mode` + optional attendance). */
 export interface RegistrationDateEntry {
+  id?: string;
   date: string;
   attendanceMode: AttendanceMode;
+  /** From API `is_attended` — not shown as text; drives lobby badge color. */
+  isAttended?: boolean;
 }
 
 export interface Registration {
@@ -550,7 +553,11 @@ export interface AttendanceModeUserDay {
   id: string;
   date: string;
   attendanceMode: AttendanceMode;
+  /** Optional present/absent mark when API returns it */
+  attendanceMark?: AttendanceMarkStatus | null;
 }
+
+export type AttendanceMarkStatus = "present" | "absent";
 
 /** Row from GET /analytics/registrations/users/ */
 export interface AttendanceModeUserRow {

@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import type { StreamingFeedbackFormValues } from "@/features/feedback/streaming-feedback.schema";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
-import { mapStreamingFeedbackToCreatePayloads } from "@/lib/feedback-mappers";
+import { mapStreamingFeedbackToUpsertPayloads } from "@/lib/feedback-mappers";
 import { resolveFeedbackEventId } from "@/lib/feedback-options";
 import { ROUTES } from "@/lib/routes";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -25,7 +25,8 @@ function FeedbackContent() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { upcomingEvent } = useEventRegistration();
-  const { feedback, isSubmitting, error, fetchFeedback, submitMultiDayFeedback } = useFeedbackStore();
+  const { feedback, isSubmitting, error, fetchFeedback, upsertMultiDayFeedback } =
+    useFeedbackStore();
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const feedbackEventId = resolveFeedbackEventId(upcomingEvent?.id);
@@ -46,8 +47,8 @@ function FeedbackContent() {
     if (!user) return;
 
     setSubmitSuccess(false);
-    const payloads = mapStreamingFeedbackToCreatePayloads(data, feedbackEventId);
-    await submitMultiDayFeedback(payloads);
+    const { creates, updates } = mapStreamingFeedbackToUpsertPayloads(data, feedbackEventId);
+    await upsertMultiDayFeedback({ creates, updates });
     setSubmitSuccess(true);
     router.push(ROUTES.home);
   };

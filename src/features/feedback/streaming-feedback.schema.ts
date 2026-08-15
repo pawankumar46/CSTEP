@@ -14,6 +14,8 @@ const ratingEntrySchema = z.object({
 const dailyOverallEntrySchema = ratingEntrySchema.extend({
   /** Event day id for `POST /events/feedback/` `event_date` (day overall — no schedule_item). */
   eventDayId: z.string(),
+  /** Existing feedback id for `PUT /events/feedback/:id/`. */
+  feedbackId: z.string().optional(),
 });
 
 const sessionEntrySchema = z.object({
@@ -24,6 +26,8 @@ const sessionEntrySchema = z.object({
   eventDayId: z.string(),
   rating: z.number().min(0).max(5),
   comments: z.string(),
+  /** Existing feedback id for `PUT /events/feedback/:id/`. */
+  feedbackId: z.string().optional(),
 });
 
 export const streamingFeedbackSchema = z

@@ -154,10 +154,15 @@ function formatAttendanceModeLabel(mode: AttendanceMode): string {
   return mode === "virtual" ? "Virtual" : "Physical";
 }
 
-/** List API `registration_dates: [{ date, mode }]` (also accepts legacy date strings). */
+/** List API `registration_dates: [{ id, date, mode, is_attended }]` (also accepts legacy date strings). */
 function extractRegistrationDateEntriesFromApi(
   raw: Record<string, unknown>,
-): { date: string; attendanceMode?: AttendanceMode }[] {
+): {
+  id?: string;
+  date: string;
+  attendanceMode?: AttendanceMode;
+  isAttended?: boolean;
+}[] {
   const candidates = [raw.registration_dates, raw.participation_dates];
 
   for (const dates of candidates) {
@@ -170,9 +175,18 @@ function extractRegistrationDateEntriesFromApi(
           if (!date) return null;
           const modeRaw = entry.mode ?? entry.attendance_mode;
           const hasMode = modeRaw != null && String(modeRaw).trim() !== "";
+          const idRaw = entry.id;
+          const attendedRaw = entry.is_attended ?? entry.isAttended;
           return {
+            id: idRaw != null && String(idRaw).trim() !== "" ? String(idRaw) : undefined,
             date,
             attendanceMode: hasMode ? mapApiAttendanceMode(modeRaw) : undefined,
+            isAttended:
+              typeof attendedRaw === "boolean"
+                ? attendedRaw
+                : attendedRaw == null
+                  ? undefined
+                  : String(attendedRaw).toLowerCase() === "true",
           };
         }
         if (typeof item === "string" && item.trim()) {
@@ -180,7 +194,16 @@ function extractRegistrationDateEntriesFromApi(
         }
         return null;
       })
-      .filter((entry): entry is { date: string; attendanceMode?: AttendanceMode } => entry != null);
+      .filter(
+        (
+          entry,
+        ): entry is {
+          id?: string;
+          date: string;
+          attendanceMode?: AttendanceMode;
+          isAttended?: boolean;
+        } => entry != null,
+      );
   }
 
   const days = raw.days;
@@ -875,12 +898,18 @@ export function mapApiRegistrationToRegistration(
 
   const registrationDates = apiRegistrationDateEntries
     .filter(
-      (entry): entry is { date: string; attendanceMode: AttendanceMode } =>
-        entry.attendanceMode != null,
+      (entry): entry is {
+        id?: string;
+        date: string;
+        attendanceMode: AttendanceMode;
+        isAttended?: boolean;
+      } => entry.attendanceMode != null,
     )
     .map((entry) => ({
+      id: entry.id,
       date: entry.date,
       attendanceMode: entry.attendanceMode,
+      isAttended: entry.isAttended,
     }));
 
   const modesFromDates = registrationDates.map((entry) => entry.attendanceMode);

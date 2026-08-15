@@ -20,7 +20,7 @@ import { useEventRegistration } from "@/hooks/useEventRegistration";
 import { useEventPresenceSocket } from "@/hooks/useEventPresenceSocket";
 import { mockEvents } from "@/mock/events";
 import {
-  getLiveBroadcastCameras,
+  getLiveEventStream,
   pickDefaultLiveCamera,
   type LiveBroadcastCamera,
 } from "@/services/broadcast.service";
@@ -96,13 +96,17 @@ export default function StreamingPage() {
       }
 
       try {
-        const liveCameras = await getLiveBroadcastCameras(liveEventId);
+        const liveStream = await getLiveEventStream(liveEventId);
         if (cancelled) return;
 
-        const defaultCamera = pickDefaultLiveCamera(liveCameras);
-        setCameras(liveCameras);
+        const defaultCamera = pickDefaultLiveCamera(liveStream.cameras);
+        setCameras(liveStream.cameras);
         setSelectedCameraId(defaultCamera?.id ?? null);
         setStreamUrl(defaultCamera?.playbackUrl ?? LIVE_STREAM_URL ?? undefined);
+        setIsMuted(liveStream.videoMutedByDefault);
+        if (liveStream.concurrentViewers != null) {
+          setViewerCount(liveStream.concurrentViewers);
+        }
       } catch {
         if (cancelled) return;
         setCameras([]);
@@ -288,16 +292,9 @@ export default function StreamingPage() {
     </div>
   );
 
-  const exitButton = (
-    <Button variant="outline" size="sm" onClick={handleExit} title="Exit and share feedback">
-      <Home className="h-4 w-4 mr-2" />
-      Exit
-    </Button>
-  );
-
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4 min-w-0">
           <span className="font-semibold truncate">{APP_NAME} Live</span>
           {isTheaterView && (
@@ -305,9 +302,21 @@ export default function StreamingPage() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExit}
+            title="Submit feedback and leave the stream"
+            className="gap-1.5"
+          >
+            <Home className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Submit Feedback & Exit</span>
+            <span className="sm:hidden">Feedback & Exit</span>
+          </Button>
           <Badge variant="success" className="gap-1">
             <Users className="h-3 w-3" />
-            {viewerCount.toLocaleString()} watching
+            <span className="hidden sm:inline">{viewerCount.toLocaleString()} watching</span>
+            <span className="sm:hidden">{viewerCount.toLocaleString()}</span>
           </Badge>
           <ThemeToggle />
         </div>
@@ -318,10 +327,7 @@ export default function StreamingPage() {
           <div className="space-y-4">
             {player}
 
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground truncate sm:hidden">{event.name}</p>
-              {exitButton}
-            </div>
+            <p className="text-sm text-muted-foreground truncate sm:hidden">{event.name}</p>
 
             <div className="grid gap-4 xl:grid-cols-12 xl:items-stretch xl:min-h-[min(520px,calc(100vh-22rem))]">
               <div className="xl:col-span-7 flex flex-col gap-4 min-h-0">
@@ -341,7 +347,6 @@ export default function StreamingPage() {
           <div className="grid lg:grid-cols-3 gap-6 items-start">
             <div className="lg:col-span-2 space-y-4">
               {player}
-              <div className="flex justify-end">{exitButton}</div>
               {moderatorControls}
               {infoCardsGrid}
             </div>

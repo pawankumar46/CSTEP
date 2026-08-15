@@ -30,13 +30,27 @@ function attendanceModeForDate(row: AttendanceModeUserRow, date: string): string
 
 /** Lobby list: mode for a conference day from `registration_dates` or nested `days`, or —. */
 export function lobbyAttendanceModeForDate(row: Registration, date: string): string {
+  const entry = lobbyAttendanceEntryForDate(row, date);
+  if (!entry) return "—";
+  return entry.attendanceMode === "virtual" ? "Virtual" : "Physical";
+}
+
+/** Lobby day cell: mode + attended flag (drives green/red badge). */
+export function lobbyAttendanceEntryForDate(
+  row: Registration,
+  date: string,
+): { id?: string; attendanceMode: "physical" | "virtual"; isAttended?: boolean } | null {
   const entry = row.registrationDates?.find((item) => item.date === date);
   if (entry) {
-    return entry.attendanceMode === "virtual" ? "Virtual" : "Physical";
+    return {
+      id: entry.id,
+      attendanceMode: entry.attendanceMode,
+      isAttended: entry.isAttended,
+    };
   }
   const day = row.days?.find((item) => item.date === date);
-  if (!day) return "—";
-  return day.attendanceMode === "virtual" ? "Virtual" : "Physical";
+  if (!day) return null;
+  return { id: day.id, attendanceMode: day.attendanceMode };
 }
 
 export function registeredSessionsForDate(row: Registration, date: string): number {

@@ -5,9 +5,22 @@ import type { Event, UserRole } from "@/types";
 
 export type EventStreamPhase = "upcoming" | "live" | "ended";
 
-/** Temporary stream access for base users. Open by default; set env to `false` to restore strict gates. */
-export function isTemporaryBaseUserStreamAccessActive(): boolean {
-  return readPublicEnv("NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS") !== "false";
+/** Base users unlock Watch Live at this instant (IST). */
+export const BASE_USER_STREAM_OPENS_AT = new Date("2026-08-20T06:00:00+05:30");
+
+export const BASE_USER_STREAM_OPENS_LABEL = "20 August at 6:00 AM";
+
+/**
+ * Base-user stream access schedule.
+ * - `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true` → force open
+ * - `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=false` → force closed
+ * - unset → open at/after 20 Aug 2026 06:00 IST
+ */
+export function isTemporaryBaseUserStreamAccessActive(now = new Date()): boolean {
+  const override = readPublicEnv("NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS");
+  if (override === "true") return true;
+  if (override === "false") return false;
+  return now.getTime() >= BASE_USER_STREAM_OPENS_AT.getTime();
 }
 
 export function canBypassStreamParticipantChecks(role?: UserRole): boolean {
@@ -84,8 +97,26 @@ export function getWatchLiveAccess({
   const phase = getEventStreamPhase(event);
   const streamOpenToBaseUsers = isTemporaryBaseUserStreamAccessActive();
 
-  // Staff and base users (when preview/event access is open) are not date-gated on Watch Live.
-  if (isAuthenticated && role && (isStaffRole(role) || (isBaseUserRole(role) && streamOpenToBaseUsers))) {
+  if (isAuthenticated && role && isStaffRole(role)) {
+    return {
+      phase,
+      canWatchLive: true,
+      disabledTitle: "",
+      showSignInToWatch: false,
+    };
+  }
+
+  // Base users: locked until 20 Aug 6:00 AM IST (or env override).
+  if (isAuthenticated && role && isBaseUserRole(role) && !streamOpenToBaseUsers) {
+    return {
+      phase,
+      canWatchLive: false,
+      disabledTitle: `Live stream opens on ${BASE_USER_STREAM_OPENS_LABEL}`,
+      showSignInToWatch: false,
+    };
+  }
+
+  if (isAuthenticated && role && isBaseUserRole(role) && streamOpenToBaseUsers) {
     return {
       phase,
       canWatchLive: true,
@@ -121,7 +152,6 @@ export function getWatchLiveAccess({
     };
   }
 
-  // Stream is in progress — base users only below this point.
   if (!isAuthenticated) {
     return {
       phase,
