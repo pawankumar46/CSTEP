@@ -506,11 +506,7 @@ Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 - optional `days__attendance_mode` (`PHYSICAL` / `VIRTUAL`; omitted for All)
 - optional `search` (name/email/phone — Enter to submit; clear button resets)
 
-Row interaction:
-- **Present:** click the Physical/Virtual chip in a day column (gray by default → green when present; red tint when absent).
-- **Absent:** select row checkboxes → **Mark Absent** (requires a specific participation day, not All days).
-
-Mark API (`PATCH /registrations/registration/bulk-attendance/`) is **under development** — gated by `ATTENDANCE_MARK_API_READY`; until then marks update locally as a preview.
+Day columns show Physical/Virtual badges (read-only).
 
 #### Notifications — `notification.service.ts`
 
@@ -635,6 +631,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 - **Streaming HLS playback fix:** `VideoPlayer` now prefers `hls.js` whenever supported instead of trusting `canPlayType("application/vnd.apple.mpegurl")` (Chrome/Edge report `maybe` but cannot play `.m3u8` natively), retries fatal network/media errors up to 3 times before showing the error state, and no longer tears down the HLS instance on mute/pause changes. Fixes AWS IVS playback URLs such as `https://<id>.<region>.playback.live-video.net/api/video/v1/<channel>.m3u8`.
 - **Live analytics:** Removed the Participation Trend card from Live Event Insights.
+- **Attendance Mode analytics:** Removed present/absent marking (click-to-present chips, row checkboxes, Mark Absent). Day columns are read-only Physical/Virtual badges again.
 - **Manage Recordings UI:** Added Lobby navigation and `/dashboard/manage-recordings` for staff. Event selection loads dates, date selection loads sessions, and the validated form accepts either a recording URL or video file. Added playable recording preview cards in a responsive three-column grid. Moderators and event administrators can delete any recording via confirmation dialog. Save/delete remain UI preview until the backend contract is available.
 
 ### 2026-08-14
@@ -649,7 +646,6 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 - **Dashboard feedback:** Compact highlight rating cards; overall per-session list scrolls in fixed height.
 - **Feedback edit:** Submitted session/day ratings show **Edit**; updates use `PUT /events/feedback/:id/` (`event`, `event_date`, `schedule_item`, `rating`, `comment`). New ratings still use POST.
 - **Dashboard feedback:** Redesigned `/dashboard/feedback` — highlight count cards for 5★–1★, expandable per-session averages, respondent table with Users/Sessions/Date filters, rating chips, and Export.
-- **Attendance Mode analytics:** Present by clicking Physical/Virtual (gray → green); Absent via row checkboxes + Mark Absent. Mark API still gated until BE ships.
 - **Attendance Mode analytics:** Server search sends `search=` on `GET /analytics/registrations/users/`; clear button resets the query (Enter to submit).
 - **Streaming:** Header **Submit Feedback & Exit** (moved from below the player); opens the feedback dialog before leaving.
 - **Streaming:** Event Agenda on `/streaming` includes **19 Aug**, **20 Aug**, and **21 Aug** tabs (`icas-stream-agenda.ts`).

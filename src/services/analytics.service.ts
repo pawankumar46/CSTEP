@@ -22,7 +22,6 @@ import {
 import { mockAnalytics, mockAuditLogs, mockPermissions } from "@/mock/analytics";
 import type {
   AnalyticsData,
-  AttendanceMarkStatus,
   AttendanceMode,
   AttendanceModeUsersPage,
   AuditLog,
@@ -239,32 +238,6 @@ export const getAllAttendanceModeUsers = async (
     rows.push(...next.rows);
   }
   return rows;
-};
-
-/** Pending: PATCH /registrations/registration/bulk-attendance/ — wire when Django ships. */
-export const ATTENDANCE_MARK_API_READY = false;
-
-/** Mark selected registrations present/absent for a day. No-op until `ATTENDANCE_MARK_API_READY`. */
-export const bulkMarkRegistrationAttendance = async (
-  ids: string[],
-  status: AttendanceMarkStatus,
-  date: string,
-): Promise<void> => {
-  if (!ATTENDANCE_MARK_API_READY) {
-    throw new Error(
-      "Attendance marking API is under development. Selection UI is ready; try again once the backend endpoint is live.",
-    );
-  }
-
-  try {
-    await apiClient.patch("/registrations/registration/bulk-attendance/", {
-      ids: ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
-      status: status === "present" ? "PRESENT" : "ABSENT",
-      date,
-    });
-  } catch (error) {
-    throw new Error(extractApiErrorMessage(error));
-  }
 };
 
 export const getAnalytics = async (): Promise<AnalyticsData> => {

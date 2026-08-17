@@ -553,11 +553,7 @@ export interface AttendanceModeUserDay {
   id: string;
   date: string;
   attendanceMode: AttendanceMode;
-  /** Optional present/absent mark when API returns it */
-  attendanceMark?: AttendanceMarkStatus | null;
 }
-
-export type AttendanceMarkStatus = "present" | "absent";
 
 /** Row from GET /analytics/registrations/users/ */
 export interface AttendanceModeUserRow {
