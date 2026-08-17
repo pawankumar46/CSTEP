@@ -14,7 +14,7 @@ interface FeedbackStats {
   distribution: { rating: number; count: number }[];
 }
 
-interface FeedbackPaginationState {
+export interface FeedbackPaginationState {
   page: number;
   total: number;
   totalPages: number;
@@ -34,6 +34,7 @@ interface FeedbackState {
   feedback: Feedback[];
   respondentFeedback: Feedback[];
   feedbackPagination: FeedbackPaginationState;
+  respondentPagination: FeedbackPaginationState;
   stats: FeedbackStats | null;
   isLoading: boolean;
   respondentLoading: boolean;
@@ -43,7 +44,7 @@ interface FeedbackState {
   fetchFeedbackPage: (page?: number, eventId?: string) => Promise<void>;
   fetchFeedback: (eventId?: string) => Promise<void>;
   fetchRespondentFeedback: (
-    params: Omit<GetFeedbackParams, "page" | "pageSize">,
+    params: GetFeedbackParams,
   ) => Promise<void>;
   fetchStats: (eventId?: string) => Promise<void>;
   submitFeedback: (data: Omit<Feedback, "id" | "createdAt">) => Promise<void>;
@@ -58,6 +59,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   feedback: [],
   respondentFeedback: [],
   feedbackPagination: EMPTY_FEEDBACK_PAGINATION,
+  respondentPagination: EMPTY_FEEDBACK_PAGINATION,
   stats: null,
   isLoading: false,
   respondentLoading: false,
@@ -116,11 +118,26 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   fetchRespondentFeedback: async (params) => {
     set({ respondentLoading: true, respondentError: null });
     try {
-      const respondentFeedback = await feedbackService.getFilteredFeedback(params);
-      set({ respondentFeedback, respondentLoading: false });
+      const result = await feedbackService.getFeedbackPage({
+        ...params,
+        page: params.page ?? 1,
+        pageSize: params.pageSize ?? feedbackService.FEEDBACK_RESPONDENT_PAGE_SIZE,
+      });
+      set({
+        respondentFeedback: result.rows,
+        respondentPagination: {
+          page: result.page,
+          total: result.total,
+          totalPages: result.totalPages,
+          hasNext: result.hasNext,
+          hasPrevious: result.hasPrevious,
+        },
+        respondentLoading: false,
+      });
     } catch (err) {
       set({
         respondentFeedback: [],
+        respondentPagination: EMPTY_FEEDBACK_PAGINATION,
         respondentError:
           err instanceof Error ? err.message : "Failed to fetch respondent feedback",
         respondentLoading: false,

@@ -331,6 +331,7 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 | `/dashboard` | Role-based dashboard home |
 | `/dashboard/lobby` | Manage registrations |
 | `/dashboard/sessions` | Event day session scheduler (add / edit / delete / drag) |
+| `/dashboard/manage-recordings` | Staff recording UI — select Event → Date → Session, then add a URL or video file (UI preview only) |
 | `/dashboard/assistance` | Assistance hub — event-scoped quick launch to enabled assistance managers |
 | `/dashboard/travel` | Manage travel assistance |
 | `/dashboard/medical` | Manage medical assistance |
@@ -488,7 +489,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
-**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **participation trend** + **Live Event Insights** from WebSocket `/ws/analytics/{eventId}/?token=&visuals=` (`type: "update"` payload — login maps, session max virtual, no-show, feedback, participation time with per-session 5-min duration buckets, participation rate) + REST fallbacks for feedback when WS feedback is empty. Participation Time (viewer join/leave cards elsewhere) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
+**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **Live Event Insights** from WebSocket `/ws/analytics/{eventId}/?token=&visuals=` (`type: "update"` payload — login maps, session max virtual, no-show, feedback, participation time with per-session 5-min duration buckets, participation rate) + REST fallbacks for feedback when WS feedback is empty. Participation Trend card removed from Live Event Insights. Participation Time (viewer join/leave cards elsewhere) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
 
 Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 
@@ -630,12 +631,17 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-08-17
+
+- **Streaming HLS playback fix:** `VideoPlayer` now prefers `hls.js` whenever supported instead of trusting `canPlayType("application/vnd.apple.mpegurl")` (Chrome/Edge report `maybe` but cannot play `.m3u8` natively), retries fatal network/media errors up to 3 times before showing the error state, and no longer tears down the HLS instance on mute/pause changes. Fixes AWS IVS playback URLs such as `https://<id>.<region>.playback.live-video.net/api/video/v1/<channel>.m3u8`.
+- **Live analytics:** Removed the Participation Trend card from Live Event Insights.
+- **Manage Recordings UI:** Added Lobby navigation and `/dashboard/manage-recordings` for staff. Event selection loads dates, date selection loads sessions, and the validated form accepts either a recording URL or video file. Added playable recording preview cards in a responsive three-column grid. Moderators and event administrators can delete any recording via confirmation dialog. Save/delete remain UI preview until the backend contract is available.
+
 ### 2026-08-14
 
-- **Feedback overall payload:** Day overall create/update includes `"is_overall_rating": true`.
 - **Lobby list:** Maps `registration_dates[]` with `is_attended`; day mode badges show **green** when attended, **red** when not. Click badge to toggle via `PATCH /registrations/registration-day/:id/` `{ is_attended }`.
 - **Dashboard feedback API:** Highlight cards and per-session/day averages now use `GET /analytics/events/feedback/?event=11`; Respondent Details remains on `GET /events/feedback/`.
-- **Respondent Details filters:** Event, User, Event Date, Rating, and Search now send server query parameters to `/events/feedback/`; Export uses all matching responses.
+- **Respondent Details filters and pagination:** Event, User, Event Date, Rating, Search, `page`, and `page_size=10` are sent to `/events/feedback/`. Previous/Next now load the corresponding API page using the response pagination metadata.
 - **Dashboard feedback UI:** Highlight rating cards use a wider 5-column layout.
 
 ### 2026-08-13

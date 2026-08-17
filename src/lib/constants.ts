@@ -61,6 +61,7 @@ export type NavItem = {
 export const LOBBY_NAV_PATHS = [
   "/dashboard/lobby",
   "/dashboard/sessions",
+  "/dashboard/manage-recordings",
   // "/dashboard/travel",
   // "/dashboard/medical",
   // "/dashboard/translation",
@@ -89,6 +90,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Manage Lobby", href: "/dashboard/lobby" },
       { label: "Manage Sessions", href: "/dashboard/sessions" },
+      { label: "Manage Recordings", href: "/dashboard/manage-recordings" },
       { label: "Manage Assistance", href: "/dashboard/assistance" },
       // { label: "Manage Travel Requests", href: "/dashboard/travel" },
       // { label: "Manage Medical Requests", href: "/dashboard/medical" },

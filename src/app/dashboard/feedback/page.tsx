@@ -14,6 +14,7 @@ export default function FeedbackPage() {
   const {
     feedback,
     respondentFeedback,
+    respondentPagination,
     isLoading,
     respondentLoading,
     error,
@@ -83,6 +84,7 @@ export default function FeedbackPage() {
       <FeedbackModeratorPanel
         feedback={feedback}
         respondentFeedback={respondentFeedback}
+        respondentPagination={respondentPagination}
         respondentLoading={respondentLoading}
         onRespondentFiltersChange={handleRespondentFiltersChange}
         analytics={eventFeedbackAnalytics}

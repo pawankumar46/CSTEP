@@ -13,6 +13,7 @@ import { mockFeedback } from "@/mock/feedback";
 import type { Feedback } from "@/types";
 
 export const FEEDBACK_LIST_PAGE_SIZE = 10;
+export const FEEDBACK_RESPONDENT_PAGE_SIZE = 10;
 const FEEDBACK_BULK_FETCH_PAGE_SIZE = 100;
 
 let feedbackList = [...mockFeedback];

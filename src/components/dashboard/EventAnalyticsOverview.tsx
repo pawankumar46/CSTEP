@@ -13,14 +13,6 @@ import {
   UserX,
   Users,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { AnalyticsMetricTable } from "@/components/dashboard/AnalyticsDistributionTable";
 import { AnalyticsCollapsibleSection } from "@/components/dashboard/AnalyticsCollapsibleSection";
 import { EventFeedbackCharts } from "@/components/dashboard/EventFeedbackCharts";
@@ -28,8 +20,6 @@ import { LiveLoginInsightsCharts } from "@/components/dashboard/LiveLoginInsight
 import { ParticipationTimeTable } from "@/components/dashboard/ParticipationTimeTable";
 import { SessionParticipationAnalytics } from "@/components/dashboard/SessionParticipationAnalytics";
 import { RegistrationInsightsCharts } from "@/components/dashboard/RegistrationInsightsCharts";
-import { ChartCard } from "@/components/shared/ChartCard";
-import { ChartFilterGroup } from "@/components/shared/ChartFilterGroup";
 import { StatCard } from "@/components/shared/StatCard";
 import { isIcasEventName } from "@/lib/icas-conference";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -37,15 +27,6 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  buildRegistrationIntervalTrend,
-  formatRegistrationIntervalDayLabel,
   mapApiRegistrationInsights,
   type RegistrationTrendGranularity,
 } from "@/lib/analytics-mappers";
@@ -54,43 +35,7 @@ import { useLiveAnalyticsSocket } from "@/hooks/useLiveAnalyticsSocket";
 import { getAllEvents } from "@/services/event.service";
 import { useAnalyticsStore } from "@/store/useAnalyticsStore";
 import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
-import type { Event, StreamingParticipationMode } from "@/types";
-
-const COMPACT_CHART_HEIGHT = 128;
-const PARTICIPATION_INTERVAL_MINUTES = 15;
-const PARTICIPATION_MODE_OPTIONS: { value: StreamingParticipationMode; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "physical", label: "Physical" },
-  { value: "virtual", label: "Virtual" },
-];
-const AXIS_TICK = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
-const TOOLTIP_STYLE = {
-  fontSize: 12,
-  borderRadius: 8,
-  border: "1px solid hsl(var(--border))",
-  background: "hsl(var(--card))",
-  color: "hsl(var(--card-foreground))",
-};
-
-function toLocalIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function buildDateRange(startIso: string, endIso: string): string[] {
-  const start = new Date(`${startIso.slice(0, 10)}T12:00:00`);
-  const end = new Date(`${endIso.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-  const dates: string[] = [];
-  const cursor = new Date(start);
-  while (cursor <= end && dates.length < 31) {
-    dates.push(toLocalIsoDate(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return dates;
-}
+import type { Event } from "@/types";
 
 /** Prefer known ICAS event, else highest registration count. */
 function pickAnalyticsEvent(events: Event[]): Event | null {
@@ -102,50 +47,9 @@ function pickAnalyticsEvent(events: Event[]): Event | null {
   )[0] ?? events[0];
 }
 
-function CompactIntervalBarChart({ data }: { data: { name: string; value: number }[] }) {
-  const chartWidth = Math.max(260, data.length * 14);
-
-  return (
-    <div className="h-[128px] w-full overflow-x-auto">
-      <BarChart
-        width={chartWidth}
-        height={COMPACT_CHART_HEIGHT}
-        data={data}
-        margin={{ top: 4, right: 8, left: -12, bottom: 20 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/60" />
-        <XAxis
-          dataKey="name"
-          tick={AXIS_TICK}
-          axisLine={false}
-          tickLine={false}
-          interval={3}
-          angle={-35}
-          textAnchor="end"
-          height={36}
-        />
-        <YAxis
-          tick={AXIS_TICK}
-          axisLine={false}
-          tickLine={false}
-          width={28}
-          allowDecimals={false}
-          domain={[0, (max: number) => Math.max(5, Math.ceil(max * 1.15))]}
-        />
-        <Tooltip contentStyle={TOOLTIP_STYLE} />
-        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={10} />
-      </BarChart>
-    </div>
-  );
-}
-
 export function EventAnalyticsOverview() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [participationIntervalDate, setParticipationIntervalDate] = useState<string>(
-    () => toLocalIsoDate(new Date()),
-  );
-  const [participationMode, setParticipationMode] = useState<StreamingParticipationMode>("all");
   const [trendGranularity, setTrendGranularity] = useState<RegistrationTrendGranularity>("daily");
   const [attendanceDateFilter, setAttendanceDateFilter] = useState<string>("all");
 
@@ -188,11 +92,6 @@ export function EventAnalyticsOverview() {
     streamingSummaryError,
     fetchStreamingSummary,
     clearStreamingSummary,
-    streamingParticipationTrend,
-    streamingParticipationTrendLoading,
-    streamingParticipationTrendError,
-    fetchStreamingParticipationTrend,
-    clearStreamingParticipationTrend,
   } = useAnalyticsStore();
 
   useLiveAnalyticsSocket(selectedEventId);
@@ -244,7 +143,6 @@ export function EventAnalyticsOverview() {
       clearRegistrationDemographics();
       clearEventFeedbackAnalytics();
       clearStreamingSummary();
-      clearStreamingParticipationTrend();
       return;
     }
     fetchEventAnalytics(selectedEventId);
@@ -268,7 +166,6 @@ export function EventAnalyticsOverview() {
     clearEventFeedbackAnalytics,
     fetchStreamingSummary,
     clearStreamingSummary,
-    clearStreamingParticipationTrend,
   ]);
 
   useEffect(() => {
@@ -285,55 +182,12 @@ export function EventAnalyticsOverview() {
 
   useEffect(() => {
     setAttendanceDateFilter("all");
-    setParticipationMode("all");
   }, [selectedEventId]);
 
   useEffect(() => {
     if (!selectedEventId) return;
     fetchRegistrationTrend(selectedEventId, trendGranularity);
   }, [selectedEventId, trendGranularity, fetchRegistrationTrend]);
-
-  const participationDateOptions = useMemo(() => {
-    const today = toLocalIsoDate(new Date());
-    const fromEventDays = (eventAnalytics?.days ?? [])
-      .map((day) => day.date.slice(0, 10))
-      .filter(Boolean);
-    const fromEventRange = selectedEvent?.date
-      ? buildDateRange(selectedEvent.date, selectedEvent.endDate ?? selectedEvent.date)
-      : [];
-
-    return [...new Set([today, ...fromEventDays, ...fromEventRange])];
-  }, [eventAnalytics?.days, selectedEvent?.date, selectedEvent?.endDate]);
-
-  useEffect(() => {
-    if (participationDateOptions.length === 0) return;
-    if (!participationDateOptions.includes(participationIntervalDate)) {
-      setParticipationIntervalDate(participationDateOptions[0]);
-    }
-  }, [participationDateOptions, participationIntervalDate]);
-
-  useEffect(() => {
-    if (!selectedEventId || !participationIntervalDate) return;
-    fetchStreamingParticipationTrend(selectedEventId, {
-      mode: participationMode,
-      intervalMinutes: PARTICIPATION_INTERVAL_MINUTES,
-      date: participationIntervalDate,
-    });
-  }, [
-    selectedEventId,
-    participationIntervalDate,
-    participationMode,
-    fetchStreamingParticipationTrend,
-  ]);
-
-  const participationIntervalTrend = useMemo(() => {
-    if (!streamingParticipationTrend) return [];
-    return buildRegistrationIntervalTrend({
-      date: streamingParticipationTrend.date,
-      intervalMinutes: streamingParticipationTrend.intervalMinutes,
-      buckets: streamingParticipationTrend.buckets,
-    });
-  }, [streamingParticipationTrend]);
 
   const liveStreamingSummary = useMemo(() => {
     if (!streamingSummary && !liveStreamingPartial) return null;
@@ -482,9 +336,6 @@ export function EventAnalyticsOverview() {
       {streamingSummaryError && (
         <p className="text-sm text-destructive">{streamingSummaryError}</p>
       )}
-      {streamingParticipationTrendError && (
-        <p className="text-sm text-destructive">{streamingParticipationTrendError}</p>
-      )}
 
       {showLiveRegistrationData && !initialEventLoading && (
         <div className="space-y-3">
@@ -543,68 +394,15 @@ export function EventAnalyticsOverview() {
       )}
 
       {(streamingSummary
-        || streamingParticipationTrend
         || eventAnalytics
         || eventFeedbackAnalytics
         || streamingSummaryLoading
-        || streamingParticipationTrendLoading
         || eventFeedbackAnalyticsLoading
         || Boolean(selectedEventId)) && !initialEventLoading && (
         <AnalyticsCollapsibleSection title="Live Event Insights">
           <LiveLoginInsightsCharts />
 
           <SessionParticipationAnalytics />
-
-          <div className="max-w-xl space-y-2">
-            <ChartCard
-              compact
-              title="Participation Trend"
-              description="Activity per 15-minute interval. Filter by All, Physical, or Virtual."
-              filters={
-                <div className="flex flex-col items-end gap-2">
-                  <ChartFilterGroup
-                    options={PARTICIPATION_MODE_OPTIONS}
-                    value={participationMode}
-                    onChange={setParticipationMode}
-                    className="justify-end"
-                  />
-                  {participationDateOptions.length > 0 ? (
-                    <Select
-                      value={participationIntervalDate}
-                      onValueChange={setParticipationIntervalDate}
-                    >
-                      <SelectTrigger className="h-8 w-full max-w-[9.5rem] text-xs" aria-label="Event day">
-                        <SelectValue placeholder="Day" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {participationDateOptions.map((date) => (
-                          <SelectItem key={date} value={date}>
-                            {formatRegistrationIntervalDayLabel(date)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
-                </div>
-              }
-            >
-              {streamingParticipationTrendLoading ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Loading participation trend…
-                </p>
-              ) : streamingParticipationTrendError ? (
-                <p className="py-8 text-center text-sm text-destructive">
-                  {streamingParticipationTrendError}
-                </p>
-              ) : participationIntervalTrend.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No participation activity in this period yet.
-                </p>
-              ) : (
-                <CompactIntervalBarChart data={participationIntervalTrend} />
-              )}
-            </ChartCard>
-          </div>
 
           <EventFeedbackCharts
             eventFeedback={liveFeedback ?? eventFeedbackAnalytics}

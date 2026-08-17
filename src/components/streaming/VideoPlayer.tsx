@@ -16,6 +16,7 @@ import { THEATER_PLAYER_CLASS, type StreamViewMode } from "@/lib/stream-view";
 
 const BUFFERING_TIMEOUT_MS = 20000;
 const IFRAME_LOAD_TIMEOUT_MS = 20000;
+const MAX_HLS_RECOVERY_ATTEMPTS = 3;
 /** Masks Google Drive embed control bar when iframe fallback is used. */
 const DRIVE_EMBED_CHROME = "3rem";
 
@@ -135,6 +136,17 @@ export function VideoPlayer({
     }
   }, [compact, isMuted]);
 
+  // Read latest values inside the HLS effect without re-initializing the stream.
+  const isMutedRef = useRef(isMuted);
+  const isPausedRef = useRef(isPaused);
+  const tryPlayRef = useRef(tryPlayVideo);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+    isPausedRef.current = isPaused;
+    tryPlayRef.current = tryPlayVideo;
+  }, [isMuted, isPaused, tryPlayVideo]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !playbackUrl || isHlsStream) return;
@@ -155,37 +167,48 @@ export function VideoPlayer({
 
     let hls: Hls | null = null;
     let cancelled = false;
+    let recoveryAttempts = 0;
 
-    const startPlayback = async () => {
-      video.muted = compact ? true : isMuted;
-
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = playbackUrl;
-      } else if (Hls.isSupported()) {
-        hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-        hls.loadSource(playbackUrl);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          if (!isPaused && !cancelled) void tryPlayVideo();
-        });
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) {
-            setPlaybackError(true);
-            setIsBuffering(false);
-          }
-        });
-      } else {
-        setPlaybackError(true);
-        setIsBuffering(false);
-        return;
-      }
-
-      if (!isPaused && !cancelled) {
-        await tryPlayVideo();
-      }
+    const playWhenReady = () => {
+      if (cancelled || isPausedRef.current) return;
+      void tryPlayRef.current();
     };
 
-    void startPlayback();
+    video.muted = compact ? true : isMutedRef.current;
+
+    // hls.js first: Chrome/Edge report `maybe` for the Apple HLS mime type but
+    // cannot actually play .m3u8 natively.
+    if (Hls.isSupported()) {
+      hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+      hls.loadSource(playbackUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, playWhenReady);
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal || cancelled || !hls) return;
+
+        if (recoveryAttempts < MAX_HLS_RECOVERY_ATTEMPTS) {
+          recoveryAttempts += 1;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad();
+            return;
+          }
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+            return;
+          }
+        }
+
+        setPlaybackError(true);
+        setIsBuffering(false);
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = playbackUrl;
+      playWhenReady();
+    } else {
+      setPlaybackError(true);
+      setIsBuffering(false);
+      return;
+    }
 
     return () => {
       cancelled = true;
@@ -193,7 +216,7 @@ export function VideoPlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [compact, isHlsStream, playbackUrl, reloadKey, playbackError, isMuted, isPaused, tryPlayVideo]);
+  }, [compact, isHlsStream, playbackUrl, reloadKey, playbackError]);
 
   useEffect(() => {
     const video = videoRef.current;

@@ -35,6 +35,7 @@ import {
 } from "@/lib/feedback-options";
 import type { ExportColumn } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
+import type { FeedbackPaginationState } from "@/store/useFeedbackStore";
 import type { EventFeedbackAnalytics, Feedback } from "@/types";
 
 const RATING_FILTERS: { value: FeedbackRatingFilter; label: string }[] = [
@@ -60,6 +61,7 @@ interface FeedbackModeratorPanelProps {
   feedback: Feedback[];
   respondentFeedback: Feedback[];
   respondentLoading?: boolean;
+  respondentPagination: FeedbackPaginationState;
   onRespondentFiltersChange: (filters: RespondentFeedbackFilters) => void;
   analytics?: EventFeedbackAnalytics | null;
   analyticsLoading?: boolean;
@@ -71,6 +73,7 @@ export interface RespondentFeedbackFilters {
   userId?: string;
   rating?: number;
   search?: string;
+  page?: number;
 }
 
 function SessionRatingBar({ avgRating }: { avgRating: number }) {
@@ -161,6 +164,7 @@ export function FeedbackModeratorPanel({
   feedback,
   respondentFeedback,
   respondentLoading = false,
+  respondentPagination,
   onRespondentFiltersChange,
   analytics,
   analyticsLoading = false,
@@ -235,6 +239,7 @@ export function FeedbackModeratorPanel({
       userId: string;
       rating: FeedbackRatingFilter;
       search: string;
+      page: number;
     }> = {},
   ) => {
     const nextEventId = overrides.eventId ?? eventId;
@@ -242,6 +247,7 @@ export function FeedbackModeratorPanel({
     const nextUserId = overrides.userId ?? userId;
     const nextRating = overrides.rating ?? ratingFilter;
     const nextSearch = overrides.search ?? appliedSearch;
+    const nextPage = overrides.page ?? 1;
     onRespondentFiltersChange({
       eventId: nextEventId || undefined,
       eventDateId:
@@ -249,6 +255,7 @@ export function FeedbackModeratorPanel({
       userId: nextUserId === ALL_FEEDBACK_FILTER ? undefined : nextUserId,
       rating: nextRating === "all" ? undefined : nextRating,
       search: nextSearch.trim() || undefined,
+      page: nextPage,
     });
   };
 
@@ -259,7 +266,7 @@ export function FeedbackModeratorPanel({
     setRatingFilter("all");
     setSearchDraft("");
     setAppliedSearch("");
-    onRespondentFiltersChange({ eventId: DEFAULT_FEEDBACK_EVENT_ID });
+    onRespondentFiltersChange({ eventId: DEFAULT_FEEDBACK_EVENT_ID, page: 1 });
   };
 
   const toggleSession = (key: string) => {
@@ -401,7 +408,7 @@ export function FeedbackModeratorPanel({
           <div>
             <CardTitle className="text-base">Respondent details</CardTitle>
             <CardDescription>
-              Server filters: event, user, event date, rating, and search.
+              {respondentPagination.total} responses · Server filters and pagination.
             </CardDescription>
           </div>
           <ExportMenu
@@ -555,7 +562,13 @@ export function FeedbackModeratorPanel({
             <DataTable
               columns={columns}
               data={respondentRows}
-              pageSize={10}
+              serverPagination={{
+                page: respondentPagination.page,
+                totalPages: respondentPagination.totalPages,
+                hasNext: respondentPagination.hasNext,
+                hasPrevious: respondentPagination.hasPrevious,
+                onPageChange: (page) => applyRespondentFilters({ page }),
+              }}
             />
           )}
         </CardContent>
