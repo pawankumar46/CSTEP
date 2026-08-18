@@ -513,6 +513,7 @@ red means absent. Moderators and event administrators can click a badge to toggl
 attendance through `PATCH /registrations/registration-day/:id/`. Excel/PDF export
 includes Physical/Virtual plus a Present/Absent attendance column per conference day.
 List rows include `designation` and `org_name` when returned by the API.
+Use **Columns** to choose which fields appear in the table and in Excel/PDF export.
 
 #### Notifications — `notification.service.ts`
 
@@ -646,6 +647,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 - **Attendance Mode export:** Excel/PDF now includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`, matching Lobby.
 - **Attendance Mode table:** Restored **Designation** and **Organization** columns from `GET /registrations/registration/` (`designation`, `org_name`).
+- **Attendance Mode columns:** Added a column chooser to show/hide table columns and filter Excel/PDF export to the same visible set (including City, State, and day columns).
 - **Build/type fix:** Normalized nullable live analytics `sessionId` mapping and renamed a local API route context type to avoid Next route type generation conflicts.
 - **Live analytics export:** Participation Time and Participation Rate tables include Excel/PDF export of the current session rows (including the Participation Time total row).
 - **Live analytics day filter:** Participation Time and Participation Rate each send `{ action }` for **All**, or `{ action, day_id }` for a specific day. Tables show live WebSocket rows only (sample participation rows removed).

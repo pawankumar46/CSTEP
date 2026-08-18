@@ -8,6 +8,7 @@ import { ExportMenu } from "@/components/shared/ExportMenu";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
 import { SearchBar } from "@/components/shared/SearchBar";
+import { TableColumnChooser } from "@/components/shared/TableColumnChooser";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  createDefaultAttendanceModeVisibility,
+  filterAttendanceModeExportColumns,
+  filterAttendanceModeTableColumns,
+  getAttendanceModeColumnOptions,
+  mergeAttendanceModeVisibility,
+} from "@/lib/attendance-mode-columns";
 import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -83,6 +91,9 @@ export function AttendanceModeAnalytics() {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [attendanceLoadingKey, setAttendanceLoadingKey] = useState<string | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [visibleColumnIds, setVisibleColumnIds] = useState<Set<string>>(() =>
+    createDefaultAttendanceModeVisibility(EVENT_DAY_OPTIONS),
+  );
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -235,7 +246,32 @@ export function AttendanceModeAnalytics() {
     [dayDate],
   );
 
-  const columns = useMemo<ColumnDef<AttendanceModeUserRow>[]>(
+  const columnOptions = useMemo(
+    () => getAttendanceModeColumnOptions(visibleDayDates),
+    [visibleDayDates],
+  );
+
+  useEffect(() => {
+    setVisibleColumnIds((current) => mergeAttendanceModeVisibility(current, visibleDayDates));
+  }, [visibleDayDates]);
+
+  const handleColumnToggle = useCallback((id: string, visible: boolean) => {
+    setVisibleColumnIds((current) => {
+      const next = new Set(current);
+      if (visible) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleResetColumns = useCallback(() => {
+    setVisibleColumnIds(createDefaultAttendanceModeVisibility(visibleDayDates));
+  }, [visibleDayDates]);
+
+  const allColumns = useMemo<ColumnDef<AttendanceModeUserRow>[]>(
     () => [
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "phone", header: "Phone" },
@@ -256,6 +292,26 @@ export function AttendanceModeAnalytics() {
         cell: ({ row }) =>
           row.original.orgName?.trim() ? (
             <span className="text-sm">{row.original.orgName}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        accessorKey: "city",
+        header: "City",
+        cell: ({ row }) =>
+          row.original.city?.trim() ? (
+            <span className="text-sm">{row.original.city}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        accessorKey: "state",
+        header: "State",
+        cell: ({ row }) =>
+          row.original.state?.trim() ? (
+            <span className="text-sm">{row.original.state}</span>
           ) : (
             <span className="text-muted-foreground">—</span>
           ),
@@ -371,6 +427,11 @@ export function AttendanceModeAnalytics() {
     ],
   );
 
+  const columns = useMemo(
+    () => filterAttendanceModeTableColumns(allColumns, visibleColumnIds),
+    [allColumns, visibleColumnIds],
+  );
+
   const modeLabel =
     attendanceMode === "all"
       ? "All modes"
@@ -387,10 +448,14 @@ export function AttendanceModeAnalytics() {
     ? `Attendance Mode — ${selectedEvent.name} (${modeLabel}, ${dayLabel})`
     : `Attendance Mode (${modeLabel}, ${dayLabel})`;
 
-  const exportColumns = useMemo(
-    () => getAttendanceModeUsersExportColumns(dayDate),
-    [dayDate],
-  );
+  const exportColumns = useMemo(() => {
+    const allExportColumns = getAttendanceModeUsersExportColumns(dayDate);
+    return filterAttendanceModeExportColumns(
+      allExportColumns,
+      visibleColumnIds,
+      visibleDayDates,
+    );
+  }, [dayDate, visibleColumnIds, visibleDayDates]);
 
   const fetchAllForExport = useCallback(async () => {
     if (!selectedEventId) return [];
@@ -533,16 +598,25 @@ export function AttendanceModeAnalytics() {
                 )}
               </CardDescription>
             </div>
-            <ExportMenu
-              data={rows}
-              columns={exportColumns}
-              filename={exportFilename}
-              title={exportTitle}
-              disabled={rows.length === 0 || loading}
-              fetchAllData={fetchAllForExport}
-              allFilename={`${exportFilename}-all`}
-              allTitle={`${exportTitle} — All`}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <TableColumnChooser
+                options={columnOptions}
+                visibleIds={visibleColumnIds}
+                onToggle={handleColumnToggle}
+                onReset={handleResetColumns}
+                disabled={loading}
+              />
+              <ExportMenu
+                data={rows}
+                columns={exportColumns}
+                filename={exportFilename}
+                title={exportTitle}
+                disabled={rows.length === 0 || loading || exportColumns.length === 0}
+                fetchAllData={fetchAllForExport}
+                allFilename={`${exportFilename}-all`}
+                allTitle={`${exportTitle} — All`}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
