@@ -487,7 +487,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `WS` | `/ws/analytics/{eventId}/?token=&visuals=` | Live Event Insights WebSocket. Path `eventId`; query `token` + comma-separated `visuals` (includes `participation_time` + `participation_duration`). After connect, Participation Time / Rate day chips send `{ "action": "participation_time"\|"participation_rate", "day_id": <event-day id> }`. Server pushes `{ type: "update", data: { statewise_login, countrywise_login, daywise_login, session_wise_max_virtual, no_show, session_wise_feedback, daywise_feedback, participation_rate, participation_time, participation_duration } }`. Client: `useLiveAnalyticsSocket` |
 | `WS` | `/ws/events/{eventId}/?token=` | Viewer presence while on `/streaming`. Client sends `{"type":"heartbeat"}` on connect and every 15s (skips when tab hidden). Client: `useEventPresenceSocket` |
 | `WS` | `/ws/events/{eventId}/chat/?token=` | Live stream chat. Client sends `message` (optional `reply_to`), `edit`, `delete`, or per-message `reaction`; server pushes `history`, `message`, `message_edited`, `reaction_update`, `message_deleted`, or socket-local `error`. Client: `useEventChatSocket` + `LiveChatPanel` on `/streaming` |
-| `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`, optional `search`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
+| `GET` | `/registrations/registration/` | Attendance Mode table (`event_id`, optional `day_id`, optional `attendance_mode=PHYSICAL\|VIRTUAL`, optional `search`) |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
@@ -503,10 +503,12 @@ Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 - **`registration_insights`**: `by_day_last_7[{ date, count }]`, `by_attendance_mode`, `by_state`, `by_gender`, `by_designation` for Registration Insights charts.
 
 **Attendance Mode analytics** (`/dashboard/analytics/attendance-mode`) uses `GET /registrations/registration/` with:
-- `event`
-- optional `days__day__date` (`2026-08-19` / `2026-08-20` / `2026-08-21`)
-- optional `days__attendance_mode` (`PHYSICAL` / `VIRTUAL`; omitted for All)
+- `event_id`
+- optional `day_id` (event day id from `GET /events/event-days/dropdown/`, e.g. `10`)
+- optional `attendance_mode` (`PHYSICAL` / `VIRTUAL`; omitted for All)
 - optional `search` (name/email/phone — Enter to submit; clear button resets)
+
+Example: `?event_id=11&day_id=10&attendance_mode=VIRTUAL`. Rows with empty `registration_dates` are hidden when day or mode filters are active.
 
 Day columns map `registration_dates[].mode` and `is_attended`: green means present,
 red means absent. Moderators and event administrators can click a badge to toggle
@@ -647,6 +649,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 - **Live analytics:** No-show card title/description now states metrics are for **virtual** attendees.
 - **Streaming access:** Base-user Watch Live now opens at **19 Aug 2026 06:00 IST** (was 20 Aug). Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
+- **Attendance Mode filters:** `GET /registrations/registration/` now uses `event_id`, `day_id` (event day id, e.g. `10`), and `attendance_mode=PHYSICAL|VIRTUAL`. Rows with empty `registration_dates` are hidden when day or mode filters are active.
 - **Recordings playback:** When `GET /events/recordings/` returns an uploaded-file URL in `file`, the frontend now strips AWS signed query params before playback. `file_url` links are left unchanged.
 - **Attendance Mode export:** Excel/PDF now includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`, matching Lobby.
 - **Attendance Mode table:** Restored **Designation** and **Organization** columns from `GET /registrations/registration/` (`designation`, `org_name`).

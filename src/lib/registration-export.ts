@@ -109,15 +109,10 @@ export const ATTENDANCE_MODE_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
 export const ATTENDANCE_MODE_USERS_EXPORT_COLUMNS: ExportColumn<AttendanceModeUserRow>[] =
   getAttendanceModeUsersExportColumns();
 
-/** Day columns follow the participation-day filter (`all` → every day). */
+/** Day columns follow the visible participation-day dates. */
 export function getAttendanceModeUsersExportColumns(
-  dayDate: string = "all",
+  dayDates: readonly string[] = ATTENDANCE_MODE_EXPORT_DAY_DATES,
 ): ExportColumn<AttendanceModeUserRow>[] {
-  const dayDates =
-    dayDate === "all"
-      ? [...ATTENDANCE_MODE_EXPORT_DAY_DATES]
-      : ATTENDANCE_MODE_EXPORT_DAY_DATES.filter((date) => date === dayDate);
-
   return [
     { header: "User Name", value: (row) => row.userName },
     { header: "Phone", value: (row) => row.phone },

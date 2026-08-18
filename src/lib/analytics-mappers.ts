@@ -707,6 +707,36 @@ export function mapApiAttendanceModeUserRow(raw: unknown): AttendanceModeUserRow
   };
 }
 
+function hasAttendanceModeRegistrationDates(raw: unknown): boolean {
+  const row = (raw ?? {}) as Record<string, unknown>;
+  const dates = Array.isArray(row.registration_dates)
+    ? row.registration_dates
+    : Array.isArray(row.days)
+      ? row.days
+      : [];
+  return dates.length > 0;
+}
+
+/** When day/mode filters are active, drop rows the API returns with empty `registration_dates`. */
+export function filterAttendanceModeUsersRawResults(
+  raw: unknown,
+  filters: { dayId?: string; attendanceMode?: string },
+): unknown {
+  if (!filters.dayId && !filters.attendanceMode) return raw;
+
+  if (Array.isArray(raw)) {
+    return raw.filter(hasAttendanceModeRegistrationDates);
+  }
+
+  const row = (raw ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(row.results)) return raw;
+
+  return {
+    ...row,
+    results: row.results.filter(hasAttendanceModeRegistrationDates),
+  };
+}
+
 export function mapApiAttendanceModeUsersPage(
   raw: unknown,
   fallbacks?: { page?: number; pageSize?: number },

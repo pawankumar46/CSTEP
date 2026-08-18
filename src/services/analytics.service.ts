@@ -12,6 +12,7 @@ import {
   mapApiStreamingSummary,
   mapApiStreamingParticipationTrend,
   mapApiAttendanceModeUsersPage,
+  filterAttendanceModeUsersRawResults,
 } from "@/lib/analytics-mappers";
 import { extractApiErrorMessage } from "@/lib/auth-mappers";
 import { delay } from "@/lib/utils";
@@ -175,8 +176,8 @@ export const getStreamingParticipationTrend = async (
 
 export interface GetAttendanceModeUsersParams {
   eventId: string;
-  /** YYYY-MM-DD — omit for all days */
-  dayDate?: string;
+  /** Event day id from GET /events/event-days/dropdown/ — omit for all days */
+  dayId?: string;
   /** PHYSICAL / VIRTUAL app value — omit for all modes */
   attendanceMode?: AttendanceMode;
   /** Name/email/phone search — sent as `search=` */
@@ -185,7 +186,12 @@ export interface GetAttendanceModeUsersParams {
   pageSize?: number;
 }
 
-/** Live: GET /registrations/registration/?event=&days__day__date=&days__attendance_mode=&search= */
+function toNumericQueryValue(value: string): string | number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : value;
+}
+
+/** Live: GET /registrations/registration/?event_id=&day_id=&attendance_mode=&search= */
 export const getAttendanceModeUsers = async (
   params: GetAttendanceModeUsersParams,
 ): Promise<AttendanceModeUsersPage> => {
@@ -193,15 +199,15 @@ export const getAttendanceModeUsers = async (
   const pageSize = params.pageSize ?? 10;
   try {
     const query: Record<string, string | number> = {
-      event: params.eventId,
+      event_id: toNumericQueryValue(params.eventId),
       page,
       page_size: pageSize,
     };
-    if (params.dayDate) {
-      query["days__day__date"] = params.dayDate;
+    if (params.dayId) {
+      query.day_id = toNumericQueryValue(params.dayId);
     }
     if (params.attendanceMode) {
-      query["days__attendance_mode"] = params.attendanceMode.toUpperCase();
+      query.attendance_mode = params.attendanceMode.toUpperCase();
     }
     const trimmedSearch = params.search?.trim();
     if (trimmedSearch) {
@@ -211,7 +217,11 @@ export const getAttendanceModeUsers = async (
     const { data } = await apiClient.get<unknown>("/registrations/registration/", {
       params: query,
     });
-    return mapApiAttendanceModeUsersPage(data, { page, pageSize });
+    const filtered = filterAttendanceModeUsersRawResults(data, {
+      dayId: params.dayId,
+      attendanceMode: params.attendanceMode,
+    });
+    return mapApiAttendanceModeUsersPage(filtered, { page, pageSize });
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

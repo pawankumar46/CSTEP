@@ -27,11 +27,12 @@ import {
   mergeAttendanceModeVisibility,
 } from "@/lib/attendance-mode-columns";
 import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
+import { sortEventDaysByDate } from "@/lib/icas-conference";
 import { slugifyFilename } from "@/lib/export-utils";
 import { cn, formatDateTime } from "@/lib/utils";
 import { getAttendanceModeUsersExportColumns } from "@/lib/registration-export";
 import { getAllAttendanceModeUsers, getAttendanceModeUsers } from "@/services/analytics.service";
-import { getAllEvents } from "@/services/event.service";
+import { getAllEvents, getEventDaysDropdown, type EventDayDropdownOption } from "@/services/event.service";
 import { updateRegistrationDayAttendance } from "@/services/lobby.service";
 import { useAuthStore } from "@/store/useAuthStore";
 import type {
@@ -43,9 +44,8 @@ import type {
 } from "@/types";
 
 const TABLE_PAGE_SIZE = 10;
+const ALL_DAYS_VALUE = "all";
 const ATTENDANCE_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
-
-const EVENT_DAY_OPTIONS = ["2026-08-19", "2026-08-20", "2026-08-21"] as const;
 
 const MODE_OPTIONS: { value: "all" | AttendanceMode; label: string }[] = [
   { value: "all", label: "All" },
@@ -68,6 +68,26 @@ function pickDefaultEvent(events: Event[]): Event | null {
   return events.find((event) => event.id === "11") ?? events[0];
 }
 
+function dayLabelForSelection(
+  eventDays: EventDayDropdownOption[],
+  selectedDayId: string,
+): string {
+  if (selectedDayId === ALL_DAYS_VALUE) return "All days";
+  const day = eventDays.find((item) => item.id === selectedDayId);
+  return day ? day.label : "Selected day";
+}
+
+function visibleDatesForSelection(
+  eventDays: EventDayDropdownOption[],
+  selectedDayId: string,
+): string[] {
+  if (selectedDayId === ALL_DAYS_VALUE) {
+    return sortEventDaysByDate(eventDays).map((day) => day.date.slice(0, 10));
+  }
+  const day = eventDays.find((item) => item.id === selectedDayId);
+  return day ? [day.date.slice(0, 10)] : [];
+}
+
 export function AttendanceModeAnalytics() {
   const user = useAuthStore((state) => state.user);
   const canManageAttendance = user
@@ -77,7 +97,9 @@ export function AttendanceModeAnalytics() {
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [dayDate, setDayDate] = useState<string>("all");
+  const [eventDays, setEventDays] = useState<EventDayDropdownOption[]>([]);
+  const [eventDaysLoading, setEventDaysLoading] = useState(false);
+  const [selectedDayId, setSelectedDayId] = useState<string>(ALL_DAYS_VALUE);
   const [attendanceMode, setAttendanceMode] = useState<"all" | AttendanceMode>("all");
   const [rows, setRows] = useState<AttendanceModeUserRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -92,7 +114,7 @@ export function AttendanceModeAnalytics() {
   const [attendanceLoadingKey, setAttendanceLoadingKey] = useState<string | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
   const [visibleColumnIds, setVisibleColumnIds] = useState<Set<string>>(() =>
-    createDefaultAttendanceModeVisibility(EVENT_DAY_OPTIONS),
+    createDefaultAttendanceModeVisibility([]),
   );
 
   const selectedEvent = useMemo(
@@ -126,6 +148,41 @@ export function AttendanceModeAnalytics() {
 
   useEffect(() => {
     if (!selectedEventId) {
+      setEventDays([]);
+      setSelectedDayId(ALL_DAYS_VALUE);
+      return;
+    }
+
+    let cancelled = false;
+    setEventDaysLoading(true);
+
+    void (async () => {
+      try {
+        const days = sortEventDaysByDate(await getEventDaysDropdown(selectedEventId));
+        if (cancelled) return;
+        setEventDays(days);
+        setSelectedDayId((current) =>
+          current === ALL_DAYS_VALUE || days.some((day) => day.id === current)
+            ? current
+            : ALL_DAYS_VALUE,
+        );
+      } catch {
+        if (!cancelled) {
+          setEventDays([]);
+          setSelectedDayId(ALL_DAYS_VALUE);
+        }
+      } finally {
+        if (!cancelled) setEventDaysLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEventId]);
+
+  useEffect(() => {
+    if (!selectedEventId) {
       setRows([]);
       setTotalCount(0);
       setTotalPages(1);
@@ -144,7 +201,7 @@ export function AttendanceModeAnalytics() {
       try {
         const result = await getAttendanceModeUsers({
           eventId: selectedEventId,
-          dayDate: dayDate === "all" ? undefined : dayDate,
+          dayId: selectedDayId === ALL_DAYS_VALUE ? undefined : selectedDayId,
           attendanceMode: attendanceMode === "all" ? undefined : attendanceMode,
           search: appliedSearch || undefined,
           page,
@@ -172,17 +229,18 @@ export function AttendanceModeAnalytics() {
     return () => {
       cancelled = true;
     };
-  }, [selectedEventId, dayDate, attendanceMode, page, appliedSearch]);
+  }, [selectedEventId, selectedDayId, attendanceMode, page, appliedSearch]);
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
+    setSelectedDayId(ALL_DAYS_VALUE);
     setSearchDraft("");
     setAppliedSearch("");
     setPage(1);
   };
 
   const handleDayChange = (value: string) => {
-    setDayDate(value);
+    setSelectedDayId(value);
     setPage(1);
   };
 
@@ -239,11 +297,8 @@ export function AttendanceModeAnalytics() {
   );
 
   const visibleDayDates = useMemo(
-    () =>
-      dayDate === "all"
-        ? [...EVENT_DAY_OPTIONS]
-        : EVENT_DAY_OPTIONS.filter((date) => date === dayDate),
-    [dayDate],
+    () => visibleDatesForSelection(eventDays, selectedDayId),
+    [eventDays, selectedDayId],
   );
 
   const columnOptions = useMemo(
@@ -438,8 +493,7 @@ export function AttendanceModeAnalytics() {
       : attendanceMode === "virtual"
         ? "Virtual"
         : "Physical";
-  const dayLabel =
-    dayDate === "all" ? "All days" : formatRegistrationIntervalDayLabel(dayDate);
+  const dayLabel = dayLabelForSelection(eventDays, selectedDayId);
 
   const exportFilename = slugifyFilename(
     `attendance-mode-${modeLabel}-${dayLabel}-${selectedEvent?.name ?? "event"}`,
@@ -449,23 +503,23 @@ export function AttendanceModeAnalytics() {
     : `Attendance Mode (${modeLabel}, ${dayLabel})`;
 
   const exportColumns = useMemo(() => {
-    const allExportColumns = getAttendanceModeUsersExportColumns(dayDate);
+    const allExportColumns = getAttendanceModeUsersExportColumns(visibleDayDates);
     return filterAttendanceModeExportColumns(
       allExportColumns,
       visibleColumnIds,
       visibleDayDates,
     );
-  }, [dayDate, visibleColumnIds, visibleDayDates]);
+  }, [visibleColumnIds, visibleDayDates]);
 
   const fetchAllForExport = useCallback(async () => {
     if (!selectedEventId) return [];
     return getAllAttendanceModeUsers({
       eventId: selectedEventId,
-      dayDate: dayDate === "all" ? undefined : dayDate,
+      dayId: selectedDayId === ALL_DAYS_VALUE ? undefined : selectedDayId,
       attendanceMode: attendanceMode === "all" ? undefined : attendanceMode,
       search: appliedSearch || undefined,
     });
-  }, [selectedEventId, dayDate, attendanceMode, appliedSearch]);
+  }, [selectedEventId, selectedDayId, attendanceMode, appliedSearch]);
 
   return (
     <div className="space-y-4">
@@ -510,18 +564,18 @@ export function AttendanceModeAnalytics() {
             <div className="space-y-2">
               <Label htmlFor="attendance-day">Participation day</Label>
               <Select
-                value={dayDate}
+                value={selectedDayId}
                 onValueChange={handleDayChange}
-                disabled={!selectedEventId}
+                disabled={!selectedEventId || eventDaysLoading}
               >
                 <SelectTrigger id="attendance-day">
                   <SelectValue placeholder="Choose a day" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All days</SelectItem>
-                  {EVENT_DAY_OPTIONS.map((date) => (
-                    <SelectItem key={date} value={date}>
-                      {formatRegistrationIntervalDayLabel(date)}
+                  <SelectItem value={ALL_DAYS_VALUE}>All days</SelectItem>
+                  {eventDays.map((day) => (
+                    <SelectItem key={day.id} value={day.id}>
+                      {day.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

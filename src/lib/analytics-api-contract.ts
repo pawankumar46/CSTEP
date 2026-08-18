@@ -125,7 +125,7 @@ export interface ApiRegistrationsListQuery {
   page_size?: number;
 }
 
-/** GET /analytics/registrations/users/?event_id=&days__day__date=&days__attendance_mode= */
+/** GET /registrations/registration/?event_id=&day_id=&attendance_mode= */
 export interface ApiAttendanceModeUserDay {
   id: number | string;
   date: string;
