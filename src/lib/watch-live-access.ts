@@ -5,17 +5,15 @@ import type { Event, UserRole } from "@/types";
 
 export type EventStreamPhase = "upcoming" | "live" | "ended";
 
-/** Base users unlock Watch Live at this instant (IST). */
-export const BASE_USER_STREAM_OPENS_AT = new Date("2026-08-20T06:00:00+05:30");
-
-export const BASE_USER_STREAM_OPENS_LABEL = "20 August at 6:00 AM";
-
 /**
- * Base-user stream access schedule.
+ * Base users unlock Watch Live at this instant (IST).
  * - `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true` → force open
  * - `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=false` → force closed
- * - unset → open at/after 20 Aug 2026 06:00 IST
+ * - unset → open at/after 19 Aug 2026 06:00 IST
  */
+export const BASE_USER_STREAM_OPENS_AT = new Date("2026-08-19T06:00:00+05:30");
+export const BASE_USER_STREAM_OPENS_LABEL = "19 August at 6:00 AM";
+
 export function isTemporaryBaseUserStreamAccessActive(now = new Date()): boolean {
   const override = readPublicEnv("NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS");
   if (override === "true") return true;
@@ -106,7 +104,6 @@ export function getWatchLiveAccess({
     };
   }
 
-  // Base users: locked until 20 Aug 6:00 AM IST (or env override).
   if (isAuthenticated && role && isBaseUserRole(role) && !streamOpenToBaseUsers) {
     return {
       phase,

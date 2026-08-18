@@ -35,11 +35,6 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (baseUserStreamLocked) {
-      router.replace(ROUTES.home);
-      return;
-    }
-
     if (needsRegistration) {
       router.replace(ROUTES.eventRegister);
       return;

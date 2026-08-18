@@ -262,7 +262,7 @@ export function LiveLoginInsightsCharts() {
         <InsightCard
           icon={UserX}
           title="No-show by day - Virtual Attendees"
-          description="Registered vs attended vs no-show for each event day."
+          description="Registered vs attended vs no-show for virtual attendees on each event day."
           className="lg:col-span-2 xl:col-span-3"
         >
           {noShowRows.length === 0 ? (

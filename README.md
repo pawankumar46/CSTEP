@@ -99,7 +99,7 @@ Create `.env.local` from `.env.example`:
 | `NEXT_PUBLIC_LIVE_STREAM_FILE_ID` | Optional | Legacy Google Drive proxy (`/api/stream/video`) only — not used for public Watch Live |
 | `NEXT_PUBLIC_STREAM_LEFT_BANNER_URL` | Optional | Left banner image on streaming page |
 | `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right side fallback image when Camera 3 is unavailable |
-| `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS` | Optional | Base-user Watch Live: unset = opens **20 Aug 2026 06:00 IST**; `true` = force open; `false` = keep locked |
+| `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS` | Optional | Base-user Watch Live: unset = opens **19 Aug 2026 06:00 IST**; `true` = force open; `false` = keep locked |
 | `NEXT_PUBLIC_BRAND_LOGO_DARK_SRC` | Optional | Dark theme logo path |
 
 After changing any `NEXT_PUBLIC_*` variable in `.env.local`, **restart the dev server** (`npm run clean && npm run dev` if the old protocol still appears). In production, **redeploy** so the build picks up new values.
@@ -589,7 +589,7 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 3. Default feed is primary + active session; if multiple sessions exist, `StreamCameraPicker` switches the center player. Left/right **static banner images** only (no live side feeds)
 4. Event administrators create/manage sessions in **Video management** (`/dashboard/video-management`)
 5. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
-6. `StreamAccessGuard` enforces auth; staff always allowed. Base users unlock Watch Live at **20 Aug 2026 06:00 IST** (override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
+6. `StreamAccessGuard` enforces auth; staff always allowed. Base users unlock Watch Live at **19 Aug 2026 06:00 IST** (override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
 7. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
 8. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — supports replies, per-message like/love/laugh/wow/sad/angry reactions, owner edits within 5 minutes, soft deletion, and moderator deletion
 
@@ -645,6 +645,8 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-08-18
 
+- **Live analytics:** No-show card title/description now states metrics are for **virtual** attendees.
+- **Streaming access:** Base-user Watch Live now opens at **19 Aug 2026 06:00 IST** (was 20 Aug). Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
 - **Attendance Mode export:** Excel/PDF now includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`, matching Lobby.
 - **Attendance Mode table:** Restored **Designation** and **Organization** columns from `GET /registrations/registration/` (`designation`, `org_name`).
 - **Attendance Mode columns:** Added a column chooser to show/hide table columns and filter Excel/PDF export to the same visible set (including City, State, and day columns).
@@ -679,12 +681,11 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 - **Attendance Mode analytics:** Server search sends `search=` on `GET /analytics/registrations/users/`; clear button resets the query (Enter to submit).
 - **Streaming:** Header **Submit Feedback & Exit** (moved from below the player); opens the feedback dialog before leaving.
 - **Streaming:** Event Agenda on `/streaming` includes **19 Aug**, **20 Aug**, and **21 Aug** tabs (`icas-stream-agenda.ts`).
-- **Streaming access:** Base-user Watch Live is **disabled until 20 Aug 2026 06:00 IST** (tooltip: “Live stream opens on 20 August at 6:00 AM”). Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
-- **Streaming cameras:** Watch Live / `/streaming` loads feeds from `GET /events/event/:id/` → `broadcast_sessions[].playback_url` (e.g. event 11).
+- **Streaming access:** Base-user Watch Live is **disabled until 19 Aug 2026 06:00 IST** (tooltip: “Live stream opens on 19 August at 6:00 AM”). Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
 
 ### 2026-08-12
 
-- **Streaming access:** Base users can watch live by default (same as staff) — no registration or “stream not live” gate. Set `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=false` to restore strict checks.
+- **Streaming access:** Base users unlock Watch Live at **19 Aug 2026 06:00 IST** — before that they follow the normal registration and live-window gates. Set `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=false` to keep locked.
 - **Streaming:** Live player uses top-level **`playbackUrl`** per broadcast session; static left/right banners; viewer count placeholder set to 2. Mobile player height restored (16:9 shell; banners stay desktop-only).
 - **Analytics:** Participation Duration table shows **10 rows** with a sticky header; extra rows scroll.
 - **Lobby:** Export menu includes **Export all (Excel/PDF)** for every registered participant on the selected event (not only the current page).
