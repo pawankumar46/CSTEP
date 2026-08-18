@@ -359,7 +359,7 @@ function mapParticipationTime(raw: unknown): {
       buckets[key] = pickNumber(value) ?? 0;
     }
     rows.push({
-      sessionId: pickId(row.session_id) ?? pickId(row.sessionId),
+      sessionId: pickId(row.session_id) ?? pickId(row.sessionId) ?? undefined,
       sessionName: name,
       sessionDurationMinutes: pickNumber(row.session_duration_min) ?? 0,
       uniqueParticipants: pickNumber(row.unique_participants) ?? 0,
@@ -415,7 +415,7 @@ function mapParticipationRate(raw: unknown): {
     }
 
     rows.push({
-      sessionId: pickId(row.session_id) ?? pickId(row.sessionId),
+      sessionId: pickId(row.session_id) ?? pickId(row.sessionId) ?? undefined,
       sessionName: name,
       sessionDurationMinutes: pickNumber(row.session_duration_min) ?? 0,
       date,

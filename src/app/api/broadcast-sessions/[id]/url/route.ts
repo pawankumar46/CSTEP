@@ -9,9 +9,12 @@ import { extractApiErrorMessage } from "@/lib/auth-mappers";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type RouteContext = { params: Promise<{ id: string }> };
+type BroadcastUrlRouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(request: NextRequest, context: RouteContext) {
+export async function GET(
+  request: NextRequest,
+  context: BroadcastUrlRouteContext,
+) {
   try {
     const { id } = await context.params;
     const target = request.nextUrl.searchParams.get("target");

@@ -646,6 +646,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 - **Attendance Mode export:** Excel/PDF now includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`, matching Lobby.
 - **Attendance Mode table:** Restored **Designation** and **Organization** columns from `GET /registrations/registration/` (`designation`, `org_name`).
+- **Build/type fix:** Normalized nullable live analytics `sessionId` mapping and renamed a local API route context type to avoid Next route type generation conflicts.
 - **Live analytics export:** Participation Time and Participation Rate tables include Excel/PDF export of the current session rows (including the Participation Time total row).
 - **Live analytics day filter:** Participation Time and Participation Rate each send `{ action }` for **All**, or `{ action, day_id }` for a specific day. Tables show live WebSocket rows only (sample participation rows removed).
 - **Live analytics streaming cards:** Removed Broadcast Sessions and Peak Concurrent summary cards from Live Event Insights; Currently Watching and Unique Viewers remain.
