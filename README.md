@@ -647,6 +647,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 - **Live analytics:** No-show card title/description now states metrics are for **virtual** attendees.
 - **Streaming access:** Base-user Watch Live now opens at **19 Aug 2026 06:00 IST** (was 20 Aug). Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
+- **Recordings playback:** When `GET /events/recordings/` returns an uploaded-file URL in `file`, the frontend now strips AWS signed query params before playback. `file_url` links are left unchanged.
 - **Attendance Mode export:** Excel/PDF now includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`, matching Lobby.
 - **Attendance Mode table:** Restored **Designation** and **Organization** columns from `GET /registrations/registration/` (`designation`, `org_name`).
 - **Attendance Mode columns:** Added a column chooser to show/hide table columns and filter Excel/PDF export to the same visible set (including City, State, and day columns).
