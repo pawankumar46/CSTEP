@@ -326,12 +326,13 @@ More diagrams (HTTP paths, domains, routes, auth gate): see `.cursor/rules/appli
 | `/event-register` | Multi-step event registration (ICAS includes **19 Aug** as **Physical only**; 20–21 Aug keep Physical/Virtual) |
 | `/profile` | Delegate profile & assistance requests |
 | `/my-registrations` | Signed-in user’s event registrations (`GET /registrations/registration/my/`) |
+| `/recordings` | Authenticated recording viewer using paginated `GET /events/recordings/` with playable URL/file cards |
 | `/feedback` | Multi-day session feedback — day tabs and sessions scoped to the signed-in user's registration (`GET /registrations/registration/my/`) |
 | `/streaming` | Live stream (guarded by registration + event phase) |
 | `/dashboard` | Role-based dashboard home |
 | `/dashboard/lobby` | Manage registrations |
 | `/dashboard/sessions` | Event day session scheduler (add / edit / delete / drag) |
-| `/dashboard/manage-recordings` | Staff recording UI — select Event → Date → Session, then add a URL or video file (UI preview only) |
+| `/dashboard/manage-recordings` | Paginated, playable session recordings from `GET /events/recordings/`; Add Recording button reserved for the future POST API |
 | `/dashboard/assistance` | Assistance hub — event-scoped quick launch to enabled assistance managers |
 | `/dashboard/travel` | Manage travel assistance |
 | `/dashboard/medical` | Manage medical assistance |
@@ -484,7 +485,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/streaming/participation-trend/` | Participation Trend chart (`event_id`, `mode=all\|physical\|virtual`, `interval_minutes=15`, optional `date=YYYY-MM-DD`). Response: `{ mode, results: [{ bucket_start, count }] }` (empty `results` when no activity) |
 | `WS` | `/ws/analytics/{eventId}/?token=&visuals=` | Live Event Insights WebSocket. Path `eventId`; query `token` + comma-separated `visuals` (includes `participation_time` + `participation_duration`; no post-connect message). Server pushes `{ type: "update", data: { statewise_login, countrywise_login, daywise_login, session_wise_max_virtual, no_show, session_wise_feedback, daywise_feedback, participation_rate, participation_time, participation_duration } }`. Client: `useLiveAnalyticsSocket` |
 | `WS` | `/ws/events/{eventId}/?token=` | Viewer presence while on `/streaming`. Client sends `{"type":"heartbeat"}` on connect and every 15s (skips when tab hidden). Client: `useEventPresenceSocket` |
-| `WS` | `/ws/events/{eventId}/chat/?token=` | Live stream chat. Client sends `message` / `edit` / `delete` / `reaction`; server pushes `history`, `message`, `message_edited`, `message_deleted`, `reaction_counts`, or socket-local `error`. Client: `useEventChatSocket` + `LiveChatPanel` on `/streaming` |
+| `WS` | `/ws/events/{eventId}/chat/?token=` | Live stream chat. Client sends `message` (optional `reply_to`), `edit`, `delete`, or per-message `reaction`; server pushes `history`, `message`, `message_edited`, `reaction_update`, `message_deleted`, or socket-local `error`. Client: `useEventChatSocket` + `LiveChatPanel` on `/streaming` |
 | `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`, optional `search`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
@@ -500,13 +501,16 @@ Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 - **`registration_intervals_by_day[]`** (Participation Trend): per event day, `interval_minutes` (15) and `buckets[]` with `bucket_start` (ISO) and `count` (registrations in that window).
 - **`registration_insights`**: `by_day_last_7[{ date, count }]`, `by_attendance_mode`, `by_state`, `by_gender`, `by_designation` for Registration Insights charts.
 
-**Attendance Mode analytics** (`/dashboard/analytics/attendance-mode`) uses `GET /analytics/registrations/users/` with:
-- `event_id`
+**Attendance Mode analytics** (`/dashboard/analytics/attendance-mode`) uses `GET /registrations/registration/` with:
+- `event`
 - optional `days__day__date` (`2026-08-19` / `2026-08-20` / `2026-08-21`)
 - optional `days__attendance_mode` (`PHYSICAL` / `VIRTUAL`; omitted for All)
 - optional `search` (name/email/phone — Enter to submit; clear button resets)
 
-Day columns show Physical/Virtual badges (read-only).
+Day columns map `registration_dates[].mode` and `is_attended`: green means present,
+red means absent. Moderators and event administrators can click a badge to toggle
+attendance through `PATCH /registrations/registration-day/:id/`. Excel/PDF export
+includes Physical/Virtual plus a Present/Absent attendance column per conference day.
 
 #### Notifications — `notification.service.ts`
 
@@ -517,6 +521,15 @@ Day columns show Physical/Virtual badges (read-only).
 | `POST` | `/notification/notification/:id/read/` | Mark one read |
 | `POST` | `/notification/notification/read-all/` | Mark all read → `{ marked_read }` |
 | `WS` | `/ws/notifications/?token=` | Push `{ notification: { … } }`. Client: `useNotificationSocket` + `useNotifications` → `NotificationDropdown` |
+
+#### Recordings — `recording.service.ts`
+
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| `GET` | `/events/recordings/?page=1&page_size=10` | Paginated session recordings: `session`, `date`, `session_title`, `started_at`, `ended_at`, `file`, `file_url`, `status` |
+| `POST` | `/events/recordings/` | URL JSON: `{ session, status: "READY", file_url }`; MP4 upload multipart: `session`, `status=READY`, `file`. MP4 is compressed client-side (H.264/AAC, max 1280px) before upload |
+| `PATCH` | `/events/recordings/:id/` | Update session and replace the URL or compressed MP4 using the same JSON/multipart formats |
+| `DELETE` | `/events/recordings/:id/` | Permanently delete a recording after confirmation |
 
 #### Broadcast (via Next proxy) — `broadcast.service.ts`
 
@@ -575,7 +588,7 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 5. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
 6. `StreamAccessGuard` enforces auth; staff always allowed. Base users unlock Watch Live at **20 Aug 2026 06:00 IST** (override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
 7. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
-8. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — history + reactions on connect; send/edit/delete/react over the socket (owner edit 15 min, owner delete 60 min, moderator+ delete anytime)
+8. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — supports replies, per-message like/love/laugh/wow/sad/angry reactions, owner edits within 5 minutes, soft deletion, and moderator deletion
 
 ### 4. Assistance moderation
 
@@ -627,12 +640,20 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ## Changelog
 
+### 2026-08-18
+
+- **Attendance Mode export:** Excel/PDF now includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`, matching Lobby.
+
 ### 2026-08-17
 
+- **Live chat protocol:** Added replies, six per-message reactions, reaction updates, edit broadcasts, and soft-deleted message/reply placeholders. Removed the obsolete global reaction counter protocol.
 - **Streaming HLS playback fix:** `VideoPlayer` now prefers `hls.js` whenever supported instead of trusting `canPlayType("application/vnd.apple.mpegurl")` (Chrome/Edge report `maybe` but cannot play `.m3u8` natively), retries fatal network/media errors up to 3 times before showing the error state, and no longer tears down the HLS instance on mute/pause changes. Fixes AWS IVS playback URLs such as `https://<id>.<region>.playback.live-video.net/api/video/v1/<channel>.m3u8`.
 - **Live analytics:** Removed the Participation Trend card from Live Event Insights.
-- **Attendance Mode analytics:** Removed present/absent marking (click-to-present chips, row checkboxes, Mark Absent). Day columns are read-only Physical/Virtual badges again.
-- **Manage Recordings UI:** Added Lobby navigation and `/dashboard/manage-recordings` for staff. Event selection loads dates, date selection loads sessions, and the validated form accepts either a recording URL or video file. Added playable recording preview cards in a responsive three-column grid. Moderators and event administrators can delete any recording via confirmation dialog. Save/delete remain UI preview until the backend contract is available.
+- **Streaming:** Header includes **Home** (leaves stream and returns to `/`) and **Submit Feedback & Exit**.
+- **Attendance Mode analytics:** Switched the list to `GET /registrations/registration/` with event/day/mode/search filters. Day badges use `registration_dates[].is_attended` and moderators/event administrators can toggle attendance using the same registration-day API as Manage Lobby. Removed Designation and Organization from the table and export.
+- **Lobby export:** CSV/PDF includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`.
+- **Manage Recordings API:** `/dashboard/manage-recordings` supports paginated GET, POST, PATCH, and DELETE through `/events/recordings/`. Add/Edit follows Day → Session → URL/File; `status: "READY"` is automatic. MP4 uploads are compressed in-browser with progress feedback. Playback supports YouTube/Vimeo, AWS IVS/HLS, and direct video files.
+- **User recordings:** Added **Recordings** to authenticated desktop/mobile account menus and a protected `/recordings` page backed by `GET /events/recordings/`.
 
 ### 2026-08-14
 

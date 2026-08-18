@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Home, Loader2, LogOut, User } from "lucide-react";
+import { Home, Loader2, LogOut, User, Video } from "lucide-react";
 import { SearchBar } from "@/components/shared/SearchBar";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { NotificationDropdown } from "@/components/shared/NotificationDropdown";
@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ROUTES } from "@/lib/routes";
 
 interface NavbarProps {
   onSearch?: (query: string) => void;
@@ -70,6 +71,10 @@ export function Navbar({ onSearch }: NavbarProps) {
                 <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
                   <User className="mr-2 h-4 w-4" />
                   Profile Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(ROUTES.recordings)}>
+                  <Video className="mr-2 h-4 w-4" />
+                  Recordings
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut}>
                   {isLoggingOut ? (

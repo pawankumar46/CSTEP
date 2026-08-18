@@ -10,12 +10,10 @@ import {
   buildEventChatWebSocketUrl,
   CHAT_MAX_MESSAGE_LENGTH,
 } from "@/lib/event-chat-ws";
-import type { ChatReactionCounts, ChatReactionType, LiveChatMessage } from "@/types";
+import type { ChatReactionType, LiveChatMessage, LiveChatReaction } from "@/types";
 
 const RECONNECT_BASE_MS = 1500;
 const RECONNECT_MAX_MS = 20000;
-
-const EMPTY_COUNTS: ChatReactionCounts = { like: 0, love: 0, clap: 0 };
 
 export type EventChatStatus = "idle" | "connecting" | "connected" | "disconnected";
 
@@ -27,6 +25,30 @@ function upsertMessage(list: LiveChatMessage[], next: LiveChatMessage): LiveChat
   return copy;
 }
 
+function updateMessageReactions(
+  list: LiveChatMessage[],
+  messageId: string,
+  reactions: LiveChatReaction[],
+): LiveChatMessage[] {
+  return list.map((item) =>
+    item.id === messageId ? { ...item, reactions } : item,
+  );
+}
+
+function markMessageDeleted(
+  list: LiveChatMessage[],
+  messageId: string,
+): LiveChatMessage[] {
+  return list.map((item) => ({
+    ...item,
+    ...(item.id === messageId ? { isDeleted: true } : {}),
+    replyTo:
+      item.replyTo?.id === messageId
+        ? { ...item.replyTo, isDeleted: true }
+        : item.replyTo,
+  }));
+}
+
 /**
  * Event live chat WebSocket.
  * URL: `{ws|wss}://{host}/ws/events/{eventId}/chat/?token=…`
@@ -34,7 +56,6 @@ function upsertMessage(list: LiveChatMessage[], next: LiveChatMessage): LiveChat
 export function useEventChatSocket(eventId: string | null | undefined) {
   const [status, setStatus] = useState<EventChatStatus>("idle");
   const [messages, setMessages] = useState<LiveChatMessage[]>([]);
-  const [reactionCounts, setReactionCounts] = useState<ChatReactionCounts>(EMPTY_COUNTS);
   const [error, setError] = useState<string | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
@@ -53,7 +74,7 @@ export function useEventChatSocket(eventId: string | null | undefined) {
   }, []);
 
   const sendMessage = useCallback(
-    (text: string) => {
+    (text: string, replyToId?: string) => {
       const message = text.trim();
       if (!message) return false;
       if (message.length > CHAT_MAX_MESSAGE_LENGTH) {
@@ -61,7 +82,13 @@ export function useEventChatSocket(eventId: string | null | undefined) {
         return false;
       }
       setError(null);
-      return sendJson({ type: "message", message });
+      return sendJson({
+        type: "message",
+        message,
+        ...(replyToId
+          ? { reply_to: Number(replyToId) || replyToId }
+          : {}),
+      });
     },
     [sendJson],
   );
@@ -96,9 +123,13 @@ export function useEventChatSocket(eventId: string | null | undefined) {
   );
 
   const sendReaction = useCallback(
-    (reaction: ChatReactionType) => {
+    (messageId: string, reaction: ChatReactionType) => {
       setError(null);
-      return sendJson({ type: "reaction", reaction });
+      return sendJson({
+        type: "reaction",
+        message_id: Number(messageId) || messageId,
+        reaction,
+      });
     },
     [sendJson],
   );
@@ -138,7 +169,6 @@ export function useEventChatSocket(eventId: string | null | undefined) {
       closeSocket();
       setStatus("idle");
       setMessages([]);
-      setReactionCounts(EMPTY_COUNTS);
       setError(null);
       return;
     }
@@ -185,10 +215,7 @@ export function useEventChatSocket(eventId: string | null | undefined) {
 
             switch (message.type) {
               case "history":
-                setMessages(message.messages.filter((item) => !item.isDeleted));
-                break;
-              case "reaction_counts":
-                setReactionCounts(message.counts);
+                setMessages(message.messages);
                 break;
               case "message":
                 setMessages((prev) => upsertMessage(prev, message.message));
@@ -196,8 +223,19 @@ export function useEventChatSocket(eventId: string | null | undefined) {
               case "message_edited":
                 setMessages((prev) => upsertMessage(prev, message.message));
                 break;
+              case "reaction_update":
+                setMessages((prev) =>
+                  updateMessageReactions(
+                    prev,
+                    message.messageId,
+                    message.reactions,
+                  ),
+                );
+                break;
               case "message_deleted":
-                setMessages((prev) => prev.filter((item) => item.id !== message.messageId));
+                setMessages((prev) =>
+                  markMessageDeleted(prev, message.messageId),
+                );
                 break;
               case "error":
                 setError(message.detail);
@@ -275,7 +313,6 @@ export function useEventChatSocket(eventId: string | null | undefined) {
   return {
     status,
     messages,
-    reactionCounts,
     error,
     clearError,
     sendMessage,

@@ -4,13 +4,21 @@ import {
   CHAT_OWNER_DELETE_WINDOW_MS,
 } from "@/lib/event-chat-ws";
 import type {
-  ChatReactionCounts,
   ChatReactionType,
   LiveChatMessage,
+  LiveChatReaction,
+  LiveChatReplyPreview,
   UserRole,
 } from "@/types";
 
-const REACTION_TYPES: ChatReactionType[] = ["like", "love", "clap"];
+const REACTION_TYPES: ChatReactionType[] = [
+  "like",
+  "love",
+  "laugh",
+  "wow",
+  "sad",
+  "angry",
+];
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -31,23 +39,60 @@ function nullableString(value: unknown): string | null {
   return String(value);
 }
 
+function mapReplyPreview(raw: unknown): LiveChatReplyPreview | null {
+  const row = asRecord(raw);
+  if (!row) return null;
+  const id = pickString(row.id);
+  if (!id) return null;
+  return {
+    id,
+    senderId: pickString(row.sender, row.sender_id),
+    senderName: pickString(row.sender_name) || "Guest",
+    message: pickString(row.message),
+    isDeleted: Boolean(row.is_deleted),
+  };
+}
+
+export function isChatReactionType(value: string): value is ChatReactionType {
+  return REACTION_TYPES.includes(value as ChatReactionType);
+}
+
+export function mapApiChatReactions(raw: unknown): LiveChatReaction[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    const row = asRecord(item);
+    const reaction = pickString(row?.reaction);
+    if (!row || !isChatReactionType(reaction)) return [];
+    const senderIds = Array.isArray(row.sender_ids)
+      ? row.sender_ids.map((id) => String(id))
+      : [];
+    return [{
+      reaction,
+      count: Number(row.count ?? senderIds.length) || 0,
+      senderIds,
+    }];
+  });
+}
+
 export function mapApiLiveChatMessage(raw: unknown): LiveChatMessage | null {
   const row = asRecord(raw);
   if (!row) return null;
 
   const id = pickString(row.id, row.pk);
-  const message = pickString(row.message);
-  if (!id || !message) return null;
+  if (!id) return null;
 
   return {
     id,
     eventId: pickString(row.event, row.event_id),
     senderId: pickString(row.sender_id, row.senderId, row.sender),
     senderName: pickString(row.sender_name, row.senderName) || "Guest",
-    message,
-    createdAt: pickString(row.created_at, row.createdAt) || new Date().toISOString(),
+    message: pickString(row.message),
+    createdAt:
+      pickString(row.created_at, row.createdAt) || new Date().toISOString(),
     editedAt: nullableString(row.edited_at ?? row.editedAt),
     isDeleted: Boolean(row.is_deleted ?? row.isDeleted),
+    replyTo: mapReplyPreview(row.reply_to ?? row.replyTo),
+    reactions: mapApiChatReactions(row.reactions),
   };
 }
 
@@ -56,19 +101,6 @@ export function mapApiLiveChatMessages(raw: unknown): LiveChatMessage[] {
   return raw
     .map(mapApiLiveChatMessage)
     .filter((item): item is LiveChatMessage => Boolean(item));
-}
-
-export function mapApiReactionCounts(raw: unknown): ChatReactionCounts {
-  const row = asRecord(raw) ?? {};
-  return {
-    like: Number(row.like ?? 0) || 0,
-    love: Number(row.love ?? 0) || 0,
-    clap: Number(row.clap ?? 0) || 0,
-  };
-}
-
-export function isChatReactionType(value: string): value is ChatReactionType {
-  return REACTION_TYPES.includes(value as ChatReactionType);
 }
 
 export function canEditLiveChatMessage(
@@ -98,9 +130,13 @@ export function canDeleteLiveChatMessage(
 
 export type EventChatServerMessage =
   | { type: "history"; messages: LiveChatMessage[] }
-  | { type: "reaction_counts"; counts: ChatReactionCounts }
   | { type: "message"; message: LiveChatMessage }
   | { type: "message_edited"; message: LiveChatMessage }
+  | {
+      type: "reaction_update";
+      messageId: string;
+      reactions: LiveChatReaction[];
+    }
   | { type: "message_deleted"; messageId: string }
   | { type: "error"; detail: string }
   | { type: "unknown" };
@@ -113,8 +149,6 @@ export function parseEventChatServerMessage(raw: unknown): EventChatServerMessag
   switch (type) {
     case "history":
       return { type: "history", messages: mapApiLiveChatMessages(row.messages) };
-    case "reaction_counts":
-      return { type: "reaction_counts", counts: mapApiReactionCounts(row.counts) };
     case "message": {
       const message = mapApiLiveChatMessage(row.message);
       return message ? { type: "message", message } : { type: "unknown" };
@@ -122,6 +156,16 @@ export function parseEventChatServerMessage(raw: unknown): EventChatServerMessag
     case "message_edited": {
       const message = mapApiLiveChatMessage(row.message);
       return message ? { type: "message_edited", message } : { type: "unknown" };
+    }
+    case "reaction_update": {
+      const messageId = pickString(row.message_id, row.messageId);
+      return messageId
+        ? {
+            type: "reaction_update",
+            messageId,
+            reactions: mapApiChatReactions(row.reactions),
+          }
+        : { type: "unknown" };
     }
     case "message_deleted": {
       const messageId = pickString(row.message_id, row.messageId);

@@ -319,6 +319,27 @@ export interface Recording {
   views: number;
 }
 
+export interface EventRecording {
+  id: string;
+  sessionId: string;
+  date: string;
+  sessionTitle: string;
+  startedAt: string;
+  endedAt: string | null;
+  file: string | null;
+  fileUrl: string | null;
+  status: string;
+}
+
+export interface EventRecordingsPage {
+  rows: EventRecording[];
+  page: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
 export interface Feedback {
   id: string;
   userId: string;
@@ -548,14 +569,15 @@ export interface StreamingParticipationTrend {
   buckets: RegistrationIntervalBucket[];
 }
 
-/** Day row from GET /analytics/registrations/users/ */
+/** Day row from GET /registrations/registration/ `registration_dates`. */
 export interface AttendanceModeUserDay {
   id: string;
   date: string;
   attendanceMode: AttendanceMode;
+  isAttended?: boolean;
 }
 
-/** Row from GET /analytics/registrations/users/ */
+/** Row mapped from GET /registrations/registration/ */
 export interface AttendanceModeUserRow {
   id: string;
   userName: string;
@@ -725,6 +747,28 @@ export interface ChatMessage {
 }
 
 /** Live event chat message from WebSocket / Django chat API. */
+export interface LiveChatReplyPreview {
+  id: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  isDeleted: boolean;
+}
+
+export type ChatReactionType =
+  | "like"
+  | "love"
+  | "laugh"
+  | "wow"
+  | "sad"
+  | "angry";
+
+export interface LiveChatReaction {
+  reaction: ChatReactionType;
+  count: number;
+  senderIds: string[];
+}
+
 export interface LiveChatMessage {
   id: string;
   eventId: string;
@@ -734,14 +778,8 @@ export interface LiveChatMessage {
   createdAt: string;
   editedAt: string | null;
   isDeleted: boolean;
-}
-
-export type ChatReactionType = "like" | "love" | "clap";
-
-export interface ChatReactionCounts {
-  like: number;
-  love: number;
-  clap: number;
+  replyTo: LiveChatReplyPreview | null;
+  reactions: LiveChatReaction[];
 }
 
 export interface StreamState {

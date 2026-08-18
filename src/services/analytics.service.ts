@@ -185,7 +185,7 @@ export interface GetAttendanceModeUsersParams {
   pageSize?: number;
 }
 
-/** Live: GET /analytics/registrations/users/?event_id=&days__day__date=&days__attendance_mode=&search= */
+/** Live: GET /registrations/registration/?event=&days__day__date=&days__attendance_mode=&search= */
 export const getAttendanceModeUsers = async (
   params: GetAttendanceModeUsersParams,
 ): Promise<AttendanceModeUsersPage> => {
@@ -193,7 +193,7 @@ export const getAttendanceModeUsers = async (
   const pageSize = params.pageSize ?? 10;
   try {
     const query: Record<string, string | number> = {
-      event_id: params.eventId,
+      event: params.eventId,
       page,
       page_size: pageSize,
     };
@@ -208,7 +208,7 @@ export const getAttendanceModeUsers = async (
       query.search = trimmedSearch;
     }
 
-    const { data } = await apiClient.get<unknown>("/analytics/registrations/users/", {
+    const { data } = await apiClient.get<unknown>("/registrations/registration/", {
       params: query,
     });
     return mapApiAttendanceModeUsersPage(data, { page, pageSize });

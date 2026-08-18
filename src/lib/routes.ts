@@ -9,6 +9,7 @@ export const ROUTES = {
   streaming: "/streaming",
   profile: "/profile",
   myRegistrations: "/my-registrations",
+  recordings: "/recordings",
   feedback: "/feedback",
 } as const;
 

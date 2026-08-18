@@ -4,12 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Check,
-  Heart,
-  HandMetal,
   Loader2,
   Pencil,
+  Reply,
   Send,
-  ThumbsUp,
   Trash2,
   X,
 } from "lucide-react";
@@ -25,10 +23,13 @@ import { cn } from "@/lib/utils";
 import { useEventChatSocket } from "@/hooks/useEventChatSocket";
 import type { ChatReactionType, LiveChatMessage, UserRole } from "@/types";
 
-const REACTIONS: { type: ChatReactionType; label: string; emoji: string; icon: typeof ThumbsUp }[] = [
-  { type: "like", label: "Like", emoji: "👍", icon: ThumbsUp },
-  { type: "love", label: "Love", emoji: "❤️", icon: Heart },
-  { type: "clap", label: "Clap", emoji: "👏", icon: HandMetal },
+const REACTIONS: { type: ChatReactionType; label: string; emoji: string }[] = [
+  { type: "like", label: "Like", emoji: "👍" },
+  { type: "love", label: "Love", emoji: "❤️" },
+  { type: "laugh", label: "Laugh", emoji: "😂" },
+  { type: "wow", label: "Wow", emoji: "😮" },
+  { type: "sad", label: "Sad", emoji: "😢" },
+  { type: "angry", label: "Angry", emoji: "😠" },
 ];
 
 interface LiveChatPanelProps {
@@ -53,7 +54,6 @@ export function LiveChatPanel({
   const {
     status,
     messages,
-    reactionCounts,
     error,
     clearError,
     sendMessage,
@@ -65,6 +65,7 @@ export function LiveChatPanel({
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -81,11 +82,14 @@ export function LiveChatPanel({
 
   const connected = status === "connected";
   const connecting = status === "connecting";
+  const replyingTo =
+    messages.find((message) => message.id === replyingToId) ?? null;
 
   const handleSend = () => {
     if (!connected) return;
-    if (sendMessage(draft)) {
+    if (sendMessage(draft, replyingToId ?? undefined)) {
       setDraft("");
+      setReplyingToId(null);
     }
   };
 
@@ -125,21 +129,6 @@ export function LiveChatPanel({
               />
             )}
           </span>
-          <div className="flex gap-0.5 shrink-0">
-            {REACTIONS.map((reaction) => (
-              <Button
-                key={reaction.type}
-                size="sm"
-                variant="ghost"
-                className="h-7 px-1.5 text-xs"
-                disabled={!connected}
-                onClick={() => sendReaction(reaction.type)}
-                aria-label={reaction.label}
-              >
-                {reaction.emoji} {reactionCounts[reaction.type] || 0}
-              </Button>
-            ))}
-          </div>
         </CardTitle>
       </CardHeader>
 
@@ -181,7 +170,24 @@ export function LiveChatPanel({
                         </span>
                       </div>
 
-                      {isEditing ? (
+                      {msg.replyTo && (
+                        <div className="my-1.5 border-l-2 border-primary/40 bg-muted/40 px-2 py-1 text-xs">
+                          <p className="font-medium text-primary/80">
+                            {msg.replyTo.senderName}
+                          </p>
+                          <p className="line-clamp-2 text-muted-foreground">
+                            {msg.replyTo.isDeleted
+                              ? "This message was deleted"
+                              : msg.replyTo.message}
+                          </p>
+                        </div>
+                      )}
+
+                      {msg.isDeleted ? (
+                        <p className="italic text-muted-foreground">
+                          This message was deleted
+                        </p>
+                      ) : isEditing ? (
                         <div className="mt-1.5 flex gap-1.5">
                           <Input
                             value={editDraft}
@@ -212,8 +218,24 @@ export function LiveChatPanel({
                       )}
                     </div>
 
-                    {!isEditing && (canEdit || canDelete) && (
+                    {!isEditing &&
+                      !msg.isDeleted &&
+                      (connected || canEdit || canDelete) && (
                       <div className="flex shrink-0 gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        {connected && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setReplyingToId(msg.id);
+                              clearError();
+                            }}
+                            aria-label="Reply to message"
+                          >
+                            <Reply className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {canEdit && (
                           <Button
                             size="icon"
@@ -239,6 +261,42 @@ export function LiveChatPanel({
                       </div>
                     )}
                   </div>
+                  {!msg.isDeleted && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {REACTIONS.map((reaction) => {
+                        const summary = msg.reactions.find(
+                          (item) => item.reaction === reaction.type,
+                        );
+                        const active = Boolean(
+                          userId && summary?.senderIds.includes(userId),
+                        );
+                        return (
+                          <button
+                            key={reaction.type}
+                            type="button"
+                            disabled={!connected}
+                            onClick={() =>
+                              sendReaction(msg.id, reaction.type)
+                            }
+                            aria-label={`${reaction.label} reaction`}
+                            aria-pressed={active}
+                            className={cn(
+                              "inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-[11px] transition-colors",
+                              active
+                                ? "border-primary/50 bg-primary/10 text-primary"
+                                : "border-transparent text-muted-foreground hover:border-border hover:bg-muted",
+                              !summary?.count && "sm:opacity-0 sm:group-hover:opacity-100",
+                            )}
+                          >
+                            <span aria-hidden>{reaction.emoji}</span>
+                            {summary?.count ? (
+                              <span>{summary.count}</span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </motion.div>
               );
             })
@@ -249,6 +307,30 @@ export function LiveChatPanel({
           <div className="flex shrink-0 items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2">
             <p className="text-xs text-destructive">{error}</p>
             <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={clearError} aria-label="Dismiss error">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
+        {replyingTo && (
+          <div className="flex shrink-0 items-start justify-between gap-2 rounded-md border-l-2 border-primary bg-muted/50 px-2.5 py-2">
+            <div className="min-w-0 text-xs">
+              <p className="font-medium text-primary">
+                Replying to {replyingTo.senderName}
+              </p>
+              <p className="truncate text-muted-foreground">
+                {replyingTo.isDeleted
+                  ? "This message was deleted"
+                  : replyingTo.message}
+              </p>
+            </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 shrink-0"
+              onClick={() => setReplyingToId(null)}
+              aria-label="Cancel reply"
+            >
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>

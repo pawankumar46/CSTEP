@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MapPin, Monitor, Users } from "lucide-react";
+import { Loader2, MapPin, Monitor, Users } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { ExportMenu } from "@/components/shared/ExportMenu";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -20,18 +20,22 @@ import {
 } from "@/components/ui/select";
 import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import { slugifyFilename } from "@/lib/export-utils";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { getAttendanceModeUsersExportColumns } from "@/lib/registration-export";
 import { getAllAttendanceModeUsers, getAttendanceModeUsers } from "@/services/analytics.service";
 import { getAllEvents } from "@/services/event.service";
+import { updateRegistrationDayAttendance } from "@/services/lobby.service";
+import { useAuthStore } from "@/store/useAuthStore";
 import type {
   AttendanceMode,
   AttendanceModeUserRow,
   Event,
   RegistrationStatus,
+  UserRole,
 } from "@/types";
 
 const TABLE_PAGE_SIZE = 10;
+const ATTENDANCE_ACTION_ROLES: UserRole[] = ["moderator", "event_administrator"];
 
 const EVENT_DAY_OPTIONS = ["2026-08-19", "2026-08-20", "2026-08-21"] as const;
 
@@ -57,6 +61,10 @@ function pickDefaultEvent(events: Event[]): Event | null {
 }
 
 export function AttendanceModeAnalytics() {
+  const user = useAuthStore((state) => state.user);
+  const canManageAttendance = user
+    ? ATTENDANCE_ACTION_ROLES.includes(user.role)
+    : false;
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
@@ -73,6 +81,8 @@ export function AttendanceModeAnalytics() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchDraft, setSearchDraft] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
+  const [attendanceLoadingKey, setAttendanceLoadingKey] = useState<string | null>(null);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -181,6 +191,42 @@ export function AttendanceModeAnalytics() {
     setPage(1);
   }, []);
 
+  const handleToggleDayAttendance = useCallback(
+    async (
+      registrationId: string,
+      registrationDayId: string,
+      nextAttended: boolean,
+    ) => {
+      const key = `${registrationId}:${registrationDayId}`;
+      setAttendanceLoadingKey(key);
+      setAttendanceError(null);
+      try {
+        await updateRegistrationDayAttendance(registrationDayId, nextAttended);
+        setRows((current) =>
+          current.map((row) =>
+            row.id !== registrationId
+              ? row
+              : {
+                  ...row,
+                  days: row.days.map((day) =>
+                    day.id === registrationDayId
+                      ? { ...day, isAttended: nextAttended }
+                      : day,
+                  ),
+                },
+          ),
+        );
+      } catch (error) {
+        setAttendanceError(
+          error instanceof Error ? error.message : "Failed to update attendance",
+        );
+      } finally {
+        setAttendanceLoadingKey(null);
+      }
+    },
+    [],
+  );
+
   const visibleDayDates = useMemo(
     () =>
       dayDate === "all"
@@ -194,12 +240,6 @@ export function AttendanceModeAnalytics() {
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "phone", header: "Phone" },
       { accessorKey: "email", header: "Email" },
-      { accessorKey: "designation", header: "Designation" },
-      {
-        accessorKey: "orgName",
-        header: "Organization",
-        cell: ({ row }) => row.original.orgName || "—",
-      },
       ...visibleDayDates.map((date) => ({
         id: `day-${date}`,
         header: formatRegistrationIntervalDayLabel(date),
@@ -209,10 +249,63 @@ export function AttendanceModeAnalytics() {
             return <span className="text-muted-foreground">—</span>;
           }
           const label = day.attendanceMode === "virtual" ? "Virtual" : "Physical";
+          const attended = day.isAttended === true;
+          const notAttended = day.isAttended === false;
+          const loadingKey = `${row.original.id}:${day.id}`;
+          const isUpdating = attendanceLoadingKey === loadingKey;
+
+          if (!canManageAttendance || !day.id) {
+            return (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "font-normal",
+                  attended &&
+                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                  notAttended &&
+                    "border-destructive/40 bg-destructive/10 text-destructive",
+                )}
+              >
+                {label}
+              </Badge>
+            );
+          }
+
           return (
-            <Badge variant="secondary" className="font-medium">
-              {label}
-            </Badge>
+            <button
+              type="button"
+              disabled={isUpdating || attendanceLoadingKey !== null}
+              onClick={() =>
+                void handleToggleDayAttendance(
+                  row.original.id,
+                  day.id,
+                  !attended,
+                )
+              }
+              title={attended ? `Mark ${label} absent` : `Mark ${label} present`}
+              aria-label={
+                attended
+                  ? `Mark ${row.original.userName} absent on ${date}`
+                  : `Mark ${row.original.userName} present on ${date}`
+              }
+              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            >
+              <Badge
+                variant="outline"
+                className={cn(
+                  "cursor-pointer font-normal",
+                  attended &&
+                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400",
+                  notAttended &&
+                    "border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15",
+                )}
+              >
+                {isUpdating ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : null}
+                {label}
+              </Badge>
+            </button>
           );
         },
       })),
@@ -250,7 +343,12 @@ export function AttendanceModeAnalytics() {
         ),
       },
     ],
-    [visibleDayDates],
+    [
+      attendanceLoadingKey,
+      canManageAttendance,
+      handleToggleDayAttendance,
+      visibleDayDates,
+    ],
   );
 
   const modeLabel =
@@ -290,7 +388,8 @@ export function AttendanceModeAnalytics() {
         <CardHeader>
           <CardTitle className="text-base">Filters</CardTitle>
           <CardDescription>
-            Filter registrations by event day and attendance mode (Physical / Virtual).
+            Filter registrations by event day and attendance mode. Green is present;
+            red is absent.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -380,6 +479,12 @@ export function AttendanceModeAnalytics() {
         </div>
       )}
 
+      {attendanceError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+          <p className="text-sm text-destructive">{attendanceError}</p>
+        </div>
+      )}
+
       {!selectedEventId && !eventsLoading && (
         <Card>
           <CardContent className="p-0">
@@ -401,6 +506,11 @@ export function AttendanceModeAnalytics() {
                 {loading
                   ? "Loading attendance mode users…"
                   : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
+                {canManageAttendance && (
+                  <span className="mt-1 block">
+                    Click a Physical/Virtual badge to toggle present or absent.
+                  </span>
+                )}
               </CardDescription>
             </div>
             <ExportMenu

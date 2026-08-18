@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Pause, Play, VolumeX, Share2, Users, Home,
+  Pause, Play, VolumeX, Share2, Users, Home, MessageSquare,
 } from "lucide-react";
 import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
 import { StreamCameraPicker } from "@/components/streaming/StreamCameraPicker";
@@ -172,6 +172,12 @@ export default function StreamingPage() {
     setFeedbackOpen(true);
   };
 
+  const goHome = () => {
+    notifyLeave("async");
+    allowLeaveRef.current = true;
+    router.push(ROUTES.home);
+  };
+
   const leaveStreaming = () => {
     notifyLeave("async");
     allowLeaveRef.current = true;
@@ -305,11 +311,21 @@ export default function StreamingPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={goHome}
+            title="Go to home"
+            className="gap-1.5"
+          >
+            <Home className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Home</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleExit}
             title="Submit feedback and leave the stream"
             className="gap-1.5"
           >
-            <Home className="h-4 w-4 shrink-0" />
+            <MessageSquare className="h-4 w-4 shrink-0" />
             <span className="hidden sm:inline">Submit Feedback & Exit</span>
             <span className="sm:hidden">Feedback & Exit</span>
           </Button>

@@ -23,5 +23,5 @@ export function buildEventChatWebSocketUrl(
 }
 
 export const CHAT_MAX_MESSAGE_LENGTH = 500;
-export const CHAT_EDIT_WINDOW_MS = 15 * 60 * 1000;
+export const CHAT_EDIT_WINDOW_MS = 5 * 60 * 1000;
 export const CHAT_OWNER_DELETE_WINDOW_MS = 60 * 60 * 1000;

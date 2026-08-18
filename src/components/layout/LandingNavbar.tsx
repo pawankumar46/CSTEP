@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ClipboardList, Loader2, LogOut, Menu, User, X } from "lucide-react";
+import { ChevronDown, ClipboardList, Loader2, LogOut, Menu, User, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -73,6 +73,12 @@ export function LandingNavbar() {
           <Link href={ROUTES.profile} className="cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={ROUTES.recordings} className="cursor-pointer">
+            <Video className="mr-2 h-4 w-4" />
+            Recordings
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -184,6 +190,12 @@ export function LandingNavbar() {
                   <Link href={ROUTES.profile} onClick={() => setOpen(false)}>
                     <User className="mr-2 h-4 w-4" />
                     Profile
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="justify-start" asChild>
+                  <Link href={ROUTES.recordings} onClick={() => setOpen(false)}>
+                    <Video className="mr-2 h-4 w-4" />
+                    Recordings
                   </Link>
                 </Button>
                 <Button
