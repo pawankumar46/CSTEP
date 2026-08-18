@@ -1,26 +1,104 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Clock3, Timer } from "lucide-react";
 import { ChartFilterGroup } from "@/components/shared/ChartFilterGroup";
+import { ExportMenu } from "@/components/shared/ExportMenu";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRegistrationIntervalDayLabel } from "@/lib/analytics-mappers";
 import {
-  getSessionParticipationForDay,
+  buildParticipationRateTableExportRows,
+  buildParticipationTimeTableExportRows,
+  getParticipationRateTableExportColumns,
+  getParticipationTimeTableExportColumns,
+} from "@/lib/event-analytics-export";
+import { slugifyFilename } from "@/lib/export-utils";
+import { sortEventDaysByDate } from "@/lib/icas-conference";
+import { buildParticipationDayRequest } from "@/lib/live-analytics-ws";
+import {
+  participationSessionRowKey,
   PARTICIPATION_ANALYTICS_DAY_DATES,
-  PARTICIPATION_DURATION_BUCKETS,
   sumParticipationTimeTotals,
   type ParticipationAnalyticsDayDate,
   type SessionParticipationRateRow,
   type SessionParticipationTimeRow,
 } from "@/lib/participation-session-analytics";
 import { cn } from "@/lib/utils";
+import {
+  getEventDaysDropdown,
+  type EventDayDropdownOption,
+} from "@/services/event.service";
 import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
 
-const DAY_FILTER_OPTIONS = PARTICIPATION_ANALYTICS_DAY_DATES.map((date) => ({
+const ALL_DAY_VALUE = "all";
+const DEFAULT_DAY_DATE: ParticipationAnalyticsDayDate = "2026-08-20";
+
+const FALLBACK_DAY_OPTIONS = PARTICIPATION_ANALYTICS_DAY_DATES.map((date) => ({
   value: date,
   label: formatRegistrationIntervalDayLabel(date),
 }));
+
+function resolveDaySelection(
+  days: EventDayDropdownOption[],
+  current: string,
+): string {
+  if (current === ALL_DAY_VALUE) return current;
+  if (days.some((day) => day.id === current)) return current;
+  const byDate = days.find((day) => day.date.slice(0, 10) === current)?.id;
+  return byDate ?? ALL_DAY_VALUE;
+}
+
+function dayLabelForSelection(
+  days: EventDayDropdownOption[],
+  selected: string,
+): string {
+  if (selected === ALL_DAY_VALUE) return "All days";
+  const date = dayDateForSelection(days, selected);
+  return formatRegistrationIntervalDayLabel(date);
+}
+
+function dayDateForSelection(
+  days: EventDayDropdownOption[],
+  selected: string,
+): ParticipationAnalyticsDayDate {
+  const date = days.find((day) => day.id === selected)?.date.slice(0, 10)
+    ?? (selected.length >= 10 ? selected.slice(0, 10) : "");
+  if ((PARTICIPATION_ANALYTICS_DAY_DATES as readonly string[]).includes(date)) {
+    return date as ParticipationAnalyticsDayDate;
+  }
+  return DEFAULT_DAY_DATE;
+}
+
+function timeBucketLabelsForRows(
+  rows: SessionParticipationTimeRow[],
+  fallback: string[],
+): string[] {
+  const labels = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row.buckets)) labels.add(key);
+  }
+  if (labels.size === 0) return fallback;
+  return [...labels].sort((a, b) => Number(a) - Number(b));
+}
+
+function rateSlotLabelsForRows(
+  rows: SessionParticipationRateRow[],
+  fallback: string[],
+): string[] {
+  const labels = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row.slots)) labels.add(key);
+  }
+  if (labels.size === 0) return fallback;
+  return [...labels].sort((a, b) => {
+    if (a === "Max") return 1;
+    if (b === "Max") return -1;
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return a.localeCompare(b);
+  });
+}
 
 function cellValue(value: number | undefined): string {
   if (value == null || value === 0) return "—";
@@ -112,8 +190,8 @@ function ParticipationTimeTableView({
           </tr>
         ) : (
           <>
-            {rows.map((row) => (
-              <tr key={row.sessionName}>
+            {rows.map((row, index) => (
+              <tr key={participationSessionRowKey(row, index)}>
                 <td className={sessionTdClass} title={row.sessionName}>
                   <span className="block whitespace-normal break-words">{row.sessionName}</span>
                 </td>
@@ -184,8 +262,8 @@ function ParticipationRateTableView({
             </td>
           </tr>
         ) : (
-          rows.map((row) => (
-            <tr key={row.sessionName}>
+          rows.map((row, index) => (
+            <tr key={participationSessionRowKey(row, index)}>
               <td className={sessionTdClass} title={row.sessionName}>
                 <span className="block whitespace-normal break-words">{row.sessionName}</span>
               </td>
@@ -207,27 +285,35 @@ function SectionCard({
   icon: Icon,
   title,
   description,
+  filters,
+  action,
   children,
   className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
+  filters?: React.ReactNode;
+  action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <Card className={cn("min-w-0 shadow-sm", className)}>
-      <CardHeader className="space-y-2 pb-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            <Icon className="h-4 w-4 text-primary" aria-hidden />
+      <CardHeader className="space-y-3 pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Icon className="h-4 w-4 text-primary" aria-hidden />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="text-base font-semibold tracking-tight">{title}</CardTitle>
+              <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
+            </div>
           </div>
-          <div className="min-w-0 space-y-1">
-            <CardTitle className="text-base font-semibold tracking-tight">{title}</CardTitle>
-            <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
-          </div>
+          {action}
         </div>
+        {filters}
       </CardHeader>
       <CardContent className="min-w-0 pt-0">{children}</CardContent>
     </Card>
@@ -236,54 +322,138 @@ function SectionCard({
 
 /**
  * Live Event Insights — session Participation Time + Participation Rate tables.
- * Prefers live WebSocket rows; falls back to day-toggle mock fixtures.
+ * Day chips send `{ action, day_id }` on the live analytics WebSocket.
  */
 export function SessionParticipationAnalytics() {
-  const [selectedDay, setSelectedDay] = useState<ParticipationAnalyticsDayDate>("2026-08-20");
+  const [eventDays, setEventDays] = useState<EventDayDropdownOption[]>([]);
+  const [timeDay, setTimeDay] = useState<string>(ALL_DAY_VALUE);
+  const [rateDay, setRateDay] = useState<string>(ALL_DAY_VALUE);
+
+  const eventId = useLiveAnalyticsStore((s) => s.eventId);
+  const status = useLiveAnalyticsStore((s) => s.status);
+  const sendJson = useLiveAnalyticsStore((s) => s.sendJson);
   const liveParticipation = useLiveAnalyticsStore((s) => s.snapshot?.participation ?? null);
-  const mockDay = useMemo(() => getSessionParticipationForDay(selectedDay), [selectedDay]);
 
-  const usingLiveTime = (liveParticipation?.timeRows.length ?? 0) > 0;
-  const usingLiveRate = (liveParticipation?.rateRows.length ?? 0) > 0;
-  const usingAnyLive = usingLiveTime || usingLiveRate;
+  useEffect(() => {
+    if (!eventId) {
+      setEventDays([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const days = sortEventDaysByDate(await getEventDaysDropdown(eventId));
+        if (cancelled) return;
+        setEventDays(days);
+        setTimeDay((current) => resolveDaySelection(days, current));
+        setRateDay((current) => resolveDaySelection(days, current));
+      } catch {
+        if (!cancelled) setEventDays([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
 
-  const timeRows = usingLiveTime ? liveParticipation!.timeRows : mockDay.timeRows;
-  const timeBucketLabels = usingLiveTime
-    ? liveParticipation!.timeBucketLabels
-    : [...PARTICIPATION_DURATION_BUCKETS];
-  const rateRows = usingLiveRate ? liveParticipation!.rateRows : mockDay.rateRows;
-  const rateSlotLabels = usingLiveRate
-    ? (liveParticipation!.rateSlotLabels.length > 0
-        ? liveParticipation!.rateSlotLabels
-        : ["Max"])
-    : mockDay.rateSlotLabels;
+  useEffect(() => {
+    if (status !== "connected") return;
+    sendJson(buildParticipationDayRequest("participation_time", timeDay));
+  }, [status, timeDay, sendJson]);
+
+  useEffect(() => {
+    if (status !== "connected") return;
+    sendJson(buildParticipationDayRequest("participation_rate", rateDay));
+  }, [status, rateDay, sendJson]);
+
+  const timeDate = dayDateForSelection(eventDays, timeDay);
+  const rateDate = dayDateForSelection(eventDays, rateDay);
+  const timeDayLabel = dayLabelForSelection(eventDays, timeDay);
+  const rateDayLabel = dayLabelForSelection(eventDays, rateDay);
+  const dayFilterOptions = [
+    { value: ALL_DAY_VALUE, label: "All" },
+    ...(eventDays.length > 0
+      ? eventDays.map((day) => ({
+          value: day.id,
+          label: formatRegistrationIntervalDayLabel(day.date.slice(0, 10)) || day.label,
+        }))
+      : FALLBACK_DAY_OPTIONS),
+  ];
+
+  const timeRows = liveParticipation?.timeRows ?? [];
+  const rateRows = liveParticipation?.rateRows ?? [];
+  const timeBucketLabels = timeBucketLabelsForRows(
+    timeRows,
+    liveParticipation?.timeBucketLabels ?? [],
+  );
+  const rateSlotLabels = rateSlotLabelsForRows(
+    rateRows,
+    liveParticipation?.rateSlotLabels?.length
+      ? liveParticipation.rateSlotLabels
+      : ["Max"],
+  );
+  const hasLiveTime = timeRows.length > 0;
+  const hasLiveRate = rateRows.length > 0;
+
+  const timeExportRows = useMemo(
+    () => buildParticipationTimeTableExportRows(timeRows, timeBucketLabels),
+    [timeRows, timeBucketLabels],
+  );
+  const timeExportColumns = useMemo(
+    () => getParticipationTimeTableExportColumns(timeBucketLabels),
+    [timeBucketLabels],
+  );
+  const rateExportRows = useMemo(
+    () => buildParticipationRateTableExportRows(rateRows, rateSlotLabels),
+    [rateRows, rateSlotLabels],
+  );
+  const rateExportColumns = useMemo(
+    () => getParticipationRateTableExportColumns(rateSlotLabels),
+    [rateSlotLabels],
+  );
+  const timeExportFilename = slugifyFilename(
+    timeDay === ALL_DAY_VALUE ? "participation-time-all" : `participation-time-${timeDate}`,
+  );
+  const rateExportFilename = slugifyFilename(
+    rateDay === ALL_DAY_VALUE ? "participation-rate-all" : `participation-rate-${rateDate}`,
+  );
 
   return (
     <div className="min-w-0 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Session participation
-        </h3>
-        {!usingAnyLive && (
-          <ChartFilterGroup
-            options={DAY_FILTER_OPTIONS}
-            value={selectedDay}
-            onChange={setSelectedDay}
-          />
-        )}
-      </div>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Session participation
+      </h3>
 
       <div className="grid min-w-0 gap-4">
         <SectionCard
           icon={Timer}
           title="Participation Time"
           description="Participant counts at each 5-minute mark up to that session’s duration. Scroll horizontally for longer sessions."
+          filters={
+            <ChartFilterGroup
+              idPrefix="participation-time-day"
+              options={dayFilterOptions}
+              value={timeDay}
+              onChange={setTimeDay}
+            />
+          }
+          action={
+            <ExportMenu
+              filename={timeExportFilename}
+              title={`Participation Time — ${timeDayLabel}`}
+              columns={timeExportColumns}
+              data={timeExportRows}
+              disabled={timeRows.length === 0}
+            />
+          }
         >
           <ParticipationTimeTableView rows={timeRows} bucketLabels={timeBucketLabels} />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            {usingLiveTime
+            {hasLiveTime
               ? "Live from analytics WebSocket — columns match session duration (5, 10, … min)"
-              : "Sample layout until live participation time arrives"}
+              : status === "connected"
+                ? "No participation time data for this selection."
+                : "Connect to live analytics to load participation time."}
           </p>
         </SectionCard>
 
@@ -291,12 +461,31 @@ export function SessionParticipationAnalytics() {
           icon={Clock3}
           title="Participation Rate"
           description="Participant count per slot (or max concurrent) during sessions."
+          filters={
+            <ChartFilterGroup
+              idPrefix="participation-rate-day"
+              options={dayFilterOptions}
+              value={rateDay}
+              onChange={setRateDay}
+            />
+          }
+          action={
+            <ExportMenu
+              filename={rateExportFilename}
+              title={`Participation Rate — ${rateDayLabel}`}
+              columns={rateExportColumns}
+              data={rateExportRows}
+              disabled={rateRows.length === 0}
+            />
+          }
         >
           <ParticipationRateTableView rows={rateRows} slotLabels={rateSlotLabels} />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            {usingLiveRate
+            {hasLiveRate
               ? "Live from analytics WebSocket"
-              : "Sample layout until live participation rate arrives"}
+              : status === "connected"
+                ? "No participation rate data for this selection."
+                : "Connect to live analytics to load participation rate."}
           </p>
         </SectionCard>
       </div>

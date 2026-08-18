@@ -14,6 +14,7 @@ interface ChartFilterGroupProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   className?: string;
+  idPrefix?: string;
 }
 
 export function ChartFilterGroup<T extends string>({
@@ -21,11 +22,12 @@ export function ChartFilterGroup<T extends string>({
   value,
   onChange,
   className,
+  idPrefix = "chart-filter",
 }: ChartFilterGroupProps<T>) {
   return (
     <div className={cn("flex flex-wrap gap-x-3 gap-y-1.5", className)}>
       {options.map((option) => {
-        const id = `chart-filter-${option.value.replace(/\s+/g, "-").toLowerCase()}`;
+        const id = `${idPrefix}-${option.value.replace(/\s+/g, "-").toLowerCase()}`;
         return (
           <div key={option.value} className="flex items-center gap-1.5">
             <Checkbox

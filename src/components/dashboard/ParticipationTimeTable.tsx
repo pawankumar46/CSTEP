@@ -38,7 +38,7 @@ export function ParticipationTimeTable({
         loggedIn: formatParticipationDateTime(session.loggedInAt),
         loggedOut: session.loggedOutAt
           ? formatParticipationDateTime(session.loggedOutAt)
-          : "Still watching",
+          : "Watching",
         duration: formatWatchDuration(session.durationSeconds),
       })),
     [sessions],
@@ -98,7 +98,7 @@ export function ParticipationTimeTable({
                       {session.loggedOutAt
                         ? formatParticipationDateTime(session.loggedOutAt)
                         : (
-                          <span className="text-emerald-600 dark:text-emerald-400">Still watching</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">Watching</span>
                         )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap">

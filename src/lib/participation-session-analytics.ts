@@ -28,9 +28,12 @@ export type ParticipationDurationBucket =
   (typeof PARTICIPATION_DURATION_BUCKETS)[number];
 
 export interface SessionParticipationTimeRow {
+  sessionId?: string;
   sessionName: string;
   sessionDurationMinutes: number;
   uniqueParticipants: number;
+  /** Conference day (`YYYY-MM-DD`) when the live payload includes a date. */
+  date?: string;
   /**
    * Live WS: minute keys matching session duration (`"5"`, `"10"`, … `"60"`).
    * Mock fixtures may use range labels (`"0-5"`, `"5-10"`, …).
@@ -39,8 +42,11 @@ export interface SessionParticipationTimeRow {
 }
 
 export interface SessionParticipationRateRow {
+  sessionId?: string;
   sessionName: string;
   sessionDurationMinutes: number;
+  /** Conference day (`YYYY-MM-DD`) when the live payload includes a date. */
+  date?: string;
   /** Participant count keyed by clock slot label (e.g. `"9:00"`). */
   slots: Record<string, number>;
 }
@@ -290,6 +296,54 @@ export function getSessionParticipationForDay(
     MOCK_SESSION_PARTICIPATION_BY_DAY.find((day) => day.date === date)
     ?? MOCK_SESSION_PARTICIPATION_BY_DAY[1]
   );
+}
+
+/** Merge mock fixtures across all conference days (sample UI when All is selected). */
+export function getSessionParticipationForAllDays(): SessionParticipationDayData {
+  const timeRows: SessionParticipationTimeRow[] = [];
+  const rateRows: SessionParticipationRateRow[] = [];
+  const rateSlotLabelSet = new Set<string>();
+
+  for (const day of MOCK_SESSION_PARTICIPATION_BY_DAY) {
+    timeRows.push(
+      ...day.timeRows.map((row) => ({
+        ...row,
+        date: row.date ?? day.date,
+      })),
+    );
+    rateRows.push(
+      ...day.rateRows.map((row) => ({
+        ...row,
+        date: row.date ?? day.date,
+      })),
+    );
+    for (const label of day.rateSlotLabels) rateSlotLabelSet.add(label);
+  }
+
+  return {
+    date: PARTICIPATION_ANALYTICS_DAY_DATES[0],
+    timeRows,
+    rateRows,
+    rateSlotLabels: [...rateSlotLabelSet].sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+export function participationSessionRowKey(
+  row: { sessionId?: string; date?: string; sessionName: string },
+  index: number,
+): string {
+  if (row.sessionId) {
+    return `${row.date ?? "all"}-${row.sessionId}`;
+  }
+  return `${row.date ?? "all"}-${row.sessionName}-${index}`;
+}
+
+export function filterParticipationRowsByDay<T extends { date?: string }>(
+  rows: T[],
+  day: string,
+): T[] {
+  if (!rows.some((row) => Boolean(row.date))) return rows;
+  return rows.filter((row) => row.date === day);
 }
 
 export function sumParticipationTimeTotals(

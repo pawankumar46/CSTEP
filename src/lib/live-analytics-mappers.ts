@@ -5,6 +5,7 @@ import type {
   LiveAnalyticsSnapshot,
 } from "@/lib/live-analytics-api-contract";
 import {
+  PARTICIPATION_ANALYTICS_DAY_DATES,
   type SessionParticipationRateRow,
   type SessionParticipationTimeRow,
 } from "@/lib/participation-session-analytics";
@@ -37,6 +38,97 @@ function pickString(value: unknown): string | null {
 function pickId(value: unknown): string | null {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   return pickString(value);
+}
+
+const PARTICIPATION_DAY_BY_NUMBER: Record<number, string> = {
+  1: PARTICIPATION_ANALYTICS_DAY_DATES[0],
+  2: PARTICIPATION_ANALYTICS_DAY_DATES[1],
+  3: PARTICIPATION_ANALYTICS_DAY_DATES[2],
+};
+
+function pickSessionDate(
+  row: Record<string, unknown>,
+  fallbackDate?: string,
+): string | undefined {
+  const raw =
+    pickString(row.date)
+    ?? pickString(row.event_date)
+    ?? pickString(row.session_date)
+    ?? pickString(row.day_date)
+    ?? pickString(row.day);
+  if (raw) {
+    const iso = raw.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  }
+  const dayNumber =
+    pickNumber(row.day_number)
+    ?? pickNumber(row.event_date__day_number)
+    ?? pickNumber(row.day);
+  if (dayNumber != null && PARTICIPATION_DAY_BY_NUMBER[dayNumber]) {
+    return PARTICIPATION_DAY_BY_NUMBER[dayNumber];
+  }
+  return fallbackDate;
+}
+
+function extractParticipationItems(
+  raw: unknown,
+): Array<{ row: Record<string, unknown>; date?: string }> {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    return raw.flatMap((item) => {
+      const row = asRecord(item);
+      return row ? [{ row, date: pickSessionDate(row) }] : [];
+    });
+  }
+
+  const root = asRecord(raw);
+  if (!root) return [];
+
+  const grouped = root.by_day ?? root.by_date ?? root.days;
+  if (Array.isArray(grouped)) {
+    return grouped.flatMap((group) => {
+      const groupRow = asRecord(group);
+      if (!groupRow) return [];
+      const fallback = pickSessionDate(groupRow);
+      const list = Array.isArray(groupRow.rows)
+        ? groupRow.rows
+        : Array.isArray(groupRow.sessions)
+          ? groupRow.sessions
+          : [];
+      return list.flatMap((item) => {
+        const row = asRecord(item);
+        return row ? [{ row, date: pickSessionDate(row, fallback) }] : [];
+      });
+    });
+  }
+
+  if (Array.isArray(root.rows)) {
+    return root.rows.flatMap((item) => {
+      const row = asRecord(item);
+      return row ? [{ row, date: pickSessionDate(row) }] : [];
+    });
+  }
+
+  const items: Array<{ row: Record<string, unknown>; date?: string }> = [];
+  for (const [key, value] of Object.entries(root)) {
+    const dateKey = key.slice(0, 10);
+    const isDateKey =
+      /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+      || (PARTICIPATION_ANALYTICS_DAY_DATES as readonly string[]).includes(key);
+    if (!isDateKey) continue;
+    const inner = asRecord(value);
+    const list = Array.isArray(value)
+      ? value
+      : Array.isArray(inner?.rows)
+        ? inner!.rows
+        : [];
+    for (const item of list) {
+      const row = asRecord(item);
+      if (!row) continue;
+      items.push({ row, date: pickSessionDate(row, dateKey) });
+    }
+  }
+  return items;
 }
 
 function mapShareRows(raw: unknown): DistributionDataPoint[] {
@@ -253,14 +345,11 @@ function mapParticipationTime(raw: unknown): {
   rows: SessionParticipationTimeRow[];
   bucketLabels: string[];
 } {
-  const root = asRecord(raw);
-  const list = Array.isArray(raw) ? raw : Array.isArray(root?.rows) ? root!.rows : [];
+  const list = extractParticipationItems(raw);
   const labelSet = new Set<string>();
   const rows: SessionParticipationTimeRow[] = [];
 
-  for (const item of list) {
-    const row = asRecord(item);
-    if (!row) continue;
+  for (const { row, date } of list) {
     const name = pickString(row.session_name) ?? pickString(row.name);
     if (!name) continue;
     const rawBuckets = asRecord(row.buckets) ?? {};
@@ -270,9 +359,11 @@ function mapParticipationTime(raw: unknown): {
       buckets[key] = pickNumber(value) ?? 0;
     }
     rows.push({
+      sessionId: pickId(row.session_id) ?? pickId(row.sessionId),
       sessionName: name,
       sessionDurationMinutes: pickNumber(row.session_duration_min) ?? 0,
       uniqueParticipants: pickNumber(row.unique_participants) ?? 0,
+      date,
       buckets,
     });
   }
@@ -286,14 +377,11 @@ function mapParticipationRate(raw: unknown): {
   rows: SessionParticipationRateRow[];
   slotLabels: string[];
 } {
-  const root = asRecord(raw);
-  const list = Array.isArray(raw) ? raw : Array.isArray(root?.rows) ? root!.rows : [];
+  const list = extractParticipationItems(raw);
   const labelSet = new Set<string>();
   const rows: SessionParticipationRateRow[] = [];
 
-  for (const item of list) {
-    const row = asRecord(item);
-    if (!row) continue;
+  for (const { row, date } of list) {
     const name = pickString(row.session_name) ?? pickString(row.name);
     if (!name) continue;
 
@@ -327,8 +415,10 @@ function mapParticipationRate(raw: unknown): {
     }
 
     rows.push({
+      sessionId: pickId(row.session_id) ?? pickId(row.sessionId),
       sessionName: name,
       sessionDurationMinutes: pickNumber(row.session_duration_min) ?? 0,
+      date,
       slots,
     });
   }
@@ -388,6 +478,37 @@ function mapParticipationDurationSessions(raw: unknown): ParticipationTimeSessio
   });
 }
 
+function isParticipationActionReply(raw: unknown): boolean {
+  const root = asRecord(raw);
+  if (!root) return false;
+  const action = pickString(root.action)?.toLowerCase();
+  if (action === "participation_time" || action === "participation_rate") return true;
+  const envelope = asRecord(root.data);
+  const payload = asRecord(envelope?.data);
+  return payload?.participation_time != null || payload?.participation_rate != null;
+}
+
+function extractLiveAnalyticsData(raw: unknown): Record<string, unknown> {
+  const root = asRecord(raw) ?? {};
+  const type = pickString(root.type)?.toLowerCase();
+  if (type === "update") {
+    return asRecord(root.data) ?? root;
+  }
+
+  const envelope = asRecord(root.data);
+  const nestedPayload = asRecord(envelope?.data);
+  if (nestedPayload) {
+    return nestedPayload;
+  }
+
+  const action = pickString(root.action)?.toLowerCase();
+  if (action === "participation_time" || action === "participation_rate") {
+    if (envelope?.[action] != null) return envelope;
+  }
+
+  return envelope ?? root;
+}
+
 function mapParticipation(data: Record<string, unknown>): LiveAnalyticsParticipationSnapshot | null {
   // Session 5-min buckets — `participation_time` only (not viewer duration rows).
   const hasTime = data.participation_time != null;
@@ -409,6 +530,7 @@ function mapParticipation(data: Record<string, unknown>): LiveAnalyticsParticipa
  * Subscribe ack / non-update control — not a chart payload; skip snapshot updates.
  */
 export function isLiveAnalyticsControlMessage(raw: unknown): boolean {
+  if (isParticipationActionReply(raw)) return false;
   const root = asRecord(raw);
   if (!root) return false;
   const type = pickString(root.type)?.toLowerCase();
@@ -416,16 +538,28 @@ export function isLiveAnalyticsControlMessage(raw: unknown): boolean {
   const action = pickString(root.action)?.toLowerCase();
   if (action === "ping" || action === "subscribe") return true;
   const data = asRecord(root.data);
-  return Boolean(data && Array.isArray(data.subscribed));
+  return Boolean(data && Array.isArray(data.subscribed) && !asRecord(data.data));
+}
+
+export function extractLiveAnalyticsErrors(raw: unknown): string[] {
+  const root = asRecord(raw);
+  if (!root || !Array.isArray(root.errors)) return [];
+  return root.errors
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      const row = asRecord(item);
+      return pickString(row?.detail) ?? pickString(row?.message) ?? "";
+    })
+    .filter(Boolean);
 }
 
 /**
  * Map a live analytics WebSocket JSON payload into UI-ready series.
- * Expects `{ type: "update", data: { … } }` from Django.
+ * Expects `{ type: "update", data: { … } }` from Django, or a day-scoped
+ * `{ action: "participation_time"|"participation_rate", … }` reply.
  */
 export function mapLiveAnalyticsPayload(raw: unknown): LiveAnalyticsSnapshot {
-  const root = asRecord(raw) ?? {};
-  const data = asRecord(root.data) ?? root;
+  const data = extractLiveAnalyticsData(raw);
 
   const eventId =
     pickId(data.event_id)
@@ -452,6 +586,74 @@ export function mapLiveAnalyticsPayload(raw: unknown): LiveAnalyticsSnapshot {
     participationDurationSessions: mapParticipationDurationSessions(data.participation_duration),
     streamingSummary: mapStreamingPartial(data),
     raw,
+  };
+}
+
+/** Keep existing visuals when a day-scoped participation reply only includes one table. */
+export function mergeLiveAnalyticsSnapshot(
+  previous: LiveAnalyticsSnapshot | null,
+  incoming: LiveAnalyticsSnapshot,
+  raw: unknown,
+): LiveAnalyticsSnapshot {
+  if (!previous) return incoming;
+  const data = extractLiveAnalyticsData(raw);
+  const hasTime = data.participation_time != null;
+  const hasRate = data.participation_rate != null;
+  const prevParticipation = previous.participation;
+  const nextParticipation = incoming.participation;
+
+  let participation = previous.participation;
+  if (hasTime || hasRate) {
+    participation = {
+      timeRows: hasTime
+        ? (nextParticipation?.timeRows ?? [])
+        : (prevParticipation?.timeRows ?? []),
+      timeBucketLabels: hasTime
+        ? (nextParticipation?.timeBucketLabels ?? [])
+        : (prevParticipation?.timeBucketLabels ?? []),
+      rateRows: hasRate
+        ? (nextParticipation?.rateRows ?? [])
+        : (prevParticipation?.rateRows ?? []),
+      rateSlotLabels: hasRate
+        ? (nextParticipation?.rateSlotLabels?.length
+          ? nextParticipation.rateSlotLabels
+          : ["Max"])
+        : (prevParticipation?.rateSlotLabels ?? ["Max"]),
+    };
+  } else if (nextParticipation) {
+    participation = nextParticipation;
+  }
+
+  return {
+    receivedAt: incoming.receivedAt,
+    eventId: incoming.eventId ?? previous.eventId,
+    generatedAt: incoming.generatedAt ?? previous.generatedAt,
+    statewiseLogin:
+      data.statewise_login != null ? incoming.statewiseLogin : previous.statewiseLogin,
+    countrywiseLoginVirtual:
+      data.countrywise_login != null
+        ? incoming.countrywiseLoginVirtual
+        : previous.countrywiseLoginVirtual,
+    daywiseLogin:
+      data.daywise_login != null ? incoming.daywiseLogin : previous.daywiseLogin,
+    sessionMaxVirtual:
+      data.session_wise_max_virtual != null
+        ? incoming.sessionMaxVirtual
+        : previous.sessionMaxVirtual,
+    noShow: data.no_show != null ? incoming.noShow : previous.noShow,
+    feedback:
+      data.session_wise_feedback != null
+      || data.daywise_feedback != null
+      || data.feedback != null
+        ? incoming.feedback
+        : previous.feedback,
+    participation,
+    participationDurationSessions:
+      data.participation_duration != null
+        ? incoming.participationDurationSessions
+        : previous.participationDurationSessions,
+    streamingSummary: incoming.streamingSummary ?? previous.streamingSummary,
+    raw: incoming.raw,
   };
 }
 

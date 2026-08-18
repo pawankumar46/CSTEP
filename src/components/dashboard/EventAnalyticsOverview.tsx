@@ -7,8 +7,6 @@ import {
   Clock,
   Eye,
   Pause,
-  Radio,
-  TrendingUp,
   UserPlus,
   UserX,
   Users,
@@ -217,8 +215,6 @@ export function EventAnalyticsOverview() {
     return [
       { metric: "Currently Watching", value: liveStreamingSummary.currentlyWatching },
       { metric: "Unique Viewers", value: liveStreamingSummary.uniqueViewers },
-      { metric: "Broadcast Sessions", value: liveStreamingSummary.broadcastSessions },
-      { metric: "Peak Concurrent Viewers", value: liveStreamingSummary.peakConcurrentViewers },
       { metric: "Avg Watch Time", value: liveStreamingSummary.avgWatchTimeDisplay },
       { metric: "Total Watch Time", value: liveStreamingSummary.totalWatchTimeDisplay },
       {
@@ -414,7 +410,7 @@ export function EventAnalyticsOverview() {
             <p className="py-4 text-sm text-muted-foreground">Loading streaming insights…</p>
           ) : liveStreamingSummary ? (
             <>
-              <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid auto-rows-fr gap-3 sm:grid-cols-2">
                 <StatCard
                   title="Currently Watching"
                   value={liveStreamingSummary.currentlyWatching}
@@ -424,16 +420,6 @@ export function EventAnalyticsOverview() {
                   title="Unique Viewers"
                   value={liveStreamingSummary.uniqueViewers}
                   icon={Users}
-                />
-                <StatCard
-                  title="Broadcast Sessions"
-                  value={liveStreamingSummary.broadcastSessions}
-                  icon={Radio}
-                />
-                <StatCard
-                  title="Peak Concurrent"
-                  value={liveStreamingSummary.peakConcurrentViewers}
-                  icon={TrendingUp}
                 />
               </div>
               <AnalyticsMetricTable

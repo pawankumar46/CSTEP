@@ -240,6 +240,26 @@ export function AttendanceModeAnalytics() {
       { accessorKey: "userName", header: "User Name" },
       { accessorKey: "phone", header: "Phone" },
       { accessorKey: "email", header: "Email" },
+      {
+        accessorKey: "designation",
+        header: "Designation",
+        cell: ({ row }) =>
+          row.original.designation?.trim() ? (
+            <span className="text-sm">{row.original.designation}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        accessorKey: "orgName",
+        header: "Organization",
+        cell: ({ row }) =>
+          row.original.orgName?.trim() ? (
+            <span className="text-sm">{row.original.orgName}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
       ...visibleDayDates.map((date) => ({
         id: `day-${date}`,
         header: formatRegistrationIntervalDayLabel(date),

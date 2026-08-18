@@ -187,6 +187,7 @@ c-step/
 │   │   ├── live-analytics-api-contract.ts
 │   │   ├── live-analytics-mappers.ts
 │   │   ├── participation-session-analytics.ts # Session participation time/rate tables + day fixtures
+│   │   ├── event-analytics-export.ts # Analytics Excel/PDF column defs (incl. participation time/rate)
 │   │   ├── location-permission.ts # Post-login/registration location prompt + logging
 │   │   └── env.ts             # Public env readers
 │   ├── mock/                  # Fallback mock data (dev / API errors)
@@ -483,14 +484,14 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `GET` | `/analytics/events/feedback/` | Feedback analytics (`event`, optional `day`). Dashboard feedback uses `overall.total_feedback`, `average_rating`, `rating_distribution`, `by_day[]`, and `by_session[]`; `feedback_by_date` is ignored |
 | `GET` | `/analytics/streaming/summary/` | Live Event Insights streaming cards + details (`event_id`). Response: `currently_watching`, `unique_viewers`, `broadcast_sessions`, `peak_concurrent_viewers`, watch-time fields, `live_broadcast`. Polled every **15s** on the analytics overview while an event is selected |
 | `GET` | `/analytics/streaming/participation-trend/` | Participation Trend chart (`event_id`, `mode=all\|physical\|virtual`, `interval_minutes=15`, optional `date=YYYY-MM-DD`). Response: `{ mode, results: [{ bucket_start, count }] }` (empty `results` when no activity) |
-| `WS` | `/ws/analytics/{eventId}/?token=&visuals=` | Live Event Insights WebSocket. Path `eventId`; query `token` + comma-separated `visuals` (includes `participation_time` + `participation_duration`; no post-connect message). Server pushes `{ type: "update", data: { statewise_login, countrywise_login, daywise_login, session_wise_max_virtual, no_show, session_wise_feedback, daywise_feedback, participation_rate, participation_time, participation_duration } }`. Client: `useLiveAnalyticsSocket` |
+| `WS` | `/ws/analytics/{eventId}/?token=&visuals=` | Live Event Insights WebSocket. Path `eventId`; query `token` + comma-separated `visuals` (includes `participation_time` + `participation_duration`). After connect, Participation Time / Rate day chips send `{ "action": "participation_time"\|"participation_rate", "day_id": <event-day id> }`. Server pushes `{ type: "update", data: { statewise_login, countrywise_login, daywise_login, session_wise_max_virtual, no_show, session_wise_feedback, daywise_feedback, participation_rate, participation_time, participation_duration } }`. Client: `useLiveAnalyticsSocket` |
 | `WS` | `/ws/events/{eventId}/?token=` | Viewer presence while on `/streaming`. Client sends `{"type":"heartbeat"}` on connect and every 15s (skips when tab hidden). Client: `useEventPresenceSocket` |
 | `WS` | `/ws/events/{eventId}/chat/?token=` | Live stream chat. Client sends `message` (optional `reply_to`), `edit`, `delete`, or per-message `reaction`; server pushes `history`, `message`, `message_edited`, `reaction_update`, `message_deleted`, or socket-local `error`. Client: `useEventChatSocket` + `LiveChatPanel` on `/streaming` |
 | `GET` | `/analytics/registrations/users/` | Attendance Mode analytics table (`event_id`, optional `days__day__date`, optional `days__attendance_mode=PHYSICAL\|VIRTUAL`, optional `search`). Paginated `{ count, total_pages, current_page, results[] }` with `created_at` (Date of Registration) and `updated_at` (Modified; fallback `user.updated_at`) |
 | `GET` | `/analytics/dashboard/` | Platform dashboard analytics (overview: users total, top events) |
 | `GET` | `/analytics/events/:id/` | Event-scoped analytics (overview: registrations, days, streaming) |
 
-**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **Live Event Insights** from WebSocket `/ws/analytics/{eventId}/?token=&visuals=` (`type: "update"` payload — login maps, session max virtual, no-show, feedback, participation time with per-session 5-min duration buckets, participation rate) + REST fallbacks for feedback when WS feedback is empty. Participation Trend card removed from Live Event Insights. Participation Time (viewer join/leave cards elsewhere) still uses fixtures from `src/mock/analytics-api-fixtures.ts`. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
+**Hybrid (current):** Registration cards + **Registration Insights** + **streaming summary** + **Live Event Insights** from WebSocket `/ws/analytics/{eventId}/?token=&visuals=` (`type: "update"` payload — login maps, session max virtual, no-show, feedback, participation time with per-session 5-min duration buckets, participation rate) + REST fallbacks for feedback when WS feedback is empty. Participation Trend card removed from Live Event Insights. Participation Time / Rate tables use live WebSocket data only (no sample rows). Participation Duration (viewer join/leave) may still use fixtures from `src/mock/analytics-api-fixtures.ts` until the API is wired. Target shapes are documented in `src/lib/analytics-api-contract.ts` / `live-analytics-api-contract.ts`. Overview prefers event **id 11**, else the event with the highest `registeredCount`.
 
 Notable fields the overview expects on **`GET /analytics/events/:id/`**:
 
@@ -511,6 +512,7 @@ Day columns map `registration_dates[].mode` and `is_attended`: green means prese
 red means absent. Moderators and event administrators can click a badge to toggle
 attendance through `PATCH /registrations/registration-day/:id/`. Excel/PDF export
 includes Physical/Virtual plus a Present/Absent attendance column per conference day.
+List rows include `designation` and `org_name` when returned by the API.
 
 #### Notifications — `notification.service.ts`
 
@@ -643,6 +645,10 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ### 2026-08-18
 
 - **Attendance Mode export:** Excel/PDF now includes a Present/Absent attendance column per conference day from `registration_dates[].is_attended`, matching Lobby.
+- **Attendance Mode table:** Restored **Designation** and **Organization** columns from `GET /registrations/registration/` (`designation`, `org_name`).
+- **Live analytics export:** Participation Time and Participation Rate tables include Excel/PDF export of the current session rows (including the Participation Time total row).
+- **Live analytics day filter:** Participation Time and Participation Rate each send `{ action }` for **All**, or `{ action, day_id }` for a specific day. Tables show live WebSocket rows only (sample participation rows removed).
+- **Live analytics streaming cards:** Removed Broadcast Sessions and Peak Concurrent summary cards from Live Event Insights; Currently Watching and Unique Viewers remain.
 
 ### 2026-08-17
 

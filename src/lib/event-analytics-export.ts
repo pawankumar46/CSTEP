@@ -1,4 +1,9 @@
 import type { ExportColumn } from "@/lib/export-utils";
+import {
+  sumParticipationTimeTotals,
+  type SessionParticipationRateRow,
+  type SessionParticipationTimeRow,
+} from "@/lib/participation-session-analytics";
 
 export interface AnalyticsDistributionRow {
   category: string;
@@ -51,3 +56,87 @@ export const PARTICIPATION_TIME_EXPORT_COLUMNS: ExportColumn<ParticipationTimeEx
   { header: "Left at", value: (row) => row.loggedOut },
   { header: "Duration", value: (row) => row.duration },
 ];
+
+export interface SessionParticipationTableExportRow {
+  sessionName: string;
+  sessionDurationMinutes: number;
+  uniqueParticipants?: string;
+  values: Record<string, string>;
+}
+
+function formatParticipationCount(value: number | undefined): string {
+  if (value == null || value === 0) return "—";
+  return String(value);
+}
+
+export function getParticipationTimeTableExportColumns(
+  bucketLabels: readonly string[],
+): ExportColumn<SessionParticipationTableExportRow>[] {
+  return [
+    { header: "Session", value: (row) => row.sessionName },
+    { header: "Duration (min)", value: (row) => row.sessionDurationMinutes },
+    { header: "Unique", value: (row) => row.uniqueParticipants ?? "" },
+    ...bucketLabels.map((label) => ({
+      header: `${label} min`,
+      value: (row: SessionParticipationTableExportRow) => row.values[label] ?? "",
+    })),
+  ];
+}
+
+export function buildParticipationTimeTableExportRows(
+  rows: SessionParticipationTimeRow[],
+  bucketLabels: readonly string[],
+): SessionParticipationTableExportRow[] {
+  const mapped = rows.map((row) => ({
+    sessionName: row.sessionName,
+    sessionDurationMinutes: row.sessionDurationMinutes,
+    uniqueParticipants: formatParticipationCount(row.uniqueParticipants),
+    values: Object.fromEntries(
+      bucketLabels.map((label) => [
+        label,
+        label in row.buckets ? formatParticipationCount(row.buckets[label]) : "",
+      ]),
+    ),
+  }));
+  if (mapped.length === 0) return mapped;
+
+  const totals = sumParticipationTimeTotals(rows, bucketLabels);
+  mapped.push({
+    sessionName: "Total",
+    sessionDurationMinutes: totals.sessionDurationMinutes,
+    uniqueParticipants: formatParticipationCount(totals.uniqueParticipants),
+    values: Object.fromEntries(
+      bucketLabels.map((label) => [
+        label,
+        formatParticipationCount(totals.buckets[label]),
+      ]),
+    ),
+  });
+  return mapped;
+}
+
+export function getParticipationRateTableExportColumns(
+  slotLabels: readonly string[],
+): ExportColumn<SessionParticipationTableExportRow>[] {
+  return [
+    { header: "Session", value: (row) => row.sessionName },
+    { header: "Duration (min)", value: (row) => row.sessionDurationMinutes },
+    ...slotLabels.map((label) => ({
+      header: label,
+      value: (row: SessionParticipationTableExportRow) => row.values[label] ?? "",
+    })),
+  ];
+}
+
+export function buildParticipationRateTableExportRows(
+  rows: SessionParticipationRateRow[],
+  slotLabels: readonly string[],
+): SessionParticipationTableExportRow[] {
+  return rows.map((row) => ({
+    sessionName: row.sessionName,
+    sessionDurationMinutes: row.sessionDurationMinutes,
+    values: Object.fromEntries(
+      slotLabels.map((label) => [label, formatParticipationCount(row.slots[label])]),
+    ),
+  }));
+}

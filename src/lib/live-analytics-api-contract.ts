@@ -11,10 +11,12 @@
  * - `countrywise_login`: `[{ country, count }]`
  * - `session_wise_max_virtual`: `[{ session_id, session_name, max_participants }]`
  * - `no_show`: `[{ day_id, day_number, registered, attended, no_show }]`
- * - `participation_rate`: `{ rows: [{ session_id, session_name, session_duration_min, points[], max_concurrent }] }`
- * - `participation_time`: session 5-min bucket table `{ rows: [{ session_name, session_duration_min, unique_participants, buckets }] }`
+ * - `participation_rate`: `{ rows: [{ session_id, session_name, session_duration_min, date?, points[], max_concurrent }] }` (or grouped by day)
+ * - `participation_time`: session 5-min bucket table `{ rows: [{ session_name, session_duration_min, unique_participants, date?, buckets }] }` (or grouped by day)
  * - `participation_duration`: viewer watch rows `[{ user_id, full_name, email, joined_at, left_at, watch_duration_seconds }]`
  *   Feeds the **Participation Duration** card (User / Logged in / Logged out / Duration). `left_at: null` → Still watching.
+ * Day-filter reply (client sends `{ action, day_id? }`):
+ * `{ action: "participation_time"|"participation_rate", errors: [], data: { subscribed, filters, data: { participation_*: { rows } } } }`
  * Legacy nested `{ all, physical, virtual }` mode objects are still supported for login maps.
  */
 

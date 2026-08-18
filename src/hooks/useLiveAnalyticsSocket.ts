@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   AUTH_SESSION_REFRESHED_EVENT,
   getAccessToken,
 } from "@/lib/auth-session";
 import {
+  extractLiveAnalyticsErrors,
   isLiveAnalyticsControlMessage,
   mapLiveAnalyticsPayload,
+  mergeLiveAnalyticsSnapshot,
 } from "@/lib/live-analytics-mappers";
 import { buildLiveAnalyticsWebSocketUrl } from "@/lib/live-analytics-ws";
 import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
@@ -18,7 +20,7 @@ const RECONNECT_MAX_MS = 20000;
 /**
  * Live analytics WebSocket for the selected event.
  * URL: `{ws|wss}://{API_HOST}/ws/analytics/{eventId}/?token=…&visuals=…`
- * Visuals are query params only — no post-connect subscribe/ping messages.
+ * Day filters send `{ action: "participation_time"|"participation_rate", day_id }`.
  */
 export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
   const setConnecting = useLiveAnalyticsStore((s) => s.setConnecting);
@@ -26,12 +28,25 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
   const setDisconnected = useLiveAnalyticsStore((s) => s.setDisconnected);
   const setError = useLiveAnalyticsStore((s) => s.setError);
   const setSnapshot = useLiveAnalyticsStore((s) => s.setSnapshot);
+  const setSendJson = useLiveAnalyticsStore((s) => s.setSendJson);
   const reset = useLiveAnalyticsStore((s) => s.reset);
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closedByUserRef = useRef(false);
+
+  const sendJson = useCallback((payload: Record<string, unknown>) => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify(payload));
+    return true;
+  }, []);
+
+  useEffect(() => {
+    setSendJson(sendJson);
+    return () => setSendJson(() => false);
+  }, [sendJson, setSendJson]);
 
   useEffect(() => {
     closedByUserRef.current = false;
@@ -104,7 +119,13 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
             const parsed: unknown =
               typeof event.data === "string" ? JSON.parse(event.data) : event.data;
             if (isLiveAnalyticsControlMessage(parsed)) return;
-            setSnapshot(mapLiveAnalyticsPayload(parsed));
+            const wsErrors = extractLiveAnalyticsErrors(parsed);
+            if (wsErrors.length > 0) {
+              setError(wsErrors[0]);
+            }
+            const incoming = mapLiveAnalyticsPayload(parsed);
+            const previous = useLiveAnalyticsStore.getState().snapshot;
+            setSnapshot(mergeLiveAnalyticsSnapshot(previous, incoming, parsed));
           } catch (err) {
             setError(
               err instanceof Error
@@ -171,5 +192,6 @@ export function useLiveAnalyticsSocket(eventId: string | null | undefined) {
     setDisconnected,
     setError,
     setSnapshot,
+    setSendJson,
   ]);
 }

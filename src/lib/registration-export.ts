@@ -122,6 +122,8 @@ export function getAttendanceModeUsersExportColumns(
     { header: "User Name", value: (row) => row.userName },
     { header: "Phone", value: (row) => row.phone },
     { header: "Email", value: (row) => row.email },
+    { header: "Designation", value: (row) => row.designation || "—" },
+    { header: "Organization", value: (row) => row.orgName || "—" },
     { header: "City", value: (row) => row.city },
     { header: "State", value: (row) => row.state },
     ...dayDates.flatMap((date) => {
