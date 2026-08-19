@@ -48,24 +48,56 @@ export function exportToPdf<T>(
   void Promise.all([import("jspdf"), import("jspdf-autotable")]).then(([jsPDFModule, autoTableModule]) => {
     const { jsPDF } = jsPDFModule;
     const autoTable = autoTableModule.default;
+    const isWide = columns.length > 6;
+    const pageLongEdge = isWide
+      ? Math.min(1400, Math.max(297, 64 + columns.length * 16))
+      : 297;
 
     const doc = new jsPDF({
-      orientation: columns.length > 5 ? "landscape" : "portrait",
+      orientation: isWide || columns.length > 4 ? "landscape" : "portrait",
       unit: "mm",
-      format: "a4",
+      format: isWide ? [210, pageLongEdge] : "a4",
     });
 
-    doc.setFontSize(14);
-    doc.text(title, 14, 15);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFontSize(12);
+    const titleLines = doc.splitTextToSize(title, pageWidth - 28);
+    doc.text(titleLines, 14, 12);
+
+    const columnStyles: Record<number, { cellWidth?: number; overflow?: "linebreak" | "ellipsize"; halign?: "left" | "center" | "right" }> = {
+      0: { cellWidth: isWide ? 52 : 40, overflow: "linebreak", halign: "left" },
+    };
+    if (isWide) {
+      for (let index = 1; index < columns.length; index += 1) {
+        const header = columns[index]?.header ?? "";
+        const width = Math.min(28, Math.max(12, header.length * 1.8 + 6));
+        columnStyles[index] = { cellWidth: width, halign: "center" };
+      }
+    }
 
     autoTable(doc, {
       head: [columns.map((col) => col.header)],
       body: rows.map((row) => columns.map((col) => toCellString(col.value(row)))),
-      startY: 22,
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [37, 99, 235], textColor: 255 },
+      startY: 12 + titleLines.length * 6,
+      styles: {
+        fontSize: isWide ? 6.5 : 8,
+        cellPadding: isWide ? 1.1 : 2,
+        overflow: "linebreak",
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: [37, 99, 235],
+        textColor: 255,
+        fontSize: isWide ? 6 : 8,
+        overflow: "linebreak",
+        valign: "middle",
+      },
       alternateRowStyles: { fillColor: [245, 247, 250] },
-      margin: { left: 14, right: 14 },
+      columnStyles,
+      tableWidth: isWide ? "wrap" : "auto",
+      horizontalPageBreak: isWide,
+      horizontalPageBreakRepeat: isWide ? [0, 1] : undefined,
+      margin: { left: 10, right: 10, top: 12, bottom: 12 },
     });
 
     doc.save(`${filename}.pdf`);

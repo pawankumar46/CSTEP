@@ -69,6 +69,18 @@ function formatParticipationCount(value: number | undefined): string {
   return String(value);
 }
 
+function formatRateSlotHeader(label: string): string {
+  if (label === "Max") return "Max";
+  const iso = label.match(/T(\d{2}):(\d{2})/);
+  if (iso) {
+    const hour = Number(iso[1]);
+    const minute = iso[2];
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minute} ${hour >= 12 ? "PM" : "AM"}`;
+  }
+  return label;
+}
+
 export function getParticipationTimeTableExportColumns(
   bucketLabels: readonly string[],
 ): ExportColumn<SessionParticipationTableExportRow>[] {
@@ -122,7 +134,7 @@ export function getParticipationRateTableExportColumns(
     { header: "Session", value: (row) => row.sessionName },
     { header: "Duration (min)", value: (row) => row.sessionDurationMinutes },
     ...slotLabels.map((label) => ({
-      header: label,
+      header: formatRateSlotHeader(label),
       value: (row: SessionParticipationTableExportRow) => row.values[label] ?? "",
     })),
   ];
