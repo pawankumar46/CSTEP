@@ -31,6 +31,21 @@ function pickNumber(value: unknown): number | null {
   return null;
 }
 
+function pickNumberByKeys(row: Record<string, unknown>, keys: string[]): number | null {
+  const wanted = new Set(keys.map((key) => key.trim()));
+  for (const key of keys) {
+    const direct = pickNumber(row[key]);
+    if (direct != null) return direct;
+  }
+  for (const [rawKey, value] of Object.entries(row)) {
+    if (wanted.has(rawKey.trim())) {
+      const parsed = pickNumber(value);
+      if (parsed != null) return parsed;
+    }
+  }
+  return null;
+}
+
 function pickString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -276,9 +291,11 @@ function mapNoShow(raw: unknown): LiveAnalyticsNoShowDay[] {
     rows.push({
       dayId: pickId(row.day_id) ?? String(dayNumber),
       dayNumber,
-      registered: pickNumber(row.registered) ?? 0,
-      attended: pickNumber(row.attended) ?? 0,
-      noShow: pickNumber(row.no_show) ?? 0,
+      registered: pickNumberByKeys(row, ["registered"]) ?? 0,
+      virtualAttended: pickNumberByKeys(row, ["virtual_attended"]) ?? 0,
+      physicalAttended: pickNumberByKeys(row, ["physical_attended"]) ?? 0,
+      attended: pickNumberByKeys(row, ["attended"]) ?? 0,
+      noShow: pickNumberByKeys(row, ["no_show"]) ?? 0,
     });
   }
   return rows.sort((a, b) => a.dayNumber - b.dayNumber);

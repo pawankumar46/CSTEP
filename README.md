@@ -650,6 +650,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 - **Watch Live join:** `POST /events/event/:id/join/` now includes `day_id` (today’s event day) and `session_id` (currently running schedule item by IST clock).
 - **Streaming access:** Base-user Watch Live opens at **20 Aug 2026 06:00 IST**. Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
 - **Live analytics PDF:** Participation Rate (and other wide tables) export to PDF in landscape with wrapping pages, repeating Session/Duration columns, and shorter time headers so slot columns stay readable.
+- **Live analytics not attended:** The live analytics table is labeled **Not attended by day** (API field remains `no_show`). Maps `virtual_attended` and `physical_attended` (including trailing-space API keys).
 
 ### 2026-08-18
 

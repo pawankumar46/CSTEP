@@ -139,17 +139,26 @@ function SessionMaxVirtualChart({ data }: { data: DistributionDataPoint[] }) {
 function NoShowTable({
   rows,
 }: {
-  rows: { dayNumber: number; registered: number; attended: number; noShow: number }[];
+  rows: {
+    dayNumber: number;
+    registered: number;
+    virtualAttended: number;
+    physicalAttended: number;
+    attended: number;
+    noShow: number;
+  }[];
 }) {
   return (
-    <div className="overflow-hidden rounded-md border">
+    <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b bg-muted/30 text-left text-[11px] text-muted-foreground">
             <th className="px-2 py-1.5 font-medium">Day</th>
             <th className="px-2 py-1.5 text-right font-medium">Registered</th>
+            <th className="px-2 py-1.5 text-right font-medium">Virtual attended</th>
+            <th className="px-2 py-1.5 text-right font-medium">Physical attended</th>
             <th className="px-2 py-1.5 text-right font-medium">Attended</th>
-            <th className="px-2 py-1.5 text-right font-medium">No-show</th>
+            <th className="px-2 py-1.5 text-right font-medium">Not attended</th>
           </tr>
         </thead>
         <tbody>
@@ -157,6 +166,8 @@ function NoShowTable({
             <tr key={row.dayNumber} className="border-b last:border-0">
               <td className="px-2 py-1.5 font-medium">Day {row.dayNumber}</td>
               <td className="px-2 py-1.5 text-right tabular-nums">{row.registered}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.virtualAttended}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.physicalAttended}</td>
               <td className="px-2 py-1.5 text-right tabular-nums">{row.attended}</td>
               <td className="px-2 py-1.5 text-right tabular-nums">{row.noShow}</td>
             </tr>
@@ -261,13 +272,13 @@ export function LiveLoginInsightsCharts() {
 
         <InsightCard
           icon={UserX}
-          title="No-show by day - Virtual Attendees"
-          description="Registered vs attended vs no-show for virtual attendees on each event day."
+          title="Not attended by day"
+          description="Registered vs virtual attended, physical attended, total attended, and not attended for each event day."
           className="lg:col-span-2 xl:col-span-3"
         >
           {noShowRows.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              Waiting for live no-show data…
+              Waiting for live not-attended data…
             </p>
           ) : (
             <NoShowTable rows={noShowRows} />

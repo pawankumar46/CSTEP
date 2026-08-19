@@ -10,7 +10,7 @@
  * - `statewise_login`: `[{ state, count }]`
  * - `countrywise_login`: `[{ country, count }]`
  * - `session_wise_max_virtual`: `[{ session_id, session_name, max_participants }]`
- * - `no_show`: `[{ day_id, day_number, registered, attended, no_show }]`
+ * - `no_show`: `[{ day_id, day_number, registered, virtual_attended, physical_attended, attended, no_show }]`
  * - `participation_rate`: `{ rows: [{ session_id, session_name, session_duration_min, date?, points[], max_concurrent }] }` (or grouped by day)
  * - `participation_time`: session 5-min bucket table `{ rows: [{ session_name, session_duration_min, unique_participants, date?, buckets }] }` (or grouped by day)
  * - `participation_duration`: viewer watch rows `[{ user_id, full_name, email, joined_at, left_at, watch_duration_seconds }]`
@@ -43,6 +43,8 @@ export interface LiveAnalyticsNoShowDay {
   dayId: string;
   dayNumber: number;
   registered: number;
+  virtualAttended: number;
+  physicalAttended: number;
   attended: number;
   noShow: number;
 }
