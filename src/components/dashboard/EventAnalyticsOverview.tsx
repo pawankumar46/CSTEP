@@ -417,7 +417,7 @@ export function EventAnalyticsOverview() {
                   icon={Eye}
                 />
                 <StatCard
-                  title="Unique Viewers"
+                  title="Unique Virtual Audience"
                   value={liveStreamingSummary.uniqueViewers}
                   icon={Users}
                 />

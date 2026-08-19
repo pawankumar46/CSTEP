@@ -134,17 +134,23 @@ export const joinEvent = async (
     locationAccuracy?: number | null;
     state: string;
     country?: string;
+    dayId?: number;
+    sessionId?: number;
   },
 ): Promise<void> => {
   try {
-    await apiClient.post(`/events/event/${eventId}/join/`, {
+    const body: Record<string, string | number | null> = {
       ip_address: payload.ipAddress,
       latitude: payload.latitude == null ? null : roundCoordinate(payload.latitude),
       longitude: payload.longitude == null ? null : roundCoordinate(payload.longitude),
       location_accuracy: 0,
       state: payload.state,
       country: payload.country ?? "",
-    });
+    };
+    if (payload.dayId != null) body.day_id = payload.dayId;
+    if (payload.sessionId != null) body.session_id = payload.sessionId;
+
+    await apiClient.post(`/events/event/${eventId}/join/`, body);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }

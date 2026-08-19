@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { ClientLocationInfo } from "@/lib/ipwhois-api-contract";
 import { DEFAULT_FEEDBACK_EVENT_ID } from "@/lib/feedback-options";
+import { resolveEventJoinContext } from "@/lib/event-join-context";
 import { ROUTES } from "@/lib/routes";
 import * as eventService from "@/services/event.service";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -114,6 +115,7 @@ export async function joinEventFromClient(eventId?: string | null): Promise<void
   const location = await fetchIpWhoisLocationFromApi();
   const browser = await readBrowserGeolocation();
   const resolvedEventId = resolveJoinEventId(eventId);
+  const joinContext = await resolveEventJoinContext(resolvedEventId);
 
   try {
     await eventService.joinEvent(resolvedEventId, {
@@ -123,6 +125,8 @@ export async function joinEventFromClient(eventId?: string | null): Promise<void
       locationAccuracy: 0,
       state: location.region ?? "",
       country: location.country ?? "",
+      dayId: joinContext.dayId,
+      sessionId: joinContext.sessionId,
     });
   } catch {
     // Join location is best-effort; don't block Watch Live / home flow.

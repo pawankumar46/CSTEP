@@ -420,7 +420,7 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 | `POST` | `/events/event/` | Create event |
 | `PATCH` | `/events/event/:id/` | Update event |
 | `DELETE` | `/events/event/:id/` | Delete event |
-| `POST` | `/events/event/:id/join/` | Record join location on **Watch Live** (and after login/registration). Body: `{ ip_address, latitude, longitude, location_accuracy: 0, state, country }` — lat/long rounded to **5** decimal places |
+| `POST` | `/events/event/:id/join/` | Record join on **Watch Live** (and after login/registration). Body: `{ ip_address, latitude, longitude, location_accuracy: 0, state, country, day_id, session_id }` — `day_id` is today’s event day; `session_id` is the currently running schedule item. Lat/long rounded to **5** decimal places |
 | `POST` | `/events/event/:id/leave/` | Mark viewer left when exiting `/streaming` (Exit / feedback leave) or closing/refreshing the tab (`pagehide` + keepalive fetch) |
 | `GET` | `/events/event-days/dropdown/?event=` | Event day options (feedback tabs, attendance-mode edit); `{ id, day_number, date, label, allowed_attendance_modes }` |
 | `GET` | `/events/schedule-items/?day=` | Schedule items for a day (feedback session list; paginated `results[]`) |
@@ -573,7 +573,7 @@ Lobby and all assistance dashboards support **Accept**, **Hold**, and **Reject**
 3. **Other country codes:** Skip OTP; auto-login → `POST /auth/login/` with the new email/password
 4. Event register → `POST /registrations/registration/` (base users land on `/event-register` when not yet registered). For ICAS, **19 Aug** is selectable as **Physical only**; 20–21 Aug keep Physical/Virtual from the API.
 5. Optional profile support → `POST /registrations/request-*`
-6. When login or registration lands on `/` or `/dashboard`, or when the user clicks **Watch Live**, the app resolves IP geo via [ipwhois.io](https://ipwhois.io/documentation#overview) (`GET /api/ip-lookup`), optionally reads browser GPS, and `POST /events/event/:id/join/` with `{ ip_address, latitude, longitude, location_accuracy: 0, state, country }` (`state` ← `region`; lat/long rounded to 5 decimals)
+6. When login or registration lands on `/` or `/dashboard`, or when the user clicks **Watch Live**, the app resolves IP geo via [ipwhois.io](https://ipwhois.io/documentation#overview) (`GET /api/ip-lookup`), optionally reads browser GPS, and `POST /events/event/:id/join/` with `{ ip_address, latitude, longitude, location_accuracy: 0, state, country, day_id, session_id }` (`state` ← `region`; lat/long rounded to 5 decimals; `day_id`/`session_id` from today’s event day and the running session)
 7. Leaving `/streaming` (Exit after feedback, or tab close/refresh) calls `POST /events/event/:id/leave/` once (async on in-app exit; keepalive fetch on `pagehide`)
 8. While on `/streaming`, `useEventPresenceSocket` keeps `…/ws/events/{eventId}/?token=` open and sends `{"type":"heartbeat"}` every 15s (paused when the tab is hidden)
 
@@ -644,6 +644,11 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-08-19
+
+- **Watch Live join:** `POST /events/event/:id/join/` now includes `day_id` (today’s event day) and `session_id` (currently running schedule item by IST clock).
+- **Streaming access:** Base-user Watch Live opens at **20 Aug 2026 06:00 IST**. Staff unchanged. Override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS=true|false`.
 
 ### 2026-08-18
 
