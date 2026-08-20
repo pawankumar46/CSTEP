@@ -585,9 +585,9 @@ export function VideoPlayer({
       )}
 
       {!compact && isLive && !isPaused && !playbackError && (usesVideo || usesExternalMeeting || (usesIframe && iframeReady)) && (
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-2 pointer-events-none">
-          <span className="flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
-            <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+        <div className="absolute top-1.5 left-1.5 z-10 pointer-events-none sm:top-2 sm:left-2">
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-red-600/95 px-1.5 py-px text-[9px] font-semibold leading-none tracking-wide text-white shadow-sm sm:gap-1 sm:px-2 sm:py-0.5 sm:text-[10px]">
+            <span className="h-1 w-1 shrink-0 rounded-full bg-white animate-pulse sm:h-1.5 sm:w-1.5" />
             LIVE
           </span>
         </div>
