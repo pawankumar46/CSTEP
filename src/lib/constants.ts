@@ -26,10 +26,10 @@ export const LIVE_STREAM_FILE_ID = readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_I
 
 /** Vertical side banners shown beside the live stream (hidden in fullscreen). */
 export const STREAM_LEFT_BANNER_URL =
-  readPublicEnv("NEXT_PUBLIC_STREAM_LEFT_BANNER_URL") ?? "/CstepLeft1.jpeg";
+  readPublicEnv("NEXT_PUBLIC_STREAM_LEFT_BANNER_URL") ?? "/CstepBanner.jpeg";
 
 export const STREAM_RIGHT_BANNER_URL =
-  readPublicEnv("NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL") ?? "/CstepRight1.jpeg";
+  readPublicEnv("NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL") ?? "/CstepBanner.jpeg";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   base_user: "Base User",
