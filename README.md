@@ -29,7 +29,7 @@ CSTEP is a **Next.js** web application for conference and event operations: dele
 | Area | Description |
 |------|-------------|
 | **Public site** | Landing page, event info, sign up / login, event registration |
-| **Live streaming** | `/streaming` — HLS from event broadcast sessions; multi-camera switcher when several sessions exist; optional env fallback for dev |
+| **Live streaming** | `/streaming` — HLS from event broadcast sessions; multi-camera switcher when several sessions exist; scrolling headphones reminder; optional env fallback for dev |
 | **Profile** | Delegates request travel, medical, translation, and accommodation support |
 | **Dashboard** | Role-based admin tools for lobby, assistance requests (accept / hold / reject), events, users, analytics; notification bell for moderators / event admins |
 | **Notifications** | Bell on dashboard (staff) and home navbar (users). REST `/notification/notification/…` + live WS `/ws/notifications/?token=` |
@@ -153,7 +153,7 @@ c-step/
 │   │   ├── profile/           # Profile support forms
 │   │   ├── providers/         # Auth, theme providers
 │   │   ├── shared/            # DataTable, ExportMenu, NotificationDropdown, guards, etc.
-│   │   ├── streaming/         # VideoPlayer, StreamCameraPicker, LiveChatPanel, StreamAccessGuard
+│   │   ├── streaming/         # VideoPlayer, StreamCameraPicker, LiveChatPanel, StreamingHeadphonesNotice, StreamAccessGuard
 │   │   └── ui/                # shadcn-style UI primitives
 │   ├── features/
 │   │   ├── dashboard/         # Role dashboards + Zod schemas (admin-*)
@@ -638,12 +638,16 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 | Registration payload | `registration-mappers.ts`, `registration.service.ts` |
 | Assistance forms | `event-support-mappers.ts`, `lobby.service.ts`, `date-input.ts`, `features/dashboard/admin-*.schema.ts` |
 | Analytics | `analytics.service.ts`, `analytics-mappers.ts`, `RegistrationInsightsCharts.tsx`, `useLiveAnalyticsSocket`, `useLiveAnalyticsStore`, `app/dashboard/analytics/`, `AttendanceModeAnalytics.tsx`, `EventFeedbackCharts.tsx`, `LiveLoginInsightsCharts.tsx`, `SessionParticipationAnalytics.tsx`, `IndiaStateRegistrationsMap.tsx`, `CountryRegistrationsGlobe.tsx` |
-| Streaming | `VideoPlayer.tsx`, `StreamCameraPicker.tsx`, `LiveChatPanel.tsx`, `useEventChatSocket.ts`, `stream-utils.ts`, `streaming/page.tsx` |
+| Streaming | `VideoPlayer.tsx`, `StreamCameraPicker.tsx`, `LiveChatPanel.tsx`, `StreamingHeadphonesNotice.tsx`, `useEventChatSocket.ts`, `stream-utils.ts`, `streaming/page.tsx` |
 | Notifications | `NotificationDropdown.tsx`, `useNotifications.ts`, `useNotificationSocket.ts`, `notification.service.ts`, `notification-ws.ts`, `useNotificationStore.ts` |
 
 ---
 
 ## Changelog
+
+### 2026-08-20
+
+- **Streaming notice:** `/streaming` shows a scrolling banner — “Please use headphones for a better audio experience.” — below the page header (static when reduced motion is preferred).
 
 ### 2026-08-19
 

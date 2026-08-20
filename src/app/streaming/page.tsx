@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Pause, Play, VolumeX, Share2, Users, Home, MessageSquare,
 } from "lucide-react";
+import { StreamingHeadphonesNotice } from "@/components/streaming/StreamingHeadphonesNotice";
 import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
 import { StreamCameraPicker } from "@/components/streaming/StreamCameraPicker";
 import { LiveChatPanel } from "@/components/streaming/LiveChatPanel";
@@ -337,6 +338,8 @@ export default function StreamingPage() {
           <ThemeToggle />
         </div>
       </header>
+
+      <StreamingHeadphonesNotice />
 
       <div className={cn("mx-auto px-4 py-4 sm:py-6", isTheaterView ? "w-full max-w-[min(96vw,100rem)]" : "container")}>
         {isTheaterView ? (
