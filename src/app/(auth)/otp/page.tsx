@@ -94,7 +94,7 @@ function OTPForm() {
       const user = useAuthStore.getState().user;
       const destination = user
         ? await resolvePostAuthDestination(user.id, user.role, redirectParam)
-        : sanitizeRedirect(redirectParam) ?? ROUTES.eventRegister;
+        : sanitizeRedirect(redirectParam) ?? ROUTES.home;
 
       markLocationPermissionPromptForDestination(destination, "login");
       setTimeout(() => router.replace(destination), 1200);

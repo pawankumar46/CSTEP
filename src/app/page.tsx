@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useHomeEvent } from "@/hooks/useHomeEvent";
 import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
+import { isEventPubliclyEnded } from "@/lib/event-registration-window";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomCTASkeleton } from "@/components/shared/LoadingSkeleton";
 import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
@@ -30,6 +31,7 @@ function BottomCTA() {
     upcomingEvent,
   } = useHomeEvent();
 
+  const eventEnded = isEventPubliclyEnded();
   const title = upcomingEvent?.name ?? "";
   const dates = upcomingEvent
     ? formatHomeEventDateRange(upcomingEvent.name, upcomingEvent.date, upcomingEvent.endDate)
@@ -37,11 +39,13 @@ function BottomCTA() {
   const registerHref = upcomingEvent
     ? getHomeRegisterHref(isAuthenticated, isRegistered, upcomingEvent.id)
     : ROUTES.eventRegister;
-  const registerLabel = isAuthenticated
-    ? upcomingEvent && !isRegistered
-      ? "Register for Event"
-      : null
-    : getHomeRegisterLabel(isAuthenticated, isRegistered);
+  const registerLabel = eventEnded
+    ? null
+    : isAuthenticated
+      ? upcomingEvent && !isRegistered
+        ? "Register for Event"
+        : null
+      : getHomeRegisterLabel(isAuthenticated, isRegistered);
 
   if (isLoading) {
     return <BottomCTASkeleton />;
@@ -54,26 +58,58 @@ function BottomCTA() {
   return (
     <section className="py-16 bg-primary text-primary-foreground">
       <div className="container mx-auto px-4 text-center space-y-6">
-        <h2 className="text-3xl font-bold">Ready to Join?</h2>
+        <h2 className="text-3xl font-bold">
+          {eventEnded ? "Thanks for joining us" : "Ready to Join?"}
+        </h2>
         <p className="text-primary-foreground/80 max-w-lg mx-auto">
-          {isAuthenticated && isRegistered
-            ? "You're registered for the event. Watch the live stream when it begins."
-            : isAuthenticated
-              ? "You're signed in. Complete event registration to confirm your participation."
-              : `Create an account, then register for ${title} on ${dates}.`}
+          {eventEnded
+            ? `${title || "This event"} has ended. Sign up or sign in anytime, then watch session recordings in the Recordings section.`
+            : isAuthenticated && isRegistered
+              ? "You're registered for the event. Watch the live stream when it begins."
+              : isAuthenticated
+                ? "You're signed in. Complete event registration to confirm your participation."
+                : `Create an account, then register for ${title} on ${dates}.`}
         </p>
         <div className="flex flex-wrap justify-center gap-3">
-          {registerLabel && (
-            <Button size="lg" variant="secondary" asChild>
-              <Link href={registerHref}>{registerLabel}</Link>
-            </Button>
+          {eventEnded ? (
+            <>
+              {isAuthenticated ? (
+                <Button size="lg" variant="secondary" asChild>
+                  <Link href={ROUTES.recordings}>Watch Recordings</Link>
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" variant="secondary" asChild>
+                    <Link href={ROUTES.signup}>Sign Up</Link>
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="secondary"
+                    className="border border-white/40 bg-transparent text-white hover:bg-white/15"
+                    asChild
+                  >
+                    <Link href={`${ROUTES.login}?redirect=${encodeURIComponent(ROUTES.recordings)}`}>
+                      Sign In
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {registerLabel && (
+                <Button size="lg" variant="secondary" asChild>
+                  <Link href={registerHref}>{registerLabel}</Link>
+                </Button>
+              )}
+              <WatchLiveButton
+                event={upcomingEvent}
+                size="lg"
+                variant="secondary"
+                className="border-white bg-transparent text-white hover:bg-white/15 hover:text-white disabled:opacity-50"
+              />
+            </>
           )}
-          <WatchLiveButton
-            event={upcomingEvent}
-            size="lg"
-            variant="secondary"
-            className="border-white bg-transparent text-white hover:bg-white/15 hover:text-white disabled:opacity-50"
-          />
         </div>
       </div>
     </section>

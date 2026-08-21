@@ -1,6 +1,7 @@
 import { isBaseUserRole, isStaffRole } from "@/lib/auth-utils";
 import { readPublicEnv } from "@/lib/env";
 import { formatEventDateRange } from "@/lib/event-display";
+import { isEventPubliclyEnded } from "@/lib/event-registration-window";
 import type { Event, UserRole } from "@/types";
 
 export type EventStreamPhase = "upcoming" | "live" | "ended";
@@ -43,7 +44,11 @@ function parseEventTime(value: string): number | null {
 }
 
 /** Whether the event stream window is upcoming, live, or ended. */
-export function getEventStreamPhase(event: EventTiming): EventStreamPhase {
+export function getEventStreamPhase(event: EventTiming, now = new Date()): EventStreamPhase {
+  if (isEventPubliclyEnded(now)) {
+    return "ended";
+  }
+
   if (event.status === "cancelled" || event.status === "completed") {
     return "ended";
   }
@@ -52,7 +57,7 @@ export function getEventStreamPhase(event: EventTiming): EventStreamPhase {
     return "live";
   }
 
-  const now = Date.now();
+  const nowMs = now.getTime();
   const start = parseEventTime(event.date);
   const end = parseEventTime(event.endDate ?? event.date);
 
@@ -60,8 +65,8 @@ export function getEventStreamPhase(event: EventTiming): EventStreamPhase {
     return "ended";
   }
 
-  if (now < start) return "upcoming";
-  if (now > end) return "ended";
+  if (nowMs < start) return "upcoming";
+  if (nowMs > end) return "ended";
   return "live";
 }
 
@@ -104,6 +109,15 @@ export function getWatchLiveAccess({
     };
   }
 
+  if (phase === "ended") {
+    return {
+      phase,
+      canWatchLive: false,
+      disabledTitle: "This event has ended",
+      showSignInToWatch: false,
+    };
+  }
+
   if (isAuthenticated && role && isBaseUserRole(role) && !streamOpenToBaseUsers) {
     return {
       phase,
@@ -128,15 +142,6 @@ export function getWatchLiveAccess({
       canWatchLive: false,
       disabledTitle: "Sign in to watch the live stream",
       showSignInToWatch: true,
-    };
-  }
-
-  if (phase === "ended") {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: "This event has ended",
-      showSignInToWatch: false,
     };
   }
 

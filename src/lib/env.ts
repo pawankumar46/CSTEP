@@ -32,6 +32,8 @@ export function readPublicEnv(name: string): string | undefined {
       return trimEnv(process.env.NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL);
     case "NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS":
       return trimEnv(process.env.NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS);
+    case "NEXT_PUBLIC_EVENT_ENDED":
+      return trimEnv(process.env.NEXT_PUBLIC_EVENT_ENDED);
     case "VERCEL_URL":
       return trimEnv(process.env.VERCEL_URL);
     default:

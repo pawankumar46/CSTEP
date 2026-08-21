@@ -100,6 +100,7 @@ Create `.env.local` from `.env.example`:
 | `NEXT_PUBLIC_STREAM_LEFT_BANNER_URL` | Optional | Left banner image on streaming page |
 | `NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL` | Optional | Right side fallback image when Camera 3 is unavailable |
 | `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS` | Optional | Base-user Watch Live: unset = opens **19 Aug 2026 06:00 IST**; `true` = force open; `false` = keep locked |
+| `NEXT_PUBLIC_EVENT_ENDED` | Optional | Public event window: unset = ends **21 Aug 2026 16:00 IST**; `true` = force ended (no event registration, home shows recordings); `false` = keep open |
 | `NEXT_PUBLIC_BRAND_LOGO_DARK_SRC` | Optional | Dark theme logo path |
 
 After changing any `NEXT_PUBLIC_*` variable in `.env.local`, **restart the dev server** (`npm run clean && npm run dev` if the old protocol still appears). In production, **redeploy** so the build picks up new values.
@@ -174,6 +175,7 @@ c-step/
 │   │   ├── assistance-status.ts
 │   │   ├── broadcast-mappers.ts
 │   │   ├── stream-utils.ts    # Stream URL parsing (Drive, HLS, mp4)
+│   │   ├── event-registration-window.ts # Public event end (21 Aug 16:00 IST) + registration close
 │   │   ├── date-input.ts      # Date input min values & past-date validation
 │   │   ├── client-ip.ts       # Client IP from proxy request headers
 │   │   ├── ipwhois-api-contract.ts # ipwhois.io location field contract
@@ -644,6 +646,11 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-08-21
+
+- **Agenda PDF:** Replaced `docs/ICAS-2026_Agenda.pdf` and served copy `public/docs/icas-agenda.pdf` with the updated `ICAS-2026_Agenda-updated.pdf`.
+- **Event end window:** After **21 Aug 2026 16:00 IST**, signup/signin stay open but self-service event registration closes. Post-auth redirects go to home (not `/event-register`). Home shows that the event has ended and points users to **Recordings**. Override with `NEXT_PUBLIC_EVENT_ENDED=true|false`.
 
 ### 2026-08-20
 

@@ -29,6 +29,7 @@ import {
   registeredSessionsForDate,
 } from "@/lib/registration-export";
 import { formatDateTime } from "@/lib/utils";
+import { isEventRegistrationClosed } from "@/lib/event-registration-window";
 import { ROUTES } from "@/lib/routes";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
 import type { Registration, RegistrationStatus } from "@/types";
@@ -191,12 +192,20 @@ function MyRegistrationsContent() {
         <div>
           <h1 className="text-2xl font-bold">My Registrations</h1>
           <p className="text-muted-foreground">
-            Events you have registered for. You can remove a registration anytime.
+            {isEventRegistrationClosed()
+              ? "Events you registered for. New event registration is closed."
+              : "Events you have registered for. You can remove a registration anytime."}
           </p>
         </div>
-        <Button asChild>
-          <Link href={ROUTES.eventRegister}>Register for event</Link>
-        </Button>
+        {isEventRegistrationClosed() ? (
+          <Button asChild>
+            <Link href={ROUTES.recordings}>Watch Recordings</Link>
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link href={ROUTES.eventRegister}>Register for event</Link>
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -217,11 +226,22 @@ function MyRegistrationsContent() {
         <EmptyState
           icon={ClipboardList}
           title="No registrations yet"
-          description="You have not registered for an event. Register to see it listed here."
-          action={{
-            label: "Register for event",
-            onClick: () => router.push(ROUTES.eventRegister),
-          }}
+          description={
+            isEventRegistrationClosed()
+              ? "You did not register for this event. You can still watch session recordings."
+              : "You have not registered for an event. Register to see it listed here."
+          }
+          action={
+            isEventRegistrationClosed()
+              ? {
+                  label: "Watch Recordings",
+                  onClick: () => router.push(ROUTES.recordings),
+                }
+              : {
+                  label: "Register for event",
+                  onClick: () => router.push(ROUTES.eventRegister),
+                }
+          }
         />
       ) : (
         <DataTable columns={columns} data={registrations} pageSize={10} />
