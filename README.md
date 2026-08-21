@@ -363,7 +363,7 @@ Route guards: `RouteGuard`, `StreamAccessGuard`, `EventRegisterGuard` in `src/co
 import { apiClient } from "@/lib/api-client";
 
 // GET with auth header (Bearer JWT) attached automatically
-const { data } = await apiClient.get("/events/event/upcoming/");
+const { data } = await apiClient.get("/events/event/");
 
 // POST
 await apiClient.post("/registrations/registration/", payload);
@@ -414,10 +414,9 @@ All paths are relative to `NEXT_PUBLIC_API_URL`. Services live in `src/services/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/events/event/upcoming/` | Paginated upcoming events (`results[]` with `is_registered` + `summary`) |
+| `GET` | `/events/event/` | Event list (home / upcoming; includes `is_registered` + `summary` when authenticated) |
 | `GET` | `/events/event/dropdown/` | Event options (incl. `allowed_travel` / `allowed_medical` / `allowed_translation` / `allowed_accommodation`) |
-| `GET` | `/events/event/?type=upcoming\|live\|past` | Filtered event list |
-| `GET` | `/events/event/` | All events |
+| `GET` | `/events/event/?type=live\|past` | Filtered live or past event list |
 | `GET` | `/events/event/:id/` | Single event |
 | `POST` | `/events/event/` | Create event |
 | `PATCH` | `/events/event/:id/` | Update event |
@@ -649,6 +648,7 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 
 ### 2026-08-21
 
+- **Events list API:** Replaced `GET /events/event/upcoming/` and `GET /events/event/?type=upcoming` with plain `GET /events/event/` (`getUpcomingEvents` and `getEvents("upcoming")`). Live/past still use `?type=live|past`.
 - **Agenda PDF:** Replaced `docs/ICAS-2026_Agenda.pdf` and served copy `public/docs/icas-agenda.pdf` with the updated `ICAS-2026_Agenda-updated.pdf`.
 - **Event end window:** After **21 Aug 2026 16:00 IST**, signup/signin stay open but self-service event registration closes. Post-auth redirects go to home (not `/event-register`). Home shows that the event has ended and points users to **Recordings**. Override with `NEXT_PUBLIC_EVENT_ENDED=true|false`.
 

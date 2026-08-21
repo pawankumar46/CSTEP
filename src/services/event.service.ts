@@ -68,7 +68,7 @@ export interface ScheduleItemRecord {
 
 export const getUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
   try {
-    const { data } = await apiClient.get<unknown>("/events/event/upcoming/");
+    const { data } = await apiClient.get<unknown>("/events/event/");
     return extractEventList(data).map(mapApiUpcomingEvent);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
@@ -87,11 +87,9 @@ export const getEventDropdown = async (): Promise<EventDropdownOption[]> => {
 
 export const getEvents = async (type: EventListType = "upcoming"): Promise<Event[]> => {
   try {
-    // The dedicated upcoming endpoint returns the assistance flags (allowed_*),
-    // which the list endpoint omits — needed for prefilling the edit form.
     const { data } =
       type === "upcoming"
-        ? await apiClient.get<unknown>("/events/event/upcoming/")
+        ? await apiClient.get<unknown>("/events/event/")
         : await apiClient.get<unknown>("/events/event/", { params: { type } });
     return extractEventList(data).map(mapApiEventToEvent);
   } catch (error) {
