@@ -1,7 +1,7 @@
 import { isBaseUserRole, isStaffRole } from "@/lib/auth-utils";
 import { readPublicEnv } from "@/lib/env";
 import { formatEventDateRange } from "@/lib/event-display";
-import { isEventPubliclyEnded } from "@/lib/event-registration-window";
+import { isEventPubliclyEnded, isEventRegistrationClosed } from "@/lib/event-registration-window";
 import type { Event, UserRole } from "@/types";
 
 export type EventStreamPhase = "upcoming" | "live" | "ended";
@@ -24,8 +24,7 @@ export function isTemporaryBaseUserStreamAccessActive(now = new Date()): boolean
 
 export function canBypassStreamParticipantChecks(role?: UserRole): boolean {
   if (!role) return false;
-  if (isStaffRole(role)) return true;
-  return isBaseUserRole(role) && isTemporaryBaseUserStreamAccessActive();
+  return isStaffRole(role);
 }
 
 export interface WatchLiveAccess {
@@ -34,6 +33,8 @@ export interface WatchLiveAccess {
   disabledTitle: string;
   /** Unauthenticated users may sign in when the stream is live. */
   showSignInToWatch: boolean;
+  /** Authenticated base users who still need event registration. */
+  showRegisterToWatch: boolean;
 }
 
 type EventTiming = Pick<Event, "date" | "endDate" | "status">;
@@ -88,13 +89,21 @@ export function getWatchLiveAccess({
   isRegistered: boolean;
   role?: UserRole;
 }): WatchLiveAccess {
+  const denied = (
+    disabledTitle: string,
+    phase: EventStreamPhase | null = event ? getEventStreamPhase(event) : null,
+    extras: Partial<Pick<WatchLiveAccess, "showSignInToWatch" | "showRegisterToWatch">> = {},
+  ): WatchLiveAccess => ({
+    phase,
+    canWatchLive: false,
+    disabledTitle,
+    showSignInToWatch: false,
+    showRegisterToWatch: false,
+    ...extras,
+  });
+
   if (!event) {
-    return {
-      phase: null,
-      canWatchLive: false,
-      disabledTitle: "Live stream is not available right now",
-      showSignInToWatch: false,
-    };
+    return denied("Live stream is not available right now", null);
   }
 
   const phase = getEventStreamPhase(event);
@@ -106,79 +115,34 @@ export function getWatchLiveAccess({
       canWatchLive: true,
       disabledTitle: "",
       showSignInToWatch: false,
+      showRegisterToWatch: false,
     };
   }
 
   if (phase === "ended") {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: "This event has ended",
-      showSignInToWatch: false,
-    };
-  }
-
-  if (isAuthenticated && role && isBaseUserRole(role) && !streamOpenToBaseUsers) {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: `Live stream opens on ${BASE_USER_STREAM_OPENS_LABEL}`,
-      showSignInToWatch: false,
-    };
-  }
-
-  if (isAuthenticated && role && isBaseUserRole(role) && streamOpenToBaseUsers) {
-    return {
-      phase,
-      canWatchLive: true,
-      disabledTitle: "",
-      showSignInToWatch: false,
-    };
-  }
-
-  if (!isAuthenticated && streamOpenToBaseUsers) {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: "Sign in to watch the live stream",
-      showSignInToWatch: true,
-    };
+    return denied("This event has ended", phase);
   }
 
   if (phase === "upcoming") {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: upcomingTitle(event),
-      showSignInToWatch: false,
-    };
+    return denied(upcomingTitle(event), phase);
   }
 
   if (!isAuthenticated) {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: "Sign in to watch the live stream",
-      showSignInToWatch: true,
-    };
+    return denied("Sign in to watch the live stream", phase, { showSignInToWatch: true });
   }
 
   if (!role || !isBaseUserRole(role)) {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: "Live stream is only available to registered participants",
-      showSignInToWatch: false,
-    };
+    return denied("Live stream is only available to registered participants", phase);
+  }
+
+  if (!streamOpenToBaseUsers) {
+    return denied(`Live stream opens on ${BASE_USER_STREAM_OPENS_LABEL}`, phase);
   }
 
   if (!isRegistered) {
-    return {
-      phase,
-      canWatchLive: false,
-      disabledTitle: "Register for the event to watch live",
-      showSignInToWatch: false,
-    };
+    return denied("Register for the event to watch live", phase, {
+      showRegisterToWatch: !isEventRegistrationClosed(),
+    });
   }
 
   return {
@@ -186,5 +150,6 @@ export function getWatchLiveAccess({
     canWatchLive: true,
     disabledTitle: "",
     showSignInToWatch: false,
+    showRegisterToWatch: false,
   };
 }

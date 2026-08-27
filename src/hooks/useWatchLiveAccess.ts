@@ -22,6 +22,7 @@ export function useWatchLiveAccess(event?: Pick<Event, "date" | "endDate" | "sta
         canWatchLive: false,
         disabledTitle: "Checking access…",
         showSignInToWatch: false,
+        showRegisterToWatch: false,
       };
     }
 

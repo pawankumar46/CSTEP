@@ -592,7 +592,7 @@ Implemented in `AddLobbyUsersDialog`, `lobby.service.ts`, `useLobbyStore`.
 3. Default feed is primary + active session; if multiple sessions exist, `StreamCameraPicker` switches the center player. Left/right **static banner images** only (no live side feeds)
 4. Event administrators create/manage sessions in **Video management** (`/dashboard/video-management`)
 5. Optional dev fallback: `NEXT_PUBLIC_LIVE_STREAM_URL` when no active session / HLS URL exists
-6. `StreamAccessGuard` enforces auth; staff always allowed. Base users unlock Watch Live at **19 Aug 2026 06:00 IST** (override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
+6. `StreamAccessGuard` enforces auth and **event registration** for base users; staff always allowed. Base users also unlock Watch Live at **19 Aug 2026 06:00 IST** (override with `NEXT_PUBLIC_STREAM_OPEN_TO_BASE_USERS`)
 7. Exit / go back opens feedback scoped to the user's registered days and sessions (`GET /registrations/registration/my/` → `MultiDayFeedbackForm`)
 8. **Live chat** on `/streaming` connects to `wss?://…/ws/events/{eventId}/chat/?token=` — supports replies, per-message like/love/laugh/wow/sad/angry reactions, owner edits within 5 minutes, soft deletion, and moderator deletion
 
@@ -645,6 +645,10 @@ Typical deployment target: **Vercel** (frontend) + **Django** (API).
 ---
 
 ## Changelog
+
+### 2026-08-27
+
+- **Watch Live access:** Base users must be **registered for the event** to use Watch Live on the home page and `/streaming`. Sign-in alone no longer grants stream access; unregistered users see a register prompt (or a disabled button after registration closes). Staff unchanged.
 
 ### 2026-08-21
 

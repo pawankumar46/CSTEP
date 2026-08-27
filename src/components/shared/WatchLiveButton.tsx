@@ -31,7 +31,7 @@ export function WatchLiveButton({
   onNavigate,
 }: WatchLiveButtonProps) {
   const router = useRouter();
-  const { canWatchLive, disabledTitle, showSignInToWatch } = useWatchLiveAccess(event);
+  const { canWatchLive, disabledTitle, showSignInToWatch, showRegisterToWatch } = useWatchLiveAccess(event);
   const [joining, setJoining] = useState(false);
 
   const label = (
@@ -83,6 +83,19 @@ export function WatchLiveButton({
           Watch Live
         </Link>
       </Button>
+    );
+  }
+
+  if (showRegisterToWatch) {
+    return (
+      <span title={disabledTitle} className={cn("inline-flex", className)}>
+        <Button size={size} variant={variant} asChild>
+          <Link href={ROUTES.eventRegister}>
+            {showIcon && <Play className="h-4 w-4 mr-2 fill-current" />}
+            Watch Live
+          </Link>
+        </Button>
+      </span>
     );
   }
 
