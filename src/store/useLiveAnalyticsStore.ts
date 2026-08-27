@@ -11,6 +11,8 @@ interface LiveAnalyticsState {
   error: string | null;
   snapshot: LiveAnalyticsSnapshot | null;
   lastMessageAt: string | null;
+  sendJson: (payload: Record<string, unknown>) => boolean;
+  setSendJson: (sendJson: (payload: Record<string, unknown>) => boolean) => void;
   setConnecting: (eventId: string) => void;
   setConnected: () => void;
   setDisconnected: () => void;
@@ -25,6 +27,8 @@ export const useLiveAnalyticsStore = create<LiveAnalyticsState>((set) => ({
   error: null,
   snapshot: null,
   lastMessageAt: null,
+  sendJson: () => false,
+  setSendJson: (sendJson) => set({ sendJson }),
 
   setConnecting: (eventId) =>
     set({

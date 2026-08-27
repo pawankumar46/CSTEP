@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ClipboardList, Loader2, LogOut, Menu, User, X } from "lucide-react";
+import { ChevronDown, ClipboardList, Loader2, LogOut, Menu, User, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,12 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { UserInitials } from "@/components/shared/UserInitials";
+import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
+import { NotificationDropdown } from "@/components/shared/NotificationDropdown";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
-import { useWatchLiveAccess } from "@/hooks/useWatchLiveAccess";
 import { isStaffRole } from "@/lib/auth-utils";
 import { BrandLogo } from "@/components/shared/BrandLogo";
-import { ROUTES, buildAuthUrl } from "@/lib/routes";
+import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -33,7 +34,6 @@ export function LandingNavbar() {
   const [open, setOpen] = useState(false);
   const { user, isAuthenticated, logout, isLoggingOut } = useAuthStore();
   const { upcomingEvent } = useEventRegistration();
-  const { canWatchLive, disabledTitle, showSignInToWatch } = useWatchLiveAccess(upcomingEvent);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -73,6 +73,12 @@ export function LandingNavbar() {
           <Link href={ROUTES.profile} className="cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={ROUTES.recordings} className="cursor-pointer">
+            <Video className="mr-2 h-4 w-4" />
+            Recordings
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -132,11 +138,13 @@ export function LandingNavbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
+          {isAuthenticated && <NotificationDropdown />}
           <ThemeToggle />
           {authButtons}
         </div>
 
         <div className="flex md:hidden items-center gap-2">
+          {isAuthenticated && <NotificationDropdown />}
           <ThemeToggle />
           <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -159,26 +167,12 @@ export function LandingNavbar() {
           <div className="flex flex-col gap-2 pt-2">
             {isAuthenticated && user ? (
               <>
-                {canWatchLive ? (
-                  <Button variant="outline" asChild>
-                    <Link href="/streaming" onClick={() => setOpen(false)}>
-                      Watch Live
-                    </Link>
-                  </Button>
-                ) : showSignInToWatch ? (
-                  <Button variant="outline" asChild>
-                    <Link
-                      href={buildAuthUrl(ROUTES.login, { redirect: ROUTES.streaming })}
-                      onClick={() => setOpen(false)}
-                    >
-                      Watch Live
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button variant="outline" disabled title={disabledTitle}>
-                    Watch Live
-                  </Button>
-                )}
+                <WatchLiveButton
+                  event={upcomingEvent}
+                  size="default"
+                  variant="outline"
+                  onNavigate={() => setOpen(false)}
+                />
                 {isStaffRole(user.role) && (
                   <Button asChild>
                     <Link href="/dashboard" onClick={() => setOpen(false)}>
@@ -196,6 +190,12 @@ export function LandingNavbar() {
                   <Link href={ROUTES.profile} onClick={() => setOpen(false)}>
                     <User className="mr-2 h-4 w-4" />
                     Profile
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="justify-start" asChild>
+                  <Link href={ROUTES.recordings} onClick={() => setOpen(false)}>
+                    <Video className="mr-2 h-4 w-4" />
+                    Recordings
                   </Link>
                 </Button>
                 <Button

@@ -29,6 +29,7 @@ import { isIndiaCountryCode, requiresSignupPhoneOtp } from "@/lib/country-codes"
 import { DEFAULT_SIGNUP_COUNTRY } from "@/lib/india-states";
 import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
+import { isEventRegistrationClosed } from "@/lib/event-registration-window";
 import { markLocationPermissionPromptForDestination } from "@/lib/location-permission";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
@@ -98,7 +99,7 @@ function SignupForm() {
       const user = useAuthStore.getState().user;
       const destination = user
         ? await resolvePostAuthDestination(user.id, user.role, redirectTo)
-        : ROUTES.eventRegister;
+        : ROUTES.home;
       markLocationPermissionPromptForDestination(destination, "login");
       router.replace(destination);
     } catch {
@@ -125,7 +126,10 @@ function SignupForm() {
         <CardHeader>
           <CardTitle>Create your account</CardTitle>
           <CardDescription>
-            Sign up to access event registration and the live stream. This creates your user account — event registration comes after you sign in.
+            Sign up to create your account. After you sign in you can explore the site
+            {isEventRegistrationClosed()
+              ? " and watch event recordings."
+              : " and complete event registration when available."}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -135,9 +139,14 @@ function SignupForm() {
                 Create an account to watch the live stream.
               </div>
             )}
-            {redirectTo?.startsWith(ROUTES.eventRegister) && (
+            {redirectTo?.startsWith(ROUTES.eventRegister) && !isEventRegistrationClosed() && (
               <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
                 Create an account to complete your event registration.
+              </div>
+            )}
+            {isEventRegistrationClosed() && (
+              <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+                Event registration is closed. After signup you can watch recordings from the home page.
               </div>
             )}
             {error && (

@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import { getEventCountdown } from "@/lib/event-display";
 import { cn } from "@/lib/utils";
-import type { EventStatus } from "@/types";
 
 interface EventCountdownProps {
   eventStart: string;
-  eventStatus?: EventStatus;
   className?: string;
 }
 
@@ -20,7 +18,7 @@ function CountdownSegment({ value, unit }: { value: number; unit: string }) {
   );
 }
 
-export function EventCountdown({ eventStart, eventStatus, className }: EventCountdownProps) {
+export function EventCountdown({ eventStart, className }: EventCountdownProps) {
   const [parts, setParts] = useState(() => getEventCountdown(eventStart));
 
   useEffect(() => {
@@ -33,8 +31,6 @@ export function EventCountdown({ eventStart, eventStatus, className }: EventCoun
     return () => window.clearInterval(interval);
   }, [eventStart]);
 
-  const isLive = eventStatus === "live";
-
   return (
     <div
       className={cn(
@@ -43,15 +39,7 @@ export function EventCountdown({ eventStart, eventStatus, className }: EventCoun
       )}
       aria-live="polite"
     >
-      {isLive ? (
-        <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75 motion-reduce:animate-none" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          </span>
-          Live now
-        </span>
-      ) : parts.isPast ? (
+      {parts.isPast ? (
         <span className="font-medium text-muted-foreground">Event started</span>
       ) : (
         <>

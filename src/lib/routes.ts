@@ -9,6 +9,7 @@ export const ROUTES = {
   streaming: "/streaming",
   profile: "/profile",
   myRegistrations: "/my-registrations",
+  recordings: "/recordings",
   feedback: "/feedback",
 } as const;
 
@@ -20,6 +21,7 @@ type AuthQueryParams = {
 };
 
 import { getAppBaseUrl } from "@/lib/env";
+import { isEventRegistrationClosed } from "@/lib/event-registration-window";
 
 /** Only allow same-origin relative paths as post-auth redirects. */
 export function sanitizeRedirect(path: string | null | undefined): string | null {
@@ -68,6 +70,10 @@ export function getHomeRegisterHref(
   isEventRegistered: boolean,
   eventId?: string,
 ): string {
+  if (isEventRegistrationClosed()) {
+    return ROUTES.recordings;
+  }
+
   if (!isAuthenticated) {
     const redirect = eventId
       ? `${ROUTES.eventRegister}?event=${eventId}`
@@ -99,6 +105,7 @@ export function buildResetPasswordUrl(phone?: string): string {
 }
 
 export function getHomeRegisterLabel(isAuthenticated: boolean, isEventRegistered: boolean): string | null {
+  if (isEventRegistrationClosed()) return "Watch Recordings";
   if (!isAuthenticated) return "Register";
   if (!isEventRegistered) return "Register for Event";
   return null;

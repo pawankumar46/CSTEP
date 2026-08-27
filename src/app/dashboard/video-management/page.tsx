@@ -34,8 +34,8 @@ import { Separator } from "@/components/ui/separator";
 import { getAllEvents } from "@/services/event.service";
 import {
   createBroadcastSession,
-  fetchBroadcastUrl,
-  getBroadcastSessions,
+  getBroadcastSessionsForEvents,
+  resolveBroadcastUrl,
 } from "@/services/broadcast.service";
 import { useAuthStore } from "@/store/useAuthStore";
 import { cn, copyTextToClipboard, formatDate } from "@/lib/utils";
@@ -50,6 +50,7 @@ const broadcastSchema = z.object({
 type BroadcastForm = z.infer<typeof broadcastSchema>;
 
 const INGEST_URL_ACTIONS: { label: string; target: BroadcastUrlTarget }[] = [
+  { label: "Ingest link", target: "ingest.url" },
   { label: "Stream key", target: "stream_key" },
   { label: "RTMP ingest", target: "ingest.rtmp" },
   { label: "RTSP ingest", target: "ingest.rtsp" },
@@ -57,36 +58,38 @@ const INGEST_URL_ACTIONS: { label: string; target: BroadcastUrlTarget }[] = [
 ];
 
 const PLAYBACK_URL_ACTIONS: { label: string; target: BroadcastUrlTarget }[] = [
+  { label: "Playback link", target: "playback.url" },
   { label: "HLS playback", target: "playback.hls" },
   { label: "RTSP playback", target: "playback.rtsp" },
   { label: "WebRTC playback", target: "playback.webrtc" },
 ];
 
 function CopyUrlButton({
-  sessionId,
+  session,
   label,
   target,
 }: {
-  sessionId: string;
+  session: BroadcastSessionSummary;
   label: string;
   target: BroadcastUrlTarget;
 }) {
-  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const copy = async () => {
-    setLoading(true);
     setError(null);
+    const url = resolveBroadcastUrl(session, target);
+    if (!url) {
+      setError("URL not available");
+      return;
+    }
+
     try {
-      const url = await fetchBroadcastUrl(sessionId, target);
       await copyTextToClipboard(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Copy failed");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -100,13 +103,10 @@ function CopyUrlButton({
           "h-9 w-full justify-between gap-2 px-3 transition-colors",
           copied && "border-emerald-500/50 bg-emerald-500/5",
         )}
-        disabled={loading}
         onClick={() => void copy()}
       >
         <span className="truncate text-left">{copied ? "Copied" : label}</span>
-        {loading ? (
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-        ) : copied ? (
+        {copied ? (
           <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
         ) : (
           <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -121,12 +121,12 @@ function StreamLinkGroup({
   title,
   description,
   actions,
-  sessionId,
+  session,
 }: {
   title: string;
   description: string;
   actions: { label: string; target: BroadcastUrlTarget }[];
-  sessionId: string;
+  session: BroadcastSessionSummary;
 }) {
   return (
     <div className="space-y-3">
@@ -138,7 +138,7 @@ function StreamLinkGroup({
         {actions.map((action) => (
           <CopyUrlButton
             key={action.target}
-            sessionId={sessionId}
+            session={session}
             label={action.label}
             target={action.target}
           />
@@ -195,8 +195,8 @@ function BroadcastSessionCard({ session }: { session: BroadcastSessionSummary })
       <CardContent className="space-y-5 pt-5">
         <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
           <p className="text-xs text-muted-foreground">
-            Stream URLs are fetched on demand and never displayed on screen. Use copy when you need
-            a link for your encoder or player.
+            Stream URLs come from the event broadcast session response. Use copy when you need a
+            link for your encoder or player.
           </p>
         </div>
 
@@ -204,14 +204,14 @@ function BroadcastSessionCard({ session }: { session: BroadcastSessionSummary })
           title="Ingest"
           description="Send your stream from OBS or another encoder."
           actions={INGEST_URL_ACTIONS}
-          sessionId={session.id}
+          session={session}
         />
 
         <StreamLinkGroup
           title="Playback"
           description="Distribute or test the outgoing stream."
           actions={PLAYBACK_URL_ACTIONS}
-          sessionId={session.id}
+          session={session}
         />
       </CardContent>
     </Card>
@@ -252,11 +252,11 @@ function VideoManagementContent() {
     },
   });
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(async (eventList: Event[]) => {
     setSessionsLoading(true);
     setSessionsError(null);
     try {
-      const list = await getBroadcastSessions();
+      const list = await getBroadcastSessionsForEvents(eventList.map((event) => event.id));
       setSessions(list);
     } catch (err) {
       setSessionsError(err instanceof Error ? err.message : "Failed to load broadcast sessions");
@@ -273,10 +273,13 @@ function VideoManagementContent() {
       setEventsError(null);
       try {
         const list = await getAllEvents();
-        if (!cancelled) setEvents(list);
+        if (cancelled) return;
+        setEvents(list);
+        await loadSessions(list);
       } catch (err) {
         if (!cancelled) {
           setEventsError(err instanceof Error ? err.message : "Failed to load events");
+          setSessionsLoading(false);
         }
       } finally {
         if (!cancelled) setEventsLoading(false);
@@ -284,7 +287,6 @@ function VideoManagementContent() {
     };
 
     void loadEvents();
-    void loadSessions();
     return () => {
       cancelled = true;
     };
@@ -300,13 +302,13 @@ function VideoManagementContent() {
     setIsSubmitting(true);
 
     try {
-      const list = await createBroadcastSession({
+      await createBroadcastSession({
         eventId: data.eventId,
         broadcasterId: user.id,
         name: data.name,
         isPrimary: data.isPrimary,
       });
-      setSessions(list);
+      await loadSessions(events);
       reset({ eventId: data.eventId, name: "", isPrimary: data.isPrimary });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to create broadcast session");
@@ -445,8 +447,8 @@ function VideoManagementContent() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void loadSessions()}
-            disabled={sessionsLoading}
+            onClick={() => void loadSessions(events)}
+            disabled={sessionsLoading || events.length === 0}
           >
             {sessionsLoading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { ClientLocationInfo } from "@/lib/ipwhois-api-contract";
 import { DEFAULT_FEEDBACK_EVENT_ID } from "@/lib/feedback-options";
+import { resolveEventJoinContext } from "@/lib/event-join-context";
 import { ROUTES } from "@/lib/routes";
 import * as eventService from "@/services/event.service";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -48,6 +49,7 @@ async function fetchIpWhoisLocationFromApi(): Promise<
     return {
       ip: data.ip ?? null,
       region: data.region ?? null,
+      country: data.country ?? null,
       latitude: data.latitude ?? null,
       longitude: data.longitude ?? null,
       error: data.error ?? (response.ok ? null : `IP lookup failed (${response.status})`),
@@ -56,6 +58,7 @@ async function fetchIpWhoisLocationFromApi(): Promise<
     return {
       ip: null,
       region: null,
+      country: null,
       latitude: null,
       longitude: null,
       error: err instanceof Error ? err.message : "IP lookup failed",
@@ -63,7 +66,9 @@ async function fetchIpWhoisLocationFromApi(): Promise<
   }
 }
 
-function resolveJoinEventId(): string {
+function resolveJoinEventId(preferredEventId?: string | null): string {
+  const preferred = preferredEventId?.trim();
+  if (preferred) return preferred;
   const upcoming = useHomeDataStore.getState().upcomingEvents;
   const fromHome = upcoming[0]?.id?.trim();
   if (fromHome) return fromHome;
@@ -101,36 +106,39 @@ function readBrowserGeolocation(): Promise<{
 }
 
 /**
- * After login/registration: resolve IP geo via ipwhois.io and
- * POST /events/event/:id/join/ with `{ ip_address, latitude, longitude, location_accuracy, state }`.
+ * Resolve IP + optional browser GPS and POST /events/event/:id/join/.
+ * `location_accuracy` is always sent as `0`; lat/long are rounded to 5 decimals in the service.
  */
-export async function requestLocationPermission(_source: "login" | "registration") {
+export async function joinEventFromClient(eventId?: string | null): Promise<void> {
   if (typeof window === "undefined") return;
 
   const location = await fetchIpWhoisLocationFromApi();
   const browser = await readBrowserGeolocation();
-
-  const payload = {
-    ip: location.ip,
-    region: location.region,
-    latitude: browser.latitude ?? location.latitude,
-    longitude: browser.longitude ?? location.longitude,
-    locationAccuracy: browser.accuracy,
-  };
-
-  const eventId = resolveJoinEventId();
+  const resolvedEventId = resolveJoinEventId(eventId);
+  const joinContext = await resolveEventJoinContext(resolvedEventId);
 
   try {
-    await eventService.joinEvent(eventId, {
-      ipAddress: payload.ip ?? "",
-      latitude: payload.latitude,
-      longitude: payload.longitude,
-      locationAccuracy: payload.locationAccuracy,
-      state: payload.region ?? "",
+    await eventService.joinEvent(resolvedEventId, {
+      ipAddress: location.ip ?? "",
+      latitude: browser.latitude ?? location.latitude,
+      longitude: browser.longitude ?? location.longitude,
+      locationAccuracy: 0,
+      state: location.region ?? "",
+      country: location.country ?? "",
+      dayId: joinContext.dayId,
+      sessionId: joinContext.sessionId,
     });
   } catch {
-    // Join location is best-effort; don't block the home/dashboard flow.
+    // Join location is best-effort; don't block Watch Live / home flow.
   }
+}
+
+/**
+ * After login/registration: resolve IP geo via ipwhois.io and
+ * POST /events/event/:id/join/ with `{ ip_address, latitude, longitude, location_accuracy, state, country }`.
+ */
+export async function requestLocationPermission(_source: "login" | "registration") {
+  await joinEventFromClient();
 }
 
 /** Run on home or dashboard after login / post-registration redirect. */

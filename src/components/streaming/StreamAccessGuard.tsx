@@ -4,8 +4,13 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEventRegistration } from "@/hooks/useEventRegistration";
-import { isStaffRole } from "@/lib/auth-utils";
-import { getEventStreamPhase } from "@/lib/watch-live-access";
+import { isBaseUserRole, isStaffRole } from "@/lib/auth-utils";
+import {
+  canBypassStreamParticipantChecks,
+  getEventStreamPhase,
+  isTemporaryBaseUserStreamAccessActive,
+} from "@/lib/watch-live-access";
+import { isEventRegistrationClosed } from "@/lib/event-registration-window";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 
@@ -14,14 +19,18 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, hasHydrated, user } = useAuthStore();
   const { isRegistered, checked, upcomingEvent } = useEventRegistration();
 
-  const isStaff = user ? isStaffRole(user.role) : false;
-  const needsRegistration = isAuthenticated && checked && !isStaff && !isRegistered;
+  const staffBypass = Boolean(user && isStaffRole(user.role));
+  const bypassStreamGates = user ? canBypassStreamParticipantChecks(user.role) : false;
+  const baseUserStreamLocked =
+    Boolean(user && isBaseUserRole(user.role) && !isTemporaryBaseUserStreamAccessActive());
+  const needsRegistration = isAuthenticated && checked && !bypassStreamGates && !isRegistered;
   const streamPhase = upcomingEvent ? getEventStreamPhase(upcomingEvent) : null;
-  const streamNotLive = !isStaff && checked && streamPhase !== "live";
+  const streamNotLive =
+    !staffBypass && checked && streamPhase !== "live";
 
   useEffect(() => {
     if (!hasHydrated || isLoading) return;
-    if (isAuthenticated && !isStaff && !checked) return;
+    if (isAuthenticated && !bypassStreamGates && !checked) return;
 
     if (!isAuthenticated) {
       router.replace(buildAuthUrl(ROUTES.login, { redirect: ROUTES.streaming }));
@@ -29,16 +38,25 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
     }
 
     if (needsRegistration) {
-      router.replace(ROUTES.eventRegister);
+      router.replace(isEventRegistrationClosed() ? ROUTES.home : ROUTES.eventRegister);
       return;
     }
 
     if (streamNotLive) {
       router.replace(ROUTES.home);
     }
-  }, [hasHydrated, isLoading, isAuthenticated, isStaff, checked, needsRegistration, streamNotLive, router]);
+  }, [
+    hasHydrated,
+    isLoading,
+    isAuthenticated,
+    bypassStreamGates,
+    checked,
+    needsRegistration,
+    streamNotLive,
+    router,
+  ]);
 
-  const pendingRegistrationCheck = isAuthenticated && !isStaff && !checked;
+  const pendingRegistrationCheck = isAuthenticated && !bypassStreamGates && !checked;
 
   if (!hasHydrated || isLoading || pendingRegistrationCheck) {
     return (
@@ -48,7 +66,7 @@ export function StreamAccessGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated || needsRegistration || streamNotLive) {
+  if (!isAuthenticated || baseUserStreamLocked || needsRegistration || streamNotLive) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <DashboardSkeleton />

@@ -17,7 +17,7 @@ const PLAYER_SHELL_CLASS =
   "relative w-full min-w-0 overflow-hidden bg-black aspect-video min-h-[12.5rem] sm:min-h-[15rem]";
 
 const BANNER_CLASS =
-  "hidden md:block h-full w-24 shrink-0 object-contain bg-sky-50 dark:bg-slate-900 lg:w-32 xl:w-36";
+  "hidden md:block h-auto self-stretch w-24 shrink-0 object-contain bg-sky-50 dark:bg-slate-900 lg:w-32 xl:w-36";
 
 export function StreamPlayerFrame({
   leftBannerUrl,

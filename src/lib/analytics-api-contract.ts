@@ -125,7 +125,7 @@ export interface ApiRegistrationsListQuery {
   page_size?: number;
 }
 
-/** GET /analytics/registrations/users/?event_id=&days__day__date=&days__attendance_mode= */
+/** GET /registrations/registration/?event_id=&day_id=&attendance_mode= */
 export interface ApiAttendanceModeUserDay {
   id: number | string;
   date: string;
@@ -134,26 +134,21 @@ export interface ApiAttendanceModeUserDay {
 
 export interface ApiAttendanceModeUserRow {
   id: number | string;
-  user: {
-    salutation?: string;
-    first_name?: string;
-    middle_name?: string;
-    last_name?: string;
-    phone_number?: string;
-    email?: string;
-    gender?: string;
-    role?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    designation?: string;
-    org_type?: string;
-    org_name?: string;
-    created_at?: string;
-    updated_at?: string;
-  };
+  user?: number | Record<string, unknown>;
+  user_name?: string;
+  phone_number?: string;
+  email?: string;
+  designation?: string;
+  org_name?: string;
+  event?: number | string;
   event_name?: string;
   status?: string;
+  registration_dates?: Array<{
+    id: number | string;
+    date: string;
+    mode?: "PHYSICAL" | "VIRTUAL" | string;
+    is_attended?: boolean;
+  }>;
   days?: ApiAttendanceModeUserDay[];
   created_at?: string;
   updated_at?: string;

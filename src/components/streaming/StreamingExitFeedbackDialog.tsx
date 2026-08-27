@@ -11,7 +11,7 @@ import {
   MultiDayFeedbackForm,
 } from "@/components/feedback/MultiDayFeedbackForm";
 import type { StreamingFeedbackFormValues } from "@/features/feedback/streaming-feedback.schema";
-import { mapStreamingFeedbackToCreatePayloads } from "@/lib/feedback-mappers";
+import { mapStreamingFeedbackToUpsertPayloads } from "@/lib/feedback-mappers";
 import { resolveFeedbackEventId } from "@/lib/feedback-options";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
@@ -32,7 +32,7 @@ export function StreamingExitFeedbackDialog({
   eventId,
 }: StreamingExitFeedbackDialogProps) {
   const user = useAuthStore((s) => s.user);
-  const { isSubmitting, submitMultiDayFeedback } = useFeedbackStore();
+  const { isSubmitting, upsertMultiDayFeedback } = useFeedbackStore();
 
   const feedbackEventId = resolveFeedbackEventId(eventId);
 
@@ -44,8 +44,8 @@ export function StreamingExitFeedbackDialog({
   const handleSubmit = async (data: StreamingFeedbackFormValues) => {
     if (!user) return;
 
-    const payloads = mapStreamingFeedbackToCreatePayloads(data, feedbackEventId);
-    await submitMultiDayFeedback(payloads);
+    const { creates, updates } = mapStreamingFeedbackToUpsertPayloads(data, feedbackEventId);
+    await upsertMultiDayFeedback({ creates, updates });
     handleLeave();
   };
 

@@ -6,8 +6,9 @@ import {
   formatFeedbackEventDate,
   getFeedbackSessionDisplayName,
 } from "@/lib/feedback-options";
+import { formatDateTime } from "@/lib/utils";
 import type { StreamingFeedbackFormValues } from "@/features/feedback/streaming-feedback.schema";
-import type { Feedback } from "@/types";
+import type { EventFeedbackAnalytics, Feedback } from "@/types";
 
 export interface FeedbackSummaryRespondent {
   userName: string;
@@ -36,6 +37,42 @@ export interface FeedbackTableRow {
   rating: number;
   comments: string;
 }
+
+export interface FeedbackHighlightCount {
+  rating: 1 | 2 | 3 | 4 | 5;
+  label: string;
+  count: number;
+}
+
+export interface FeedbackSessionResponse {
+  id: string;
+  userName: string;
+  rating: number;
+  comments: string;
+}
+
+export interface FeedbackSessionSummary {
+  key: string;
+  sessionTitle: string;
+  scheduleItemId?: string;
+  responseCount: number;
+  avgRating: number;
+  responses: FeedbackSessionResponse[];
+}
+
+export interface FeedbackRespondentRow {
+  id: string;
+  userName: string;
+  userEmail?: string;
+  userPhone?: string;
+  sessionTitle: string;
+  rating: number;
+  roundedRating: number;
+  comments: string;
+  submittedAt: string;
+}
+
+export type FeedbackRatingFilter = "all" | 1 | 2 | 3 | 4 | 5;
 
 export interface FeedbackFilters {
   userName: string;
@@ -115,6 +152,159 @@ export function buildFeedbackTableRows(feedback: Feedback[]): FeedbackTableRow[]
     rating: item.rating,
     comments: item.comments,
   }));
+}
+
+function getFeedbackSessionGroupKey(item: Feedback): string {
+  if (item.scheduleItemId?.trim()) return `schedule:${item.scheduleItemId.trim()}`;
+  return `title:${getFeedbackSessionDisplayName(item.sessionTitle, item.eventName)}`;
+}
+
+/** Highlight count cards for rounded ratings 5★–1★. */
+export function buildFeedbackHighlightCounts(feedback: Feedback[]): FeedbackHighlightCount[] {
+  const counts: Record<1 | 2 | 3 | 4 | 5, number> = {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+  };
+
+  for (const item of feedback) {
+    const rounded = Math.round(item.rating);
+    if (rounded >= 1 && rounded <= 5) {
+      counts[rounded as 1 | 2 | 3 | 4 | 5] += 1;
+    }
+  }
+
+  return ([5, 4, 3, 2, 1] as const).map((rating) => ({
+    rating,
+    label: `${rating} star`,
+    count: counts[rating],
+  }));
+}
+
+export function buildAnalyticsFeedbackHighlightCounts(
+  analytics: EventFeedbackAnalytics,
+): FeedbackHighlightCount[] {
+  return ([5, 4, 3, 2, 1] as const).map((rating) => ({
+    rating,
+    label: `${rating} star`,
+    count: Number(
+      analytics.overall.ratingDistribution[`${rating}.0`]
+        ?? analytics.overall.ratingDistribution[String(rating)]
+        ?? 0,
+    ),
+  }));
+}
+
+export function buildAnalyticsFeedbackSessionSummaries(
+  analytics: EventFeedbackAnalytics,
+  feedback: Feedback[],
+): FeedbackSessionSummary[] {
+  return analytics.bySession
+    .map((session) => {
+      const responses = feedback
+        .filter(
+          (item) =>
+            item.scheduleItemId === session.scheduleItemId
+            || (!item.scheduleItemId && item.sessionTitle === session.title),
+        )
+        .map((item) => ({
+          id: item.id,
+          userName: item.userName,
+          rating: item.rating,
+          comments: item.comments.trim(),
+        }));
+
+      return {
+        key: `schedule:${session.scheduleItemId}`,
+        sessionTitle: session.title,
+        scheduleItemId: session.scheduleItemId,
+        responseCount: session.totalFeedback,
+        avgRating: session.averageRating,
+        responses,
+      };
+    })
+    .sort((a, b) => {
+      if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
+      return a.sessionTitle.localeCompare(b.sessionTitle);
+    });
+}
+
+/** Per-session averages sorted highest first. */
+export function buildFeedbackSessionSummaries(feedback: Feedback[]): FeedbackSessionSummary[] {
+  const grouped = new Map<
+    string,
+    {
+      key: string;
+      sessionTitle: string;
+      scheduleItemId?: string;
+      total: number;
+      count: number;
+      responses: FeedbackSessionResponse[];
+    }
+  >();
+
+  for (const item of feedback) {
+    const key = getFeedbackSessionGroupKey(item);
+    const sessionTitle = getFeedbackSessionDisplayName(item.sessionTitle, item.eventName);
+    const existing = grouped.get(key) ?? {
+      key,
+      sessionTitle,
+      scheduleItemId: item.scheduleItemId,
+      total: 0,
+      count: 0,
+      responses: [],
+    };
+    existing.total += item.rating;
+    existing.count += 1;
+    existing.responses.push({
+      id: item.id,
+      userName: item.userName,
+      rating: item.rating,
+      comments: item.comments.trim(),
+    });
+    grouped.set(key, existing);
+  }
+
+  return [...grouped.values()]
+    .map((group) => ({
+      key: group.key,
+      sessionTitle: group.sessionTitle,
+      scheduleItemId: group.scheduleItemId,
+      responseCount: group.count,
+      avgRating: Math.round((group.total / group.count) * 10) / 10,
+      responses: group.responses,
+    }))
+    .sort((a, b) => {
+      if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
+      return a.sessionTitle.localeCompare(b.sessionTitle);
+    });
+}
+
+/** Flat respondent rows for the details table. */
+export function buildFeedbackRespondentRows(feedback: Feedback[]): FeedbackRespondentRow[] {
+  return [...feedback]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((item) => ({
+      id: item.id,
+      userName: item.userName,
+      userEmail: item.userEmail,
+      userPhone: item.userPhone,
+      sessionTitle: getFeedbackSessionDisplayName(item.sessionTitle, item.eventName),
+      rating: item.rating,
+      roundedRating: Math.round(item.rating),
+      comments: item.comments.trim(),
+      submittedAt: formatDateTime(item.createdAt),
+    }));
+}
+
+export function filterFeedbackByRating(
+  rows: FeedbackRespondentRow[],
+  filter: FeedbackRatingFilter,
+): FeedbackRespondentRow[] {
+  if (filter === "all") return rows;
+  return rows.filter((row) => row.roundedRating === filter);
 }
 
 export function filterFeedback(
@@ -324,6 +514,16 @@ export interface CreateEventFeedbackPayload {
   schedule_item?: number;
   rating: number;
   comment: string;
+  /** `true` for day overall ratings (no schedule_item). */
+  is_overall_rating?: boolean;
+}
+
+/** `PUT /events/feedback/:id/` — same body as create. */
+export type UpdateEventFeedbackPayload = CreateEventFeedbackPayload;
+
+export interface FeedbackUpsertPayloads {
+  creates: CreateEventFeedbackPayload[];
+  updates: { id: string; payload: UpdateEventFeedbackPayload }[];
 }
 
 function toPositiveIntId(value: string, label: string): number {
@@ -334,8 +534,30 @@ function toPositiveIntId(value: string, label: string): number {
   return parsed;
 }
 
-/** Map rated sessions + day overall rows to `POST /events/feedback/` payloads. */
-export function mapStreamingFeedbackToCreatePayloads(
+function toFeedbackPayload(
+  event: number,
+  eventDayId: string,
+  rating: number,
+  comments: string,
+  options?: { scheduleItemId?: string; isOverallRating?: boolean },
+): CreateEventFeedbackPayload {
+  const payload: CreateEventFeedbackPayload = {
+    event,
+    event_date: toPositiveIntId(eventDayId, "event day"),
+    rating,
+    comment: comments.trim(),
+  };
+  if (options?.scheduleItemId?.trim()) {
+    payload.schedule_item = toPositiveIntId(options.scheduleItemId, "schedule item");
+  }
+  if (options?.isOverallRating) {
+    payload.is_overall_rating = true;
+  }
+  return payload;
+}
+
+/** Map rated sessions + day overall rows to create and update payloads. */
+export function mapStreamingFeedbackToUpsertPayloads(
   data: {
     sessions: Record<
       string,
@@ -344,6 +566,7 @@ export function mapStreamingFeedbackToCreatePayloads(
         eventDayId: string;
         rating: number;
         comments: string;
+        feedbackId?: string;
       }
     >;
     dailyOverall: Record<
@@ -352,13 +575,15 @@ export function mapStreamingFeedbackToCreatePayloads(
         eventDayId: string;
         rating: number;
         comments: string;
+        feedbackId?: string;
       }
     >;
   },
   eventId: string,
-): CreateEventFeedbackPayload[] {
+): FeedbackUpsertPayloads {
   const event = toPositiveIntId(eventId, "event");
-  const payloads: CreateEventFeedbackPayload[] = [];
+  const creates: CreateEventFeedbackPayload[] = [];
+  const updates: { id: string; payload: UpdateEventFeedbackPayload }[] = [];
 
   for (const session of Object.values(data.sessions)) {
     if (session.rating <= 0) continue;
@@ -367,13 +592,18 @@ export function mapStreamingFeedbackToCreatePayloads(
         "Session feedback is missing day or schedule item ids. Please reload and try again.",
       );
     }
-    payloads.push({
+    const payload = toFeedbackPayload(
       event,
-      event_date: toPositiveIntId(session.eventDayId, "event day"),
-      schedule_item: toPositiveIntId(session.sessionId, "schedule item"),
-      rating: session.rating,
-      comment: session.comments.trim(),
-    });
+      session.eventDayId,
+      session.rating,
+      session.comments,
+      { scheduleItemId: session.sessionId },
+    );
+    if (session.feedbackId?.trim()) {
+      updates.push({ id: session.feedbackId.trim(), payload });
+    } else {
+      creates.push(payload);
+    }
   }
 
   for (const dayOverall of Object.values(data.dailyOverall)) {
@@ -383,15 +613,49 @@ export function mapStreamingFeedbackToCreatePayloads(
         "Day overall feedback is missing the event day id. Please reload and try again.",
       );
     }
-    payloads.push({
+    const payload = toFeedbackPayload(
       event,
-      event_date: toPositiveIntId(dayOverall.eventDayId, "event day"),
-      rating: dayOverall.rating,
-      comment: dayOverall.comments.trim(),
-    });
+      dayOverall.eventDayId,
+      dayOverall.rating,
+      dayOverall.comments,
+      { isOverallRating: true },
+    );
+    if (dayOverall.feedbackId?.trim()) {
+      updates.push({ id: dayOverall.feedbackId.trim(), payload });
+    } else {
+      creates.push(payload);
+    }
   }
 
-  return payloads;
+  return { creates, updates };
+}
+
+/** @deprecated Prefer `mapStreamingFeedbackToUpsertPayloads` (supports PUT updates). */
+export function mapStreamingFeedbackToCreatePayloads(
+  data: {
+    sessions: Record<
+      string,
+      {
+        sessionId: string;
+        eventDayId: string;
+        rating: number;
+        comments: string;
+        feedbackId?: string;
+      }
+    >;
+    dailyOverall: Record<
+      string,
+      {
+        eventDayId: string;
+        rating: number;
+        comments: string;
+        feedbackId?: string;
+      }
+    >;
+  },
+  eventId: string,
+): CreateEventFeedbackPayload[] {
+  return mapStreamingFeedbackToUpsertPayloads(data, eventId).creates;
 }
 
 /** Pre-fill streaming feedback form from `GET /events/feedback/` rows for this user/day. */
@@ -421,6 +685,7 @@ export function mergeExistingFeedbackIntoForm(
           comments: item.comments,
           eventDayId:
             item.eventDayId || next.dailyOverall[item.sessionDate].eventDayId,
+          feedbackId: item.id,
         };
         continue;
       }
@@ -441,6 +706,7 @@ export function mergeExistingFeedbackIntoForm(
         rating: item.rating,
         comments: item.comments,
         eventDayId: item.eventDayId || next.sessions[scheduleId].eventDayId,
+        feedbackId: item.id,
       };
     }
   }

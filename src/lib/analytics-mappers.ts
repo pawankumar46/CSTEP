@@ -661,7 +661,7 @@ function mapAttendanceUserStatus(value: unknown): RegistrationStatus {
 function mapAttendanceUserDay(raw: unknown): AttendanceModeUserDay | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
-  const mode = String(row.attendance_mode ?? "").toUpperCase();
+  const mode = String(row.attendance_mode ?? row.mode ?? "").toUpperCase();
   if (mode !== "PHYSICAL" && mode !== "VIRTUAL") return null;
   const date = String(row.date ?? "").slice(0, 10);
   if (!date) return null;
@@ -669,6 +669,8 @@ function mapAttendanceUserDay(raw: unknown): AttendanceModeUserDay | null {
     id: String(row.id ?? `${date}-${mode}`),
     date,
     attendanceMode: mode === "VIRTUAL" ? "virtual" : "physical",
+    isAttended:
+      typeof row.is_attended === "boolean" ? row.is_attended : undefined,
   };
 }
 
@@ -678,24 +680,60 @@ export function mapApiAttendanceModeUserRow(raw: unknown): AttendanceModeUserRow
     row.user && typeof row.user === "object"
       ? (row.user as Record<string, unknown>)
       : {};
-  const days = Array.isArray(row.days)
-    ? row.days.map(mapAttendanceUserDay).filter((day): day is AttendanceModeUserDay => day != null)
-    : [];
+  const daySource = Array.isArray(row.registration_dates)
+    ? row.registration_dates
+    : Array.isArray(row.days)
+      ? row.days
+      : [];
+  const days = daySource
+    .map(mapAttendanceUserDay)
+    .filter((day): day is AttendanceModeUserDay => day != null);
 
   return {
     id: String(row.id ?? ""),
-    userName: formatAttendanceUserName(user),
-    phone: String(user.phone_number ?? ""),
-    email: String(user.email ?? ""),
-    designation: String(user.designation ?? ""),
-    orgName: String(user.org_name ?? ""),
-    city: String(user.city ?? ""),
-    state: String(user.state ?? ""),
+    userName:
+      String(row.user_name ?? "").trim() || formatAttendanceUserName(user),
+    phone: String(row.phone_number ?? row.phone ?? user.phone_number ?? ""),
+    email: String(row.email ?? user.email ?? ""),
+    designation: String(row.designation ?? user.designation ?? ""),
+    orgName: String(row.org_name ?? user.org_name ?? ""),
+    city: String(row.city ?? user.city ?? ""),
+    state: String(row.state ?? user.state ?? ""),
     eventName: String(row.event_name ?? ""),
     status: mapAttendanceUserStatus(row.status),
     days,
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? user.updated_at ?? ""),
+  };
+}
+
+function hasAttendanceModeRegistrationDates(raw: unknown): boolean {
+  const row = (raw ?? {}) as Record<string, unknown>;
+  const dates = Array.isArray(row.registration_dates)
+    ? row.registration_dates
+    : Array.isArray(row.days)
+      ? row.days
+      : [];
+  return dates.length > 0;
+}
+
+/** When day/mode filters are active, drop rows the API returns with empty `registration_dates`. */
+export function filterAttendanceModeUsersRawResults(
+  raw: unknown,
+  filters: { dayId?: string; attendanceMode?: string },
+): unknown {
+  if (!filters.dayId && !filters.attendanceMode) return raw;
+
+  if (Array.isArray(raw)) {
+    return raw.filter(hasAttendanceModeRegistrationDates);
+  }
+
+  const row = (raw ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(row.results)) return raw;
+
+  return {
+    ...row,
+    results: row.results.filter(hasAttendanceModeRegistrationDates),
   };
 }
 
@@ -1138,20 +1176,6 @@ function parseTrendDate(isoDate: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function getTrendOrdinalSuffix(day: number): string {
-  if (day >= 11 && day <= 13) return "th";
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-}
-
 function formatTrendBucketLabel(
   isoDate: string,
   granularity: RegistrationTrendGranularity,
@@ -1163,9 +1187,7 @@ function formatTrendBucketLabel(
     return new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric" }).format(date);
   }
   if (granularity === "weekly") {
-    const day = date.getDate();
-    const month = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(date);
-    return `${day}${getTrendOrdinalSuffix(day)} ${month} (week beginning)`;
+    return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
   }
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
 }

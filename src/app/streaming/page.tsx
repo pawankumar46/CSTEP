@@ -1,25 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
-  Pause, Play, VolumeX, Share2, Heart, ThumbsUp, HandMetal,
-  Send, Users, Home,
+  Pause, Play, VolumeX, Share2, Users, Home, MessageSquare,
 } from "lucide-react";
+import { StreamingHeadphonesNotice } from "@/components/streaming/StreamingHeadphonesNotice";
 import { StreamPlayerFrame } from "@/components/streaming/StreamPlayerFrame";
+import { StreamCameraPicker } from "@/components/streaming/StreamCameraPicker";
+import { LiveChatPanel } from "@/components/streaming/LiveChatPanel";
+import { StreamingEventAgenda } from "@/components/streaming/StreamingEventAgenda";
 import { StreamingExitFeedbackDialog } from "@/components/streaming/StreamingExitFeedbackDialog";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useMinRole } from "@/hooks/useRoleGuard";
-import { mockEvents, mockSpeakers, mockSchedule } from "@/mock/events";
-import { mockChatMessages } from "@/mock/feedback";
-import { resolveLivePlaybackUrl } from "@/services/broadcast.service";
-import { isGoogleDriveStreamUrl } from "@/lib/stream-utils";
+import { useEventRegistration } from "@/hooks/useEventRegistration";
+import { useEventPresenceSocket } from "@/hooks/useEventPresenceSocket";
+import { mockEvents } from "@/mock/events";
+import {
+  getLiveEventStream,
+  pickDefaultLiveCamera,
+  type LiveBroadcastCamera,
+} from "@/services/broadcast.service";
+import { leaveEvent, leaveEventOnUnload } from "@/services/event.service";
+import { isEmbeddedPlaybackStreamUrl } from "@/lib/stream-utils";
 import {
   APP_NAME,
   LIVE_STREAM_URL,
@@ -30,54 +37,99 @@ import { getAppUrl } from "@/lib/env";
 import { ROUTES } from "@/lib/routes";
 import type { StreamViewMode } from "@/lib/stream-view";
 import { cn } from "@/lib/utils";
-import { UserInitials } from "@/components/shared/UserInitials";
-
-const REACTIONS = [
-  { icon: ThumbsUp, label: "Like", emoji: "👍" },
-  { icon: Heart, label: "Love", emoji: "❤️" },
-  { icon: HandMetal, label: "Clap", emoji: "👏" },
-];
 
 export default function StreamingPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isModerator = useMinRole("moderator");
-  const event = mockEvents.find((e) => e.status === "live") || mockEvents[2];
+  const { upcomingEvent } = useEventRegistration();
+  const event = upcomingEvent ?? mockEvents.find((e) => e.status === "live") ?? mockEvents[2];
+  const liveEventId = upcomingEvent?.id;
+  useEventPresenceSocket(liveEventId);
 
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [viewerCount, setViewerCount] = useState(2890);
-  const [chatMessages, setChatMessages] = useState(mockChatMessages);
-  const [newMessage, setNewMessage] = useState("");
-  const [reactions, setReactions] = useState<Record<string, number>>({ "👍": 42, "❤️": 28, "👏": 15 });
+  const [viewerCount, setViewerCount] = useState(2);
   const [linkCopied, setLinkCopied] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [viewMode, setViewMode] = useState<StreamViewMode>("default");
-  const [streamUrl, setStreamUrl] = useState<string | undefined>(LIVE_STREAM_URL || undefined);
-  const isDriveEmbed = Boolean(streamUrl && isGoogleDriveStreamUrl(streamUrl));
+  const [cameras, setCameras] = useState<LiveBroadcastCamera[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | undefined>();
+  const [streamLoading, setStreamLoading] = useState(true);
+  const isEmbeddedStream = Boolean(streamUrl && isEmbeddedPlaybackStreamUrl(streamUrl));
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowLeaveRef = useRef(false);
+  const leaveSentRef = useRef(false);
 
-  useEffect(() => {
-    if (LIVE_STREAM_URL && isGoogleDriveStreamUrl(LIVE_STREAM_URL)) {
+  const notifyLeave = useCallback((mode: "async" | "unload" = "async") => {
+    const eventId = liveEventId?.trim();
+    if (!eventId || leaveSentRef.current) return;
+    leaveSentRef.current = true;
+
+    if (mode === "unload") {
+      leaveEventOnUnload(eventId);
       return;
     }
 
+    void leaveEvent(eventId).catch(() => {
+      // Leave is best-effort; still allow navigation away.
+    });
+  }, [liveEventId]);
+
+  useEffect(() => {
+    leaveSentRef.current = false;
+  }, [liveEventId]);
+
+  useEffect(() => {
     let cancelled = false;
 
-    const loadStreamUrl = async () => {
-      const hlsUrl = await resolveLivePlaybackUrl();
-      if (!cancelled && hlsUrl) {
-        setStreamUrl(hlsUrl);
+    const loadCameras = async () => {
+      setStreamLoading(true);
+
+      if (!liveEventId) {
+        if (cancelled) return;
+        setCameras([]);
+        setSelectedCameraId(null);
+        setStreamUrl(LIVE_STREAM_URL || undefined);
+        setStreamLoading(false);
+        return;
+      }
+
+      try {
+        const liveStream = await getLiveEventStream(liveEventId);
+        if (cancelled) return;
+
+        const defaultCamera = pickDefaultLiveCamera(liveStream.cameras);
+        setCameras(liveStream.cameras);
+        setSelectedCameraId(defaultCamera?.id ?? null);
+        setStreamUrl(defaultCamera?.playbackUrl ?? LIVE_STREAM_URL ?? undefined);
+        setIsMuted(liveStream.videoMutedByDefault);
+        if (liveStream.concurrentViewers != null) {
+          setViewerCount(liveStream.concurrentViewers);
+        }
+      } catch {
+        if (cancelled) return;
+        setCameras([]);
+        setSelectedCameraId(null);
+        setStreamUrl(LIVE_STREAM_URL || undefined);
+      } finally {
+        if (!cancelled) setStreamLoading(false);
       }
     };
 
-    void loadStreamUrl();
+    void loadCameras();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [liveEventId]);
+
+  const selectCamera = (camera: LiveBroadcastCamera) => {
+    setSelectedCameraId(camera.id);
+    setStreamUrl(camera.playbackUrl);
+    setIsPaused(false);
+  };
 
   useEffect(() => {
     return () => {
@@ -94,30 +146,17 @@ export default function StreamingPage() {
       setFeedbackOpen(true);
     };
 
+    const onPageHide = () => {
+      notifyLeave("unload");
+    };
+
     window.addEventListener("popstate", onPopState);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
       window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("pagehide", onPageHide);
     };
-  }, []);
-
-  const sendMessage = () => {
-    if (!newMessage.trim()) return;
-    setChatMessages([
-      ...chatMessages,
-      {
-        id: `chat-${Date.now()}`,
-        userId: user?.id || "guest",
-        userName: user ? `${user.firstName} ${user.lastName}` : "Guest",
-        message: newMessage,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
-    setNewMessage("");
-  };
-
-  const addReaction = (emoji: string) => {
-    setReactions((prev) => ({ ...prev, [emoji]: (prev[emoji] || 0) + 1 }));
-  };
+  }, [notifyLeave]);
 
   const shareLink = async () => {
     try {
@@ -134,7 +173,14 @@ export default function StreamingPage() {
     setFeedbackOpen(true);
   };
 
+  const goHome = () => {
+    notifyLeave("async");
+    allowLeaveRef.current = true;
+    router.push(ROUTES.home);
+  };
+
   const leaveStreaming = () => {
+    notifyLeave("async");
     allowLeaveRef.current = true;
     setFeedbackOpen(false);
     router.push(ROUTES.home);
@@ -142,74 +188,64 @@ export default function StreamingPage() {
 
   const isTheaterView = viewMode === "theater";
 
+  const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId);
+  const playerTitle = selectedCamera
+    ? `${event.name} · ${selectedCamera.name}`
+    : event.name;
+
   const player = (
-    <StreamPlayerFrame
-      streamUrl={streamUrl}
-      isLive
-      isPaused={isPaused}
-      isMuted={isMuted}
-      thumbnailUrl={event.imageUrl}
-      title={event.name}
-      leftBannerUrl={STREAM_LEFT_BANNER_URL}
-      rightBannerUrl={STREAM_RIGHT_BANNER_URL}
-      leftBannerAlt="India Clean Air Summit 2026"
-      rightBannerAlt="India Clean Air Summit 2026"
-      viewMode={viewMode}
-      onViewModeChange={setViewMode}
-      onPause={() => setIsPaused(true)}
-      onResume={() => setIsPaused(false)}
-      onMute={() => setIsMuted(!isMuted)}
-    />
+    <div className="space-y-3">
+      <div className="relative">
+        <StreamPlayerFrame
+          streamUrl={streamUrl}
+          isLive
+          isPaused={isPaused}
+          isMuted={isMuted}
+          thumbnailUrl={event.imageUrl}
+          title={playerTitle}
+          leftBannerUrl={STREAM_LEFT_BANNER_URL}
+          rightBannerUrl={STREAM_RIGHT_BANNER_URL}
+          leftBannerAlt="India Clean Air Summit 2026"
+          rightBannerAlt="India Clean Air Summit 2026"
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onPause={() => setIsPaused(true)}
+          onResume={() => setIsPaused(false)}
+          onMute={() => setIsMuted(!isMuted)}
+        />
+        {streamLoading ? (
+          <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-black/60 pointer-events-none">
+            <p className="text-sm font-medium text-white">Connecting to live stream…</p>
+          </div>
+        ) : !streamUrl ? (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/70 p-6 text-center pointer-events-none">
+            <p className="text-sm font-medium text-white">No live stream is available right now.</p>
+            <p className="text-xs text-white/80 max-w-sm">
+              When an event goes live, playback will start from the active broadcast session.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <StreamCameraPicker
+        cameras={cameras}
+        selectedId={selectedCameraId}
+        onSelect={selectCamera}
+      />
+    </div>
   );
 
   const chatPanel = (
-    <Card
+    <LiveChatPanel
+      eventId={liveEventId}
+      userId={user?.id}
+      userRole={user?.role}
       className={cn(
-        "flex flex-col min-h-0",
         isTheaterView
-          ? "h-full min-h-[min(360px,52vh)] xl:min-h-[min(520px,calc(100vh-22rem))]"
-          : "min-h-[320px] lg:sticky lg:top-20 lg:min-h-[480px]",
+          ? "h-full min-h-[min(360px,52vh)] max-h-[min(520px,calc(100vh-22rem))] xl:max-h-none"
+          : "h-[min(70vh,32rem)] lg:sticky lg:top-20 lg:h-[min(calc(100vh-6rem),36rem)]",
       )}
-    >
-      <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="text-sm flex items-center justify-between gap-2">
-          Live Chat
-          <div className="flex gap-0.5 shrink-0">
-            {REACTIONS.map((r) => (
-              <Button key={r.label} size="sm" variant="ghost" className="h-7 px-1.5 text-xs" onClick={() => addReaction(r.emoji)}>
-                {r.emoji} {reactions[r.emoji] || 0}
-              </Button>
-            ))}
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-3 min-h-0 px-4 pb-4">
-        <div className="flex-1 min-h-[160px] overflow-y-auto space-y-2 pr-1">
-          {chatMessages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-sm leading-snug"
-            >
-              <span className="font-medium text-primary">{msg.userName}: </span>
-              <span>{msg.message}</span>
-            </motion.div>
-          ))}
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          />
-          <Button size="icon" onClick={sendMessage} aria-label="Send message">
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    />
   );
 
   const moderatorControls = isModerator ? (
@@ -222,7 +258,7 @@ export default function StreamingPage() {
           {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
           {isPaused ? "Resume Stream" : "Pause Stream"}
         </Button>
-        {!isDriveEmbed && (
+        {!isEmbeddedStream && (
           <Button size="sm" variant="outline" onClick={() => setIsMuted(!isMuted)}>
             <VolumeX className="h-4 w-4 mr-1" />
             {isMuted ? "Unmute" : "Mute Stream"}
@@ -256,85 +292,16 @@ export default function StreamingPage() {
     </Card>
   );
 
-  const speakerCard = (
-    <Card className={cn(isTheaterView && "h-full shadow-sm")}>
-      <CardHeader className={cn(isTheaterView ? "py-3 px-4" : undefined)}>
-        <CardTitle className={cn(isTheaterView ? "text-sm" : "text-base")}>Current Speaker</CardTitle>
-      </CardHeader>
-      <CardContent className={cn(isTheaterView && "px-4 pb-4 pt-0")}>
-        <div className="flex items-center gap-3">
-          <UserInitials name={mockSpeakers[0].name} size={isTheaterView ? "md" : "lg"} />
-          <div className="min-w-0">
-            <p className="font-medium text-sm leading-snug">{mockSpeakers[0].name}</p>
-            <p className="text-xs text-muted-foreground line-clamp-2">{mockSpeakers[0].title}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const agendaCard = (
-    <Card className={cn(isTheaterView && "flex flex-col min-h-0 flex-1 shadow-sm")}>
-      <CardHeader className={cn(isTheaterView ? "py-3 px-4 shrink-0" : undefined)}>
-        <CardTitle className={cn(isTheaterView ? "text-sm" : "text-base")}>Event Agenda</CardTitle>
-      </CardHeader>
-      <CardContent
-        className={cn(
-          "space-y-2.5",
-          isTheaterView && "px-4 pb-4 pt-0 flex-1 min-h-0 overflow-y-auto max-h-[220px] xl:max-h-none",
-        )}
-      >
-        {mockSchedule.slice(0, 4).map((item) => (
-          <div key={item.id} className="flex gap-2.5 text-sm border-b border-border/60 pb-2.5 last:border-0 last:pb-0">
-            <span className="text-[11px] text-primary font-mono w-14 shrink-0 pt-0.5">{item.time}</span>
-            <div className="min-w-0">
-              <p className="font-medium text-sm leading-snug">{item.title}</p>
-              <p className="text-xs text-muted-foreground truncate">{item.speaker}</p>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-
-  const exitButton = (
-    <Button variant="outline" size="sm" onClick={handleExit} title="Exit and share feedback">
-      <Home className="h-4 w-4 mr-2" />
-      Exit
-    </Button>
-  );
-
   const infoCardsGrid = (
-    <div className={cn(
-      "grid gap-4",
-      isTheaterView ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3",
-    )}>
+    <div className="grid gap-4 sm:grid-cols-2">
       {eventInfoCard}
-      {speakerCard}
-      {!isTheaterView && (
-        <Card className="sm:col-span-2 lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base">Event Agenda</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {mockSchedule.slice(0, 4).map((item) => (
-              <div key={item.id} className="flex gap-3 text-sm">
-                <span className="text-xs text-primary font-mono w-16 shrink-0">{item.time}</span>
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.speaker}</p>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <StreamingEventAgenda className="min-h-0" />
     </div>
   );
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4 min-w-0">
           <span className="font-semibold truncate">{APP_NAME} Live</span>
           {isTheaterView && (
@@ -342,35 +309,55 @@ export default function StreamingPage() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goHome}
+            title="Go to home"
+            className="gap-1.5"
+          >
+            <Home className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Home</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExit}
+            title="Submit feedback and leave the stream"
+            className="gap-1.5"
+          >
+            <MessageSquare className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Submit Feedback & Exit</span>
+            <span className="sm:hidden">Feedback & Exit</span>
+          </Button>
           <Badge variant="success" className="gap-1">
             <Users className="h-3 w-3" />
-            {viewerCount.toLocaleString()} watching
+            <span className="hidden sm:inline">{viewerCount.toLocaleString()} watching</span>
+            <span className="sm:hidden">{viewerCount.toLocaleString()}</span>
           </Badge>
           <ThemeToggle />
         </div>
       </header>
+
+      <StreamingHeadphonesNotice />
 
       <div className={cn("mx-auto px-4 py-4 sm:py-6", isTheaterView ? "w-full max-w-[min(96vw,100rem)]" : "container")}>
         {isTheaterView ? (
           <div className="space-y-4">
             {player}
 
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground truncate sm:hidden">{event.name}</p>
-              {exitButton}
-            </div>
+            <p className="text-sm text-muted-foreground truncate sm:hidden">{event.name}</p>
 
             <div className="grid gap-4 xl:grid-cols-12 xl:items-stretch xl:min-h-[min(520px,calc(100vh-22rem))]">
               <div className="xl:col-span-7 flex flex-col gap-4 min-h-0">
                 {moderatorControls}
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] min-h-0 flex-1">
                   {eventInfoCard}
-                  {speakerCard}
+                  <StreamingEventAgenda compact />
                 </div>
-                {agendaCard}
               </div>
 
-              <div className="xl:col-span-5 min-h-0 flex flex-col">
+              <div className="xl:col-span-5 min-h-0 flex flex-col h-full max-h-[min(520px,calc(100vh-22rem))] xl:max-h-[min(520px,calc(100vh-22rem))]">
                 {chatPanel}
               </div>
             </div>
@@ -379,7 +366,6 @@ export default function StreamingPage() {
           <div className="grid lg:grid-cols-3 gap-6 items-start">
             <div className="lg:col-span-2 space-y-4">
               {player}
-              <div className="flex justify-end">{exitButton}</div>
               {moderatorControls}
               {infoCardsGrid}
             </div>

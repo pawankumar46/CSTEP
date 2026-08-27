@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import { extractApiErrorMessage } from "@/lib/auth-mappers";
+import { getAccessToken } from "@/lib/auth-session";
+import { getApiBaseUrl } from "@/lib/env";
 import { formatEventDayDateLabel } from "@/lib/participation-dates";
 import { mapApiAllowedAttendanceModes, mapAppAllowedAttendanceModesToApi } from "@/lib/registration-mappers";
 import {
@@ -66,7 +68,7 @@ export interface ScheduleItemRecord {
 
 export const getUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
   try {
-    const { data } = await apiClient.get<unknown>("/events/event/upcoming/");
+    const { data } = await apiClient.get<unknown>("/events/event/");
     return extractEventList(data).map(mapApiUpcomingEvent);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
@@ -85,11 +87,9 @@ export const getEventDropdown = async (): Promise<EventDropdownOption[]> => {
 
 export const getEvents = async (type: EventListType = "upcoming"): Promise<Event[]> => {
   try {
-    // The dedicated upcoming endpoint returns the assistance flags (allowed_*),
-    // which the list endpoint omits — needed for prefilling the edit form.
     const { data } =
       type === "upcoming"
-        ? await apiClient.get<unknown>("/events/event/upcoming/")
+        ? await apiClient.get<unknown>("/events/event/")
         : await apiClient.get<unknown>("/events/event/", { params: { type } });
     return extractEventList(data).map(mapApiEventToEvent);
   } catch (error) {
@@ -116,30 +116,77 @@ export const getEventById = async (id: string): Promise<Event | null> => {
   }
 };
 
-/** Live: POST /events/event/:id/join/ — record client location on login/registration landing. */
+/** Round coords to at most 5 decimal places (Django Decimal ≤ 6 places). */
+function roundCoordinate(value: number, decimals = 5): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+/** Live: POST /events/event/:id/join/ — record client location on Watch Live / login. */
 export const joinEvent = async (
   eventId: string,
   payload: {
     ipAddress: string;
     latitude: number | null;
     longitude: number | null;
-    locationAccuracy: number | null;
+    locationAccuracy?: number | null;
     state: string;
+    country?: string;
+    dayId?: number;
+    sessionId?: number;
   },
 ): Promise<void> => {
   try {
-    await apiClient.post(`/events/event/${eventId}/join/`, {
+    const body: Record<string, string | number | null> = {
       ip_address: payload.ipAddress,
-      latitude: payload.latitude == null ? "" : String(payload.latitude),
-      longitude: payload.longitude == null ? "" : String(payload.longitude),
-      location_accuracy:
-        payload.locationAccuracy == null ? "" : String(payload.locationAccuracy),
+      latitude: payload.latitude == null ? null : roundCoordinate(payload.latitude),
+      longitude: payload.longitude == null ? null : roundCoordinate(payload.longitude),
+      location_accuracy: 0,
       state: payload.state,
-    });
+      country: payload.country ?? "",
+    };
+    if (payload.dayId != null) body.day_id = payload.dayId;
+    if (payload.sessionId != null) body.session_id = payload.sessionId;
+
+    await apiClient.post(`/events/event/${eventId}/join/`, body);
   } catch (error) {
     throw new Error(extractApiErrorMessage(error));
   }
 };
+
+/** Live: POST /events/event/:id/leave/ — mark viewer as left after streaming. */
+export const leaveEvent = async (eventId: string): Promise<void> => {
+  try {
+    await apiClient.post(`/events/event/${eventId}/leave/`);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
+/**
+ * Best-effort leave on tab close / refresh.
+ * Uses `fetch` + `keepalive` so the request can finish after the page unloads.
+ */
+export function leaveEventOnUnload(eventId: string): void {
+  const id = eventId.trim();
+  if (!id || typeof window === "undefined") return;
+
+  try {
+    const token = getAccessToken();
+    const url = `${getApiBaseUrl()}/events/event/${encodeURIComponent(id)}/leave/`;
+    void fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: "{}",
+      keepalive: true,
+    });
+  } catch {
+    // ignore unload races
+  }
+}
 
 export const createEvent = async (payload: CreateEventPayload): Promise<Event> => {
   try {

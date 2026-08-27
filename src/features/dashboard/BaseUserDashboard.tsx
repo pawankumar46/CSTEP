@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useEventStore } from "@/store/useEventStore";
 import { useRecordingStore } from "@/store/useRecordingStore";
+import { isEventRegistrationClosed } from "@/lib/event-registration-window";
 import { formatDate } from "@/lib/utils";
 
 export function BaseUserDashboard() {
   const { events, fetchEvents } = useEventStore();
   const { recordings, fetchRecordings } = useRecordingStore();
+  const registrationClosed = isEventRegistrationClosed();
 
   useEffect(() => {
     fetchEvents("upcoming");
@@ -26,7 +28,11 @@ export function BaseUserDashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Welcome back!</h1>
-        <p className="text-muted-foreground">Here&apos;s what&apos;s happening with your events</p>
+        <p className="text-muted-foreground">
+          {registrationClosed
+            ? "The event has ended. Watch recordings anytime from the Recordings section."
+            : "Here's what's happening with your events"}
+        </p>
       </div>
 
       <div className="grid auto-rows-fr gap-4 md:grid-cols-3">
@@ -62,10 +68,14 @@ export function BaseUserDashboard() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <Button asChild className="justify-start"><Link href="/streaming"><Video className="h-4 w-4 mr-2" /> Join Live Stream</Link></Button>
-            <Button variant="outline" asChild className="justify-start"><Link href="/dashboard/recordings"><Video className="h-4 w-4 mr-2" /> Watch Recordings</Link></Button>
+            {!registrationClosed && (
+              <Button asChild className="justify-start"><Link href="/streaming"><Video className="h-4 w-4 mr-2" /> Join Live Stream</Link></Button>
+            )}
+            <Button variant="outline" asChild className="justify-start"><Link href="/recordings"><Video className="h-4 w-4 mr-2" /> Watch Recordings</Link></Button>
             <Button variant="outline" asChild className="justify-start"><Link href="/feedback"><MessageSquare className="h-4 w-4 mr-2" /> Submit Feedback</Link></Button>
-            <Button variant="outline" asChild className="justify-start"><Link href="/event-register"><Calendar className="h-4 w-4 mr-2" /> Register for Event</Link></Button>
+            {!registrationClosed && (
+              <Button variant="outline" asChild className="justify-start"><Link href="/event-register"><Calendar className="h-4 w-4 mr-2" /> Register for Event</Link></Button>
+            )}
           </CardContent>
         </Card>
       </div>

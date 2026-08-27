@@ -235,10 +235,13 @@ export interface RegistrationDay {
   sessions: SessionRegistration[];
 }
 
-/** List payload `registration_dates[]` entry (`date` + `mode`). */
+/** List payload `registration_dates[]` entry (`date` + `mode` + optional attendance). */
 export interface RegistrationDateEntry {
+  id?: string;
   date: string;
   attendanceMode: AttendanceMode;
+  /** From API `is_attended` — not shown as text; drives lobby badge color. */
+  isAttended?: boolean;
 }
 
 export interface Registration {
@@ -314,6 +317,27 @@ export interface Recording {
   thumbnailUrl: string;
   videoUrl: string;
   views: number;
+}
+
+export interface EventRecording {
+  id: string;
+  sessionId: string;
+  date: string;
+  sessionTitle: string;
+  startedAt: string;
+  endedAt: string | null;
+  file: string | null;
+  fileUrl: string | null;
+  status: string;
+}
+
+export interface EventRecordingsPage {
+  rows: EventRecording[];
+  page: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
 }
 
 export interface Feedback {
@@ -545,14 +569,15 @@ export interface StreamingParticipationTrend {
   buckets: RegistrationIntervalBucket[];
 }
 
-/** Day row from GET /analytics/registrations/users/ */
+/** Day row from GET /registrations/registration/ `registration_dates`. */
 export interface AttendanceModeUserDay {
   id: string;
   date: string;
   attendanceMode: AttendanceMode;
+  isAttended?: boolean;
 }
 
-/** Row from GET /analytics/registrations/users/ */
+/** Row mapped from GET /registrations/registration/ */
 export interface AttendanceModeUserRow {
   id: string;
   userName: string;
@@ -667,11 +692,16 @@ export interface Permission {
 
 export interface Notification {
   id: string;
+  /** Django `notification_type` (e.g. REGISTRATION_CONFIRMED). */
+  notificationType?: string;
   title: string;
   message: string;
   type: "info" | "success" | "warning" | "error";
   read: boolean;
   createdAt: string;
+  eventId?: string | null;
+  /** Optional deep link when the notification is clicked. */
+  href?: string;
 }
 
 export interface Speaker {
@@ -714,6 +744,42 @@ export interface ChatMessage {
   userName: string;
   message: string;
   timestamp: string;
+}
+
+/** Live event chat message from WebSocket / Django chat API. */
+export interface LiveChatReplyPreview {
+  id: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  isDeleted: boolean;
+}
+
+export type ChatReactionType =
+  | "like"
+  | "love"
+  | "laugh"
+  | "wow"
+  | "sad"
+  | "angry";
+
+export interface LiveChatReaction {
+  reaction: ChatReactionType;
+  count: number;
+  senderIds: string[];
+}
+
+export interface LiveChatMessage {
+  id: string;
+  eventId: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  createdAt: string;
+  editedAt: string | null;
+  isDeleted: boolean;
+  replyTo: LiveChatReplyPreview | null;
+  reactions: LiveChatReaction[];
 }
 
 export interface StreamState {
@@ -835,6 +901,11 @@ export interface BroadcastSessionSummary {
   broadcasterName: string;
   name: string;
   isPrimary: boolean;
+  streamKey: string;
+  ingestUrl?: string;
+  playbackUrl?: string;
+  ingestUrls: BroadcastStreamUrls;
+  playbackUrls: BroadcastStreamUrls;
   isActive: boolean;
   startedAt: string | null;
   endedAt: string | null;
@@ -842,9 +913,11 @@ export interface BroadcastSessionSummary {
 }
 
 export type BroadcastUrlTarget =
+  | "ingest.url"
   | "ingest.rtmp"
   | "ingest.rtsp"
   | "ingest.webrtc"
+  | "playback.url"
   | "playback.hls"
   | "playback.rtsp"
   | "playback.webrtc"
@@ -866,12 +939,14 @@ export interface BroadcastSession {
   name: string;
   isPrimary: boolean;
   streamKey: string;
+  ingestUrl?: string;
+  playbackUrl?: string;
   ingestUrls: BroadcastStreamUrls;
   playbackUrls: BroadcastStreamUrls;
   isActive: boolean;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
-  /** Convenience: HLS playback URL for viewers */
+  /** Primary viewer playback link from API `playback_url`. */
   liveVideoUrl?: string;
 }

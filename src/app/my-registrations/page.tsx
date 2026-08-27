@@ -26,8 +26,10 @@ import { ICAS_CONFERENCE, isIcasEventName } from "@/lib/icas-conference";
 import {
   ATTENDANCE_MODE_EXPORT_DAY_DATES,
   lobbyAttendanceModeForDate,
+  registeredSessionsForDate,
 } from "@/lib/registration-export";
 import { formatDateTime } from "@/lib/utils";
+import { isEventRegistrationClosed } from "@/lib/event-registration-window";
 import { ROUTES } from "@/lib/routes";
 import { useRegistrationStore } from "@/store/useRegistrationStore";
 import type { Registration, RegistrationStatus } from "@/types";
@@ -113,13 +115,23 @@ function MyRegistrationsContent() {
         header: formatRegistrationIntervalDayLabel(date),
         cell: ({ row }: { row: { original: Registration } }) => {
           const mode = lobbyAttendanceModeForDate(row.original, date);
-          if (mode === "—") {
+          const sessionCount = registeredSessionsForDate(row.original, date);
+          if (mode === "—" && sessionCount === 0) {
             return <span className="text-muted-foreground">—</span>;
           }
           return (
-            <Badge variant="outline" className="font-normal">
-              {mode}
-            </Badge>
+            <div className="space-y-1">
+              {mode !== "—" && (
+                <Badge variant="outline" className="font-normal">
+                  {mode}
+                </Badge>
+              )}
+              {sessionCount > 0 && (
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  {sessionCount} session{sessionCount === 1 ? "" : "s"}
+                </p>
+              )}
+            </div>
           );
         },
       })),
@@ -180,12 +192,20 @@ function MyRegistrationsContent() {
         <div>
           <h1 className="text-2xl font-bold">My Registrations</h1>
           <p className="text-muted-foreground">
-            Events you have registered for. You can remove a registration anytime.
+            {isEventRegistrationClosed()
+              ? "Events you registered for. New event registration is closed."
+              : "Events you have registered for. You can remove a registration anytime."}
           </p>
         </div>
-        <Button asChild>
-          <Link href={ROUTES.eventRegister}>Register for event</Link>
-        </Button>
+        {isEventRegistrationClosed() ? (
+          <Button asChild>
+            <Link href={ROUTES.recordings}>Watch Recordings</Link>
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link href={ROUTES.eventRegister}>Register for event</Link>
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -206,11 +226,22 @@ function MyRegistrationsContent() {
         <EmptyState
           icon={ClipboardList}
           title="No registrations yet"
-          description="You have not registered for an event. Register to see it listed here."
-          action={{
-            label: "Register for event",
-            onClick: () => router.push(ROUTES.eventRegister),
-          }}
+          description={
+            isEventRegistrationClosed()
+              ? "You did not register for this event. You can still watch session recordings."
+              : "You have not registered for an event. Register to see it listed here."
+          }
+          action={
+            isEventRegistrationClosed()
+              ? {
+                  label: "Watch Recordings",
+                  onClick: () => router.push(ROUTES.recordings),
+                }
+              : {
+                  label: "Register for event",
+                  onClick: () => router.push(ROUTES.eventRegister),
+                }
+          }
         />
       ) : (
         <DataTable columns={columns} data={registrations} pageSize={10} />

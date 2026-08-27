@@ -30,6 +30,11 @@ export function toBroadcastSessionSummary(session: BroadcastSession): BroadcastS
     broadcasterName: session.broadcasterName,
     name: session.name,
     isPrimary: session.isPrimary,
+    streamKey: session.streamKey,
+    ingestUrl: session.ingestUrl,
+    playbackUrl: session.playbackUrl,
+    ingestUrls: session.ingestUrls,
+    playbackUrls: session.playbackUrls,
     isActive: session.isActive,
     startedAt: session.startedAt,
     endedAt: session.endedAt,
@@ -37,14 +42,24 @@ export function toBroadcastSessionSummary(session: BroadcastSession): BroadcastS
   };
 }
 
-export function readBroadcastUrl(session: BroadcastSession, target: BroadcastUrlTarget): string | undefined {
+export function readBroadcastUrl(
+  session: Pick<
+    BroadcastSession,
+    "ingestUrl" | "playbackUrl" | "ingestUrls" | "playbackUrls" | "streamKey"
+  >,
+  target: BroadcastUrlTarget,
+): string | undefined {
   switch (target) {
+    case "ingest.url":
+      return session.ingestUrl;
     case "ingest.rtmp":
       return session.ingestUrls.rtmp;
     case "ingest.rtsp":
       return session.ingestUrls.rtsp;
     case "ingest.webrtc":
       return session.ingestUrls.webrtc;
+    case "playback.url":
+      return session.playbackUrl;
     case "playback.hls":
       return session.playbackUrls.hls;
     case "playback.rtsp":
@@ -60,11 +75,20 @@ export function readBroadcastUrl(session: BroadcastSession, target: BroadcastUrl
 
 export async function fetchBackendBroadcastSessions(
   authorization: string | null,
+  eventId: string,
 ): Promise<BroadcastSession[]> {
-  const response = await fetch(getBackendUrl("/events/broadcast-sessions/"), {
-    headers: authHeaders(authorization),
-    cache: "no-store",
-  });
+  const trimmed = eventId.trim();
+  if (!trimmed) {
+    throw new Error("eventId is required");
+  }
+
+  const response = await fetch(
+    getBackendUrl(`/events/event/${encodeURIComponent(trimmed)}/broadcast_sessions/`),
+    {
+      headers: authHeaders(authorization),
+      cache: "no-store",
+    },
+  );
 
   if (!response.ok) {
     const body = await response.text();
@@ -75,16 +99,32 @@ export async function fetchBackendBroadcastSessions(
   return extractBroadcastSessionList(data).map(mapApiBroadcastSession);
 }
 
+export async function fetchBackendBroadcastSessionsForEvents(
+  authorization: string | null,
+  eventIds: string[],
+): Promise<BroadcastSession[]> {
+  const uniqueIds = [...new Set(eventIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniqueIds.length === 0) return [];
+
+  const results = await Promise.all(
+    uniqueIds.map((eventId) => fetchBackendBroadcastSessions(authorization, eventId)),
+  );
+  return results.flat();
+}
+
 export async function createBackendBroadcastSession(
   authorization: string | null,
   payload: CreateBroadcastSessionPayload,
 ): Promise<BroadcastSession> {
-  const response = await fetch(getBackendUrl("/events/broadcast-sessions/"), {
-    method: "POST",
-    headers: authHeaders(authorization),
-    body: JSON.stringify(toCreateBroadcastSessionPayload(payload)),
-    cache: "no-store",
-  });
+  const response = await fetch(
+    getBackendUrl(`/events/event/${encodeURIComponent(payload.eventId)}/broadcast_sessions/`),
+    {
+      method: "POST",
+      headers: authHeaders(authorization),
+      body: JSON.stringify(toCreateBroadcastSessionPayload(payload)),
+      cache: "no-store",
+    },
+  );
 
   if (!response.ok) {
     const body = await response.text();
@@ -96,9 +136,11 @@ export async function createBackendBroadcastSession(
 }
 
 export const BROADCAST_URL_TARGETS: BroadcastUrlTarget[] = [
+  "ingest.url",
   "ingest.rtmp",
   "ingest.rtsp",
   "ingest.webrtc",
+  "playback.url",
   "playback.hls",
   "playback.rtsp",
   "playback.webrtc",

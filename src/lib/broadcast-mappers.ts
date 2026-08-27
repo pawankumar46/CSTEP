@@ -44,7 +44,8 @@ function nullableString(value: unknown): string | null {
 
 export function mapApiBroadcastSession(raw: Record<string, unknown>): BroadcastSession {
   const playbackUrls = mapStreamUrls(raw.playback_urls ?? raw.playbackUrls);
-  const hls = playbackUrls.hls;
+  const ingestUrl = nullableString(raw.ingest_url ?? raw.ingestUrl) ?? undefined;
+  const playbackUrl = nullableString(raw.playback_url ?? raw.playbackUrl) ?? undefined;
 
   return {
     id: String(raw.id ?? raw.pk ?? ""),
@@ -55,12 +56,21 @@ export function mapApiBroadcastSession(raw: Record<string, unknown>): BroadcastS
     name: String(raw.name ?? ""),
     isPrimary: Boolean(raw.is_primary ?? raw.isPrimary),
     streamKey: String(raw.stream_key ?? raw.streamKey ?? ""),
+    ingestUrl,
+    playbackUrl,
     ingestUrls: mapStreamUrls(raw.ingest_urls ?? raw.ingestUrls),
     playbackUrls,
     isActive: Boolean(raw.is_active ?? raw.isActive),
     startedAt: nullableString(raw.started_at ?? raw.startedAt),
     endedAt: nullableString(raw.ended_at ?? raw.endedAt),
     createdAt: String(raw.created_at ?? raw.createdAt ?? ""),
-    liveVideoUrl: hls,
+    liveVideoUrl: playbackUrl,
   };
+}
+
+/** Live viewer URL: top-level `playback_url` / `playbackUrl` for every camera session. */
+export function resolveViewerPlaybackUrl(session: {
+  playbackUrl?: string | null;
+}): string | undefined {
+  return session.playbackUrl?.trim() || undefined;
 }

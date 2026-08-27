@@ -63,6 +63,7 @@ interface LobbyState {
   clearError: () => void;
   setSelectedEventId: (eventId: string | null) => void;
   fetchRegistrations: (eventId: string, page?: number, search?: string) => Promise<void>;
+  fetchAllRegistrationsForExport: (eventId: string) => Promise<Registration[]>;
   clearRegistrationsSearch: () => void;
   fetchTravelAssistance: (eventId: string, page?: number) => Promise<void>;
   fetchMedicalAssistance: (eventId: string, page?: number) => Promise<void>;
@@ -72,6 +73,11 @@ interface LobbyState {
   updateTravelStatus: (id: string, status: AssistanceActionStatus) => Promise<void>;
   updateTranslationStatus: (id: string, status: AssistanceActionStatus) => Promise<void>;
   bulkUpdateStatus: (ids: string[], status: RegistrationStatus) => Promise<void>;
+  updateRegistrationDayAttendance: (
+    registrationId: string,
+    registrationDayId: string,
+    isAttended: boolean,
+  ) => Promise<void>;
   bulkUpdateTravelStatus: (ids: string[], status: AssistanceActionStatus) => Promise<void>;
   bulkUpdateTranslationStatus: (ids: string[], status: AssistanceActionStatus) => Promise<void>;
   bulkUpdateMedicalStatus: (ids: string[], status: AssistanceActionStatus) => Promise<void>;
@@ -165,6 +171,16 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
         registrationsPagination: EMPTY_ASSISTANCE_PAGINATION,
         registrationsLoading: false,
       });
+    }
+  },
+
+  fetchAllRegistrationsForExport: async (eventId) => {
+    try {
+      return await lobbyService.getLobbyRegistrations(eventId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to export lobby registrations";
+      set({ error: message });
+      throw new Error(message);
     }
   },
 
@@ -301,6 +317,32 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
       set({ error: null });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to update lobby statuses" });
+      throw err;
+    }
+  },
+
+  updateRegistrationDayAttendance: async (registrationId, registrationDayId, isAttended) => {
+    try {
+      await lobbyService.updateRegistrationDayAttendance(registrationDayId, isAttended);
+      set({
+        registrations: get().registrations.map((registration) => {
+          if (registration.id !== registrationId) return registration;
+          return {
+            ...registration,
+            registrationDates: registration.registrationDates?.map((entry) =>
+              entry.id === registrationDayId
+                ? { ...entry, isAttended }
+                : entry,
+            ),
+          };
+        }),
+        error: null,
+      });
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : "Failed to update day attendance",
+      });
       throw err;
     }
   },

@@ -17,7 +17,8 @@ import { APP_NAME } from "@/lib/constants";
 import { getConferenceVenue, ICAS_CONFERENCE, isIcasEventName } from "@/lib/icas-conference";
 import { formatHomeEventDateRange, getHomeEventDays, getUpcomingEventMonthLabel } from "@/lib/event-display";
 import { useHomeEvent } from "@/hooks/useHomeEvent";
-import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES } from "@/lib/routes";
+import { getHomeRegisterHref, getHomeRegisterLabel, ROUTES, buildAuthUrl } from "@/lib/routes";
+import { isEventPubliclyEnded } from "@/lib/event-registration-window";
 import { HeroSectionSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EventCountdown } from "@/components/shared/EventCountdown";
 import { WatchLiveButton } from "@/components/shared/WatchLiveButton";
@@ -94,13 +95,16 @@ function HeroEventSlide({
   event: UpcomingEvent;
   isAuthenticated: boolean;
 }) {
+  const eventEnded = isEventPubliclyEnded();
   const eventIsRegistered = isAuthenticated && event.isRegistered;
   const registerHref = getHomeRegisterHref(isAuthenticated, eventIsRegistered, event.id);
-  const registerLabel = isAuthenticated
-    ? !event.isRegistered
-      ? "Register for Event"
-      : null
-    : getHomeRegisterLabel(isAuthenticated, eventIsRegistered);
+  const registerLabel = eventEnded
+    ? "Watch Recordings"
+    : isAuthenticated
+      ? !event.isRegistered
+        ? "Register for Event"
+        : null
+      : getHomeRegisterLabel(isAuthenticated, eventIsRegistered);
 
   const dates = formatHomeEventDateRange(event.name, event.date, event.endDate);
   const countdownStart = isIcasEventName(event.name)
@@ -116,13 +120,23 @@ function HeroEventSlide({
       </div>
 
       <div className="flex w-full min-w-0 max-w-xl flex-col justify-center gap-5 lg:w-auto lg:max-w-lg xl:max-w-xl lg:gap-6">
-        <UpcomingEventHeading eventName={event.name} eventStart={event.date} eventEnd={event.endDate} />
+        {eventEnded ? (
+          <p className="text-sm font-medium uppercase tracking-widest text-primary">
+            Event ended · {dates}
+          </p>
+        ) : (
+          <UpcomingEventHeading eventName={event.name} eventStart={event.date} eventEnd={event.endDate} />
+        )}
 
-        {isAuthenticated && eventIsRegistered && (
+        {eventEnded ? (
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            This event has ended. You can watch session recordings in the Recordings section.
+          </p>
+        ) : isAuthenticated && eventIsRegistered ? (
           <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
             You&apos;re registered for this event. Join the live stream when it begins.
           </p>
-        )}
+        ) : null}
 
         <div className="flex justify-center lg:hidden">
           <HeroImage eventName={event.name} />
@@ -157,34 +171,70 @@ function HeroEventSlide({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {registerLabel && (
-              <Button size="lg" asChild>
-                <Link href={registerHref}>
-                  {registerLabel}
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
+            {eventEnded ? (
+              isAuthenticated ? (
+                <Button size="lg" asChild>
+                  <Link href={ROUTES.recordings}>
+                    Watch Recordings
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" asChild>
+                    <Link href={ROUTES.signup}>
+                      Sign Up
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" asChild>
+                    <Link href={buildAuthUrl(ROUTES.login, { redirect: ROUTES.recordings })}>Sign In</Link>
+                  </Button>
+                </>
+              )
+            ) : (
+              <>
+                {registerLabel && (
+                  <Button size="lg" asChild>
+                    <Link href={registerHref}>
+                      {registerLabel}
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                )}
+                <WatchLiveButton
+                  event={event}
+                  size="lg"
+                  variant={registerLabel ? "outline" : "default"}
+                />
+                <EventCountdown eventStart={countdownStart} />
+              </>
             )}
-            <WatchLiveButton
-              event={event}
-              size="lg"
-              variant={registerLabel ? "outline" : "default"}
-            />
-            <EventCountdown eventStart={countdownStart} eventStatus={event.status} />
           </div>
         </div>
 
-        {!isAuthenticated && (
+        {eventEnded ? (
+          <p className="text-sm text-muted-foreground">
+            {isAuthenticated
+              ? "Browse past sessions anytime from Recordings."
+              : (
+                <>
+                  Create an account to explore the site, or{" "}
+                  <Link href={ROUTES.login} className="text-primary hover:underline">sign in</Link>
+                  {" "}to watch recordings.
+                </>
+              )}
+          </p>
+        ) : !isAuthenticated ? (
           <p className="text-sm text-muted-foreground">
             Create an account to register for the event. Already signed up?{" "}
             <Link href={ROUTES.login} className="text-primary hover:underline">Sign in</Link>
           </p>
-        )}
-        {isAuthenticated && !eventIsRegistered && (
+        ) : !eventIsRegistered ? (
           <p className="text-sm text-muted-foreground">
             You&apos;re signed in. Complete event registration to confirm your participation.
           </p>
-        )}
+        ) : null}
       </div>
     </div>
   );

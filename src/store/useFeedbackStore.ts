@@ -1,7 +1,11 @@
 import { create } from "zustand";
-import type { CreateEventFeedbackPayload } from "@/lib/feedback-mappers";
+import type {
+  CreateEventFeedbackPayload,
+  UpdateEventFeedbackPayload,
+} from "@/lib/feedback-mappers";
 import { DEFAULT_FEEDBACK_EVENT_ID } from "@/lib/feedback-options";
 import * as feedbackService from "@/services/feedback.service";
+import type { GetFeedbackParams } from "@/services/feedback.service";
 import type { Feedback } from "@/types";
 
 interface FeedbackStats {
@@ -10,7 +14,7 @@ interface FeedbackStats {
   distribution: { rating: number; count: number }[];
 }
 
-interface FeedbackPaginationState {
+export interface FeedbackPaginationState {
   page: number;
   total: number;
   totalPages: number;
@@ -28,25 +32,40 @@ const EMPTY_FEEDBACK_PAGINATION: FeedbackPaginationState = {
 
 interface FeedbackState {
   feedback: Feedback[];
+  respondentFeedback: Feedback[];
   feedbackPagination: FeedbackPaginationState;
+  respondentPagination: FeedbackPaginationState;
   stats: FeedbackStats | null;
   isLoading: boolean;
+  respondentLoading: boolean;
   isSubmitting: boolean;
   error: string | null;
+  respondentError: string | null;
   fetchFeedbackPage: (page?: number, eventId?: string) => Promise<void>;
   fetchFeedback: (eventId?: string) => Promise<void>;
+  fetchRespondentFeedback: (
+    params: GetFeedbackParams,
+  ) => Promise<void>;
   fetchStats: (eventId?: string) => Promise<void>;
   submitFeedback: (data: Omit<Feedback, "id" | "createdAt">) => Promise<void>;
   submitMultiDayFeedback: (payloads: CreateEventFeedbackPayload[]) => Promise<void>;
+  upsertMultiDayFeedback: (args: {
+    creates: CreateEventFeedbackPayload[];
+    updates: { id: string; payload: UpdateEventFeedbackPayload }[];
+  }) => Promise<void>;
 }
 
 export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   feedback: [],
+  respondentFeedback: [],
   feedbackPagination: EMPTY_FEEDBACK_PAGINATION,
+  respondentPagination: EMPTY_FEEDBACK_PAGINATION,
   stats: null,
   isLoading: false,
+  respondentLoading: false,
   isSubmitting: false,
   error: null,
+  respondentError: null,
 
   fetchFeedbackPage: async (page = 1, eventId = DEFAULT_FEEDBACK_EVENT_ID) => {
     set({ isLoading: true, error: null });
@@ -96,6 +115,36 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     }
   },
 
+  fetchRespondentFeedback: async (params) => {
+    set({ respondentLoading: true, respondentError: null });
+    try {
+      const result = await feedbackService.getFeedbackPage({
+        ...params,
+        page: params.page ?? 1,
+        pageSize: params.pageSize ?? feedbackService.FEEDBACK_RESPONDENT_PAGE_SIZE,
+      });
+      set({
+        respondentFeedback: result.rows,
+        respondentPagination: {
+          page: result.page,
+          total: result.total,
+          totalPages: result.totalPages,
+          hasNext: result.hasNext,
+          hasPrevious: result.hasPrevious,
+        },
+        respondentLoading: false,
+      });
+    } catch (err) {
+      set({
+        respondentFeedback: [],
+        respondentPagination: EMPTY_FEEDBACK_PAGINATION,
+        respondentError:
+          err instanceof Error ? err.message : "Failed to fetch respondent feedback",
+        respondentLoading: false,
+      });
+    }
+  },
+
   fetchStats: async (eventId = DEFAULT_FEEDBACK_EVENT_ID) => {
     try {
       const stats = await feedbackService.getFeedbackStats(eventId);
@@ -130,7 +179,25 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         feedback: [...created, ...get().feedback],
         isSubmitting: false,
       });
-      void get().fetchFeedbackPage(get().feedbackPagination.page || 1);
+      void get().fetchFeedback(DEFAULT_FEEDBACK_EVENT_ID);
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to submit feedback",
+        isSubmitting: false,
+      });
+      throw err;
+    }
+  },
+
+  upsertMultiDayFeedback: async ({ creates, updates }) => {
+    set({ isSubmitting: true, error: null });
+    try {
+      const saved = await feedbackService.upsertMultiDayFeedback({ creates, updates });
+      set({
+        feedback: [...saved, ...get().feedback],
+        isSubmitting: false,
+      });
+      void get().fetchFeedback(DEFAULT_FEEDBACK_EVENT_ID);
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Failed to submit feedback",

@@ -28,21 +28,67 @@ function attendanceModeForDate(row: AttendanceModeUserRow, date: string): string
   return day.attendanceMode === "virtual" ? "Virtual" : "Physical";
 }
 
-/** Lobby list: mode for a conference day from `registration_dates`, or —. */
+function attendanceStatusForDate(row: AttendanceModeUserRow, date: string): string {
+  const day = row.days.find((item) => item.date === date);
+  if (!day || day.isAttended == null) return "—";
+  return day.isAttended ? "Present" : "Absent";
+}
+
+/** Lobby list: mode for a conference day from `registration_dates` or nested `days`, or —. */
 export function lobbyAttendanceModeForDate(row: Registration, date: string): string {
-  const entry = row.registrationDates?.find((item) => item.date === date);
+  const entry = lobbyAttendanceEntryForDate(row, date);
   if (!entry) return "—";
   return entry.attendanceMode === "virtual" ? "Virtual" : "Physical";
+}
+
+/** Lobby export: Present / Absent / — from `registration_dates[].is_attended`. */
+export function lobbyAttendanceStatusForDate(row: Registration, date: string): string {
+  const entry = lobbyAttendanceEntryForDate(row, date);
+  if (!entry || entry.isAttended == null) return "—";
+  return entry.isAttended ? "Present" : "Absent";
+}
+
+/** Lobby day cell: mode + attended flag (drives green/red badge). */
+export function lobbyAttendanceEntryForDate(
+  row: Registration,
+  date: string,
+): { id?: string; attendanceMode: "physical" | "virtual"; isAttended?: boolean } | null {
+  const entry = row.registrationDates?.find((item) => item.date === date);
+  if (entry) {
+    return {
+      id: entry.id,
+      attendanceMode: entry.attendanceMode,
+      isAttended: entry.isAttended,
+    };
+  }
+  const day = row.days?.find((item) => item.date === date);
+  if (!day) return null;
+  return { id: day.id, attendanceMode: day.attendanceMode };
+}
+
+export function registeredSessionsForDate(row: Registration, date: string): number {
+  const day = row.days?.find((item) => item.date === date);
+  if (day) return day.sessions.length;
+  return row.sessionRegistrations?.filter((session) => session.date === date).length ?? 0;
 }
 
 export const LOBBY_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
   { header: "User Name", value: (row) => row.userName },
   { header: "Phone Number", value: (row) => row.phone },
   { header: "Email", value: (row) => row.email },
-  ...ATTENDANCE_MODE_EXPORT_DAY_DATES.map((date) => ({
-    header: formatRegistrationIntervalDayLabel(date),
-    value: (row: Registration) => lobbyAttendanceModeForDate(row, date),
-  })),
+  ...ATTENDANCE_MODE_EXPORT_DAY_DATES.flatMap((date) => {
+    const dayLabel = formatRegistrationIntervalDayLabel(date);
+    return [
+      {
+        header: dayLabel,
+        value: (row: Registration) => lobbyAttendanceModeForDate(row, date),
+      },
+      {
+        header: `${dayLabel} Attendance`,
+        value: (row: Registration) => lobbyAttendanceStatusForDate(row, date),
+      },
+    ];
+  }),
   { header: "Sessions", value: (row) => row.registeredSessionsCount ?? 0 },
   { header: "Status", value: (row) => formatStatus(row.status) },
 ];
@@ -63,27 +109,31 @@ export const ATTENDANCE_MODE_EXPORT_COLUMNS: ExportColumn<Registration>[] = [
 export const ATTENDANCE_MODE_USERS_EXPORT_COLUMNS: ExportColumn<AttendanceModeUserRow>[] =
   getAttendanceModeUsersExportColumns();
 
-/** Day columns follow the participation-day filter (`all` → every day). */
+/** Day columns follow the visible participation-day dates. */
 export function getAttendanceModeUsersExportColumns(
-  dayDate: string = "all",
+  dayDates: readonly string[] = ATTENDANCE_MODE_EXPORT_DAY_DATES,
 ): ExportColumn<AttendanceModeUserRow>[] {
-  const dayDates =
-    dayDate === "all"
-      ? [...ATTENDANCE_MODE_EXPORT_DAY_DATES]
-      : ATTENDANCE_MODE_EXPORT_DAY_DATES.filter((date) => date === dayDate);
-
   return [
     { header: "User Name", value: (row) => row.userName },
     { header: "Phone", value: (row) => row.phone },
     { header: "Email", value: (row) => row.email },
-    { header: "Designation", value: (row) => row.designation },
-    { header: "Organization", value: (row) => row.orgName },
+    { header: "Designation", value: (row) => row.designation || "—" },
+    { header: "Organization", value: (row) => row.orgName || "—" },
     { header: "City", value: (row) => row.city },
     { header: "State", value: (row) => row.state },
-    ...dayDates.map((date) => ({
-      header: formatRegistrationIntervalDayLabel(date),
-      value: (row: AttendanceModeUserRow) => attendanceModeForDate(row, date),
-    })),
+    ...dayDates.flatMap((date) => {
+      const dayLabel = formatRegistrationIntervalDayLabel(date);
+      return [
+        {
+          header: dayLabel,
+          value: (row: AttendanceModeUserRow) => attendanceModeForDate(row, date),
+        },
+        {
+          header: `${dayLabel} Attendance`,
+          value: (row: AttendanceModeUserRow) => attendanceStatusForDate(row, date),
+        },
+      ];
+    }),
     {
       header: "Date of Registration",
       value: (row) => (row.createdAt ? formatDateTime(row.createdAt) : "—"),

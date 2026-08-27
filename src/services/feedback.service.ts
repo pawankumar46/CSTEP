@@ -5,6 +5,7 @@ import {
   mapApiFeedbackList,
   mapApiFeedbackToFeedback,
   type CreateEventFeedbackPayload,
+  type UpdateEventFeedbackPayload,
 } from "@/lib/feedback-mappers";
 import { DEFAULT_FEEDBACK_EVENT_ID } from "@/lib/feedback-options";
 import { delay } from "@/lib/utils";
@@ -12,6 +13,7 @@ import { mockFeedback } from "@/mock/feedback";
 import type { Feedback } from "@/types";
 
 export const FEEDBACK_LIST_PAGE_SIZE = 10;
+export const FEEDBACK_RESPONDENT_PAGE_SIZE = 10;
 const FEEDBACK_BULK_FETCH_PAGE_SIZE = 100;
 
 let feedbackList = [...mockFeedback];
@@ -31,6 +33,8 @@ export interface GetFeedbackParams {
   /** Event day id (`event_date` query param — not ISO date). */
   eventDateId?: string;
   userId?: string;
+  rating?: number;
+  search?: string;
   isOverallRating?: boolean;
   page?: number;
   pageSize?: number;
@@ -55,6 +59,12 @@ export const getFeedbackPage = async (
     }
     if (params.userId) {
       query.user = params.userId;
+    }
+    if (params.rating != null) {
+      query.rating = params.rating;
+    }
+    if (params.search?.trim()) {
+      query.search = params.search.trim();
     }
     if (params.isOverallRating != null) {
       query.is_overall_rating = params.isOverallRating ? "true" : "false";
@@ -130,6 +140,27 @@ export const getFeedback = async (eventId?: string): Promise<Feedback[]> => {
 
   // Some backends ignore/reject `event` — fall back so UI still shows results.
   return loadAll(undefined);
+};
+
+/** Dashboard respondent details — all pages for active API filters. */
+export const getFilteredFeedback = async (
+  params: Omit<GetFeedbackParams, "page" | "pageSize">,
+): Promise<Feedback[]> => {
+  const first = await getFeedbackPage({
+    ...params,
+    page: 1,
+    pageSize: FEEDBACK_BULK_FETCH_PAGE_SIZE,
+  });
+  const rows = [...first.rows];
+  for (let page = 2; page <= first.totalPages; page += 1) {
+    const next = await getFeedbackPage({
+      ...params,
+      page,
+      pageSize: FEEDBACK_BULK_FETCH_PAGE_SIZE,
+    });
+    rows.push(...next.rows);
+  }
+  return rows;
 };
 
 /** `GET /events/feedback/` filtered by event day id + user (previous submissions for that day). */
@@ -213,6 +244,22 @@ export const createEventFeedback = async (
   }
 };
 
+/** Live: PUT /events/feedback/:id/ — update previously submitted feedback. */
+export const updateEventFeedback = async (
+  feedbackId: string,
+  payload: UpdateEventFeedbackPayload,
+): Promise<Feedback | null> => {
+  try {
+    const { data } = await apiClient.put<unknown>(`/events/feedback/${feedbackId}/`, payload);
+    if (data && typeof data === "object") {
+      return mapApiFeedbackToFeedback(data);
+    }
+    return null;
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error));
+  }
+};
+
 /** Submit one `POST /events/feedback/` per rated session. */
 export const submitMultiDayFeedback = async (
   payloads: CreateEventFeedbackPayload[],
@@ -220,6 +267,29 @@ export const submitMultiDayFeedback = async (
   if (payloads.length === 0) return [];
   const created = await Promise.all(payloads.map((payload) => createEventFeedback(payload)));
   return created.filter((item): item is Feedback => item != null);
+};
+
+/** Update previously submitted feedback via PUT. */
+export const updateMultiDayFeedback = async (
+  updates: { id: string; payload: UpdateEventFeedbackPayload }[],
+): Promise<Feedback[]> => {
+  if (updates.length === 0) return [];
+  const updated = await Promise.all(
+    updates.map(({ id, payload }) => updateEventFeedback(id, payload)),
+  );
+  return updated.filter((item): item is Feedback => item != null);
+};
+
+/** Create new feedback and/or update edited submissions. */
+export const upsertMultiDayFeedback = async (args: {
+  creates: CreateEventFeedbackPayload[];
+  updates: { id: string; payload: UpdateEventFeedbackPayload }[];
+}): Promise<Feedback[]> => {
+  const [created, updated] = await Promise.all([
+    submitMultiDayFeedback(args.creates),
+    updateMultiDayFeedback(args.updates),
+  ]);
+  return [...created, ...updated];
 };
 
 export const getFeedbackStats = async (eventId?: string) => {

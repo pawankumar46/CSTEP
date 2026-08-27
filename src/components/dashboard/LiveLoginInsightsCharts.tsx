@@ -1,41 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  LabelList,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { Globe2, MapPin, Users } from "lucide-react";
+import { useMemo } from "react";
+import { Globe2, MapPin, UserX, Users } from "lucide-react";
 import { CountryRegistrationsGlobe } from "@/components/dashboard/CountryRegistrationsGlobe";
 import { IndiaStateRegistrationsMap } from "@/components/dashboard/IndiaStateRegistrationsMap";
-import { ChartFilterGroup } from "@/components/shared/ChartFilterGroup";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { LiveAnalyticsConnectionStatus } from "@/lib/live-analytics-api-contract";
 import { cn } from "@/lib/utils";
 import { useLiveAnalyticsStore } from "@/store/useLiveAnalyticsStore";
-import type { DistributionDataPoint, StreamingParticipationMode } from "@/types";
-
-const LOGIN_MODE_OPTIONS: { value: StreamingParticipationMode; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "physical", label: "Physical" },
-  { value: "virtual", label: "Virtual" },
-];
-
-const TOOLTIP_STYLE = {
-  fontSize: 12,
-  borderRadius: 10,
-  border: "1px solid hsl(var(--border))",
-  background: "hsl(var(--card))",
-  color: "hsl(var(--card-foreground))",
-  boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-};
+import type { DistributionDataPoint } from "@/types";
 
 const EMPTY_SESSION_PLACEHOLDER: DistributionDataPoint[] = [
   { name: "Session 1", value: 0 },
@@ -48,43 +22,30 @@ function InsightCard({
   icon: Icon,
   title,
   description,
-  filters,
   children,
   className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
-  filters?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <Card className={cn("flex h-full flex-col overflow-hidden shadow-sm", className)}>
       <CardHeader className="space-y-2 pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <Icon className="h-4 w-4 text-primary" aria-hidden />
-            </div>
-            <div className="min-w-0 space-y-1">
-              <CardTitle className="text-base font-semibold tracking-tight">{title}</CardTitle>
-              <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
-            </div>
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Icon className="h-4 w-4 text-primary" aria-hidden />
           </div>
-          {filters}
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="text-base font-semibold tracking-tight">{title}</CardTitle>
+            <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 pt-0">{children}</CardContent>
     </Card>
-  );
-}
-
-function VirtualOnlyBadge() {
-  return (
-    <Badge variant="secondary" className="shrink-0 text-xs font-normal">
-      Virtual
-    </Badge>
   );
 }
 
@@ -129,79 +90,114 @@ function LiveStatusBadge({
 }
 
 function SessionMaxVirtualChart({ data }: { data: DistributionDataPoint[] }) {
-  const chartHeight = Math.max(data.length * 36 + 8, 140);
   const maxValue = Math.max(1, ...data.map((row) => row.value));
 
   return (
-    <div className="w-full overflow-y-auto overflow-x-hidden pr-1" style={{ maxHeight: 240 }}>
-      <div style={{ height: chartHeight, width: "100%" }}>
-        <ResponsiveContainer width="100%" height={chartHeight}>
-          <BarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 4, right: 36, left: 4, bottom: 4 }}
+    <div
+      className="w-full space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scroll-smooth"
+      style={{ maxHeight: 240 }}
+    >
+      {data.map((item, index) => {
+        const widthPercent = Math.max(
+          (item.value / maxValue) * 100,
+          item.value > 0 ? 8 : 0,
+        );
+
+        return (
+          <div
+            key={`${item.name}-${index}`}
+            className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5"
           >
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted/50" />
-            <XAxis type="number" hide domain={[0, Math.ceil(maxValue * 1.15)]} />
-            <YAxis
-              type="category"
-              dataKey="name"
-              width={88}
-              tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip
-              contentStyle={TOOLTIP_STYLE}
-              formatter={(value) => [`${Number(value ?? 0)} max`, "Virtual"]}
-            />
-            <Bar
-              dataKey="value"
-              fill={maxValue > 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.35)"}
-              radius={[0, 6, 6, 0]}
-              maxBarSize={18}
-            >
-              <LabelList
-                dataKey="value"
-                position="right"
-                className="fill-muted-foreground"
-                style={{ fontSize: 11 }}
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <p
+                className="min-w-0 flex-1 text-[11px] font-medium leading-tight text-foreground line-clamp-2"
+                title={item.name}
+              >
+                {item.name}
+              </p>
+              <p className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                <span className="font-semibold text-foreground">{item.value}</span>
+                <span> max</span>
+              </p>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted/60">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                style={{
+                  width: `${widthPercent}%`,
+                  opacity: item.value > 0 ? 1 : 0.35,
+                }}
               />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function pickModeSeries(
-  series: { all: DistributionDataPoint[]; physical: DistributionDataPoint[]; virtual: DistributionDataPoint[] } | undefined,
-  mode: StreamingParticipationMode,
+function NoShowTable({
+  rows,
+}: {
+  rows: {
+    dayNumber: number;
+    registered: number;
+    virtualAttended: number;
+    physicalAttended: number;
+    attended: number;
+    noShow: number;
+  }[];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/30 text-left text-[11px] text-muted-foreground">
+            <th className="px-2 py-1.5 font-medium">Day</th>
+            <th className="px-2 py-1.5 text-right font-medium">Registered</th>
+            <th className="px-2 py-1.5 text-right font-medium">Virtual attended</th>
+            <th className="px-2 py-1.5 text-right font-medium">Physical attended</th>
+            <th className="px-2 py-1.5 text-right font-medium">Attended</th>
+            <th className="px-2 py-1.5 text-right font-medium">Not attended</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.dayNumber} className="border-b last:border-0">
+              <td className="px-2 py-1.5 font-medium">Day {row.dayNumber}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.registered}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.virtualAttended}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.physicalAttended}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.attended}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{row.noShow}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function getCombinedLoginSeries(
+  series:
+    | { all: DistributionDataPoint[]; physical: DistributionDataPoint[]; virtual: DistributionDataPoint[] }
+    | undefined,
 ): DistributionDataPoint[] {
   if (!series) return [];
-  if (mode === "physical") return series.physical;
-  if (mode === "virtual") return series.virtual;
   return series.all.length > 0 ? series.all : [...series.physical, ...series.virtual];
 }
 
 /**
  * Live Event Insights — login visuals fed by `/ws/analytics/{eventId}/`.
- * 1. Statewise Login — Physical / Virtual / All
- * 2. Countrywise Login — Virtual
- * 3. Session Wise Max Virtual Participant count — Virtual
  */
 export function LiveLoginInsightsCharts() {
-  const [stateLoginMode, setStateLoginMode] =
-    useState<StreamingParticipationMode>("all");
-
   const status = useLiveAnalyticsStore((s) => s.status);
   const error = useLiveAnalyticsStore((s) => s.error);
   const snapshot = useLiveAnalyticsStore((s) => s.snapshot);
 
   const stateLoginData = useMemo(
-    () => pickModeSeries(snapshot?.statewiseLogin, stateLoginMode),
-    [snapshot?.statewiseLogin, stateLoginMode],
+    () => getCombinedLoginSeries(snapshot?.statewiseLogin),
+    [snapshot?.statewiseLogin],
   );
   const countryLoginData = useMemo(
     () => snapshot?.countrywiseLoginVirtual ?? [],
@@ -209,12 +205,16 @@ export function LiveLoginInsightsCharts() {
   );
   const sessionMaxVirtualData = useMemo(() => {
     const live = snapshot?.sessionMaxVirtual ?? [];
-    return live.length > 0 ? live : EMPTY_SESSION_PLACEHOLDER;
+    if (live.length === 0) return EMPTY_SESSION_PLACEHOLDER;
+    const sorted = [...live].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+    const withData = sorted.filter((row) => row.value > 0);
+    return withData.length > 0 ? withData : sorted;
   }, [snapshot?.sessionMaxVirtual]);
+  const noShowRows = snapshot?.noShow ?? [];
 
-  const hasLiveState = stateLoginData.some((row) => row.value > 0);
-  const hasLiveCountry = countryLoginData.some((row) => row.value > 0);
-  const hasLiveSession = (snapshot?.sessionMaxVirtual ?? []).some((row) => row.value > 0);
+  const hasLiveState = stateLoginData.length > 0;
+  const hasLiveCountry = countryLoginData.length > 0;
+  const hasLiveSession = (snapshot?.sessionMaxVirtual ?? []).length > 0;
 
   return (
     <div className="space-y-3">
@@ -233,15 +233,7 @@ export function LiveLoginInsightsCharts() {
         <InsightCard
           icon={MapPin}
           title="Statewise Login"
-          description="Logins from India by state. Filter by Physical, Virtual, or All."
-          filters={
-            <ChartFilterGroup
-              options={LOGIN_MODE_OPTIONS}
-              value={stateLoginMode}
-              onChange={setStateLoginMode}
-              className="justify-end"
-            />
-          }
+          description="Logins from India by state."
         >
           <IndiaStateRegistrationsMap data={stateLoginData} />
           {!hasLiveState && (
@@ -254,8 +246,7 @@ export function LiveLoginInsightsCharts() {
         <InsightCard
           icon={Globe2}
           title="Countrywise Login"
-          description="Virtual logins by country on the globe."
-          filters={<VirtualOnlyBadge />}
+          description="Logins by country on the globe."
         >
           <CountryRegistrationsGlobe data={countryLoginData} />
           {!hasLiveCountry && (
@@ -269,7 +260,6 @@ export function LiveLoginInsightsCharts() {
           icon={Users}
           title="Session Wise Max Virtual Participants"
           description="Peak concurrent virtual participants per session."
-          filters={<VirtualOnlyBadge />}
           className="lg:col-span-2 xl:col-span-1"
         >
           <SessionMaxVirtualChart data={sessionMaxVirtualData} />
@@ -277,6 +267,21 @@ export function LiveLoginInsightsCharts() {
             <p className="mt-2 text-center text-[11px] text-muted-foreground">
               Waiting for live session max virtual data…
             </p>
+          )}
+        </InsightCard>
+
+        <InsightCard
+          icon={UserX}
+          title="Not attended by day"
+          description="Registered vs virtual attended, physical attended, total attended, and not attended for each event day."
+          className="lg:col-span-2 xl:col-span-3"
+        >
+          {noShowRows.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Waiting for live not-attended data…
+            </p>
+          ) : (
+            <NoShowTable rows={noShowRows} />
           )}
         </InsightCard>
       </div>

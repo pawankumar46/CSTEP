@@ -7,6 +7,7 @@ export interface IpWhoisLocationFields {
   success?: boolean;
   message?: string;
   region?: string;
+  country?: string;
   latitude?: number;
   longitude?: number;
 }
@@ -15,9 +16,10 @@ export interface IpWhoisLocationFields {
 export interface ClientLocationInfo {
   ip: string | null;
   region: string | null;
+  country: string | null;
   latitude: number | null;
   longitude: number | null;
 }
 
 export const IPWHOIS_LOCATION_FIELDS =
-  "ip,success,message,region,latitude,longitude" as const;
+  "ip,success,message,region,country,latitude,longitude" as const;

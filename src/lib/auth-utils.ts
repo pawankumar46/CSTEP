@@ -19,18 +19,33 @@ export function getRoleFallbackRoute(role: UserRole): string {
   return role === "base_user" ? "/" : "/dashboard";
 }
 
-/** After login / signup OTP: staff → dashboard; base users → event-register if not registered. */
+/** After login / signup OTP: staff → dashboard; base users → home (or event-register while open). */
 export async function resolvePostAuthDestination(
   userId: string,
   role: UserRole,
   redirectTo?: string | null,
 ): Promise<string> {
   const { sanitizeRedirect } = await import("@/lib/routes");
+  const { isEventRegistrationClosed } = await import("@/lib/event-registration-window");
+  const registrationClosed = isEventRegistrationClosed();
   const safeRedirect = sanitizeRedirect(redirectTo ?? null);
-  if (safeRedirect) return safeRedirect;
+
+  if (safeRedirect) {
+    if (
+      registrationClosed
+      && (safeRedirect === ROUTES.eventRegister || safeRedirect.startsWith(`${ROUTES.eventRegister}?`))
+    ) {
+      return ROUTES.home;
+    }
+    return safeRedirect;
+  }
 
   if (isStaffRole(role)) {
     return getDefaultRouteForRole(role);
+  }
+
+  if (registrationClosed) {
+    return ROUTES.home;
   }
 
   try {

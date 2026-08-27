@@ -1,6 +1,5 @@
 import type { UserRole } from "@/types";
 import { readPublicEnv } from "@/lib/env";
-import { buildDriveEmbedUrl } from "@/lib/stream-utils";
 import { ICAS_CONFERENCE } from "@/lib/icas-conference";
 
 export const APP_NAME = "CSTEP";
@@ -19,21 +18,18 @@ export const FEATURED_EVENT = {
   theme: ICAS_CONFERENCE.theme,
 };
 
-/** Default Drive file when env is unset (e.g. missing Vercel build env). */
-const DEFAULT_LIVE_STREAM_FILE_ID = "1GwhnrClhI3WF-SO-lYmIZ8l3-YETBBP-";
-export const LIVE_STREAM_FILE_ID =
-  readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_ID") ?? DEFAULT_LIVE_STREAM_FILE_ID;
+/** Optional dev fallback when no active broadcast session (HLS / direct video). */
+export const LIVE_STREAM_URL = readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_URL");
 
-export const LIVE_STREAM_URL =
-  readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_URL") ??
-  buildDriveEmbedUrl(LIVE_STREAM_FILE_ID);
+/** Legacy Google Drive proxy only — not used for public live playback by default. */
+export const LIVE_STREAM_FILE_ID = readPublicEnv("NEXT_PUBLIC_LIVE_STREAM_FILE_ID");
 
 /** Vertical side banners shown beside the live stream (hidden in fullscreen). */
 export const STREAM_LEFT_BANNER_URL =
-  readPublicEnv("NEXT_PUBLIC_STREAM_LEFT_BANNER_URL") ?? "/CstepLeft1.jpeg";
+  readPublicEnv("NEXT_PUBLIC_STREAM_LEFT_BANNER_URL") ?? "/CstepBanner.jpeg";
 
 export const STREAM_RIGHT_BANNER_URL =
-  readPublicEnv("NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL") ?? "/CstepRight1.jpeg";
+  readPublicEnv("NEXT_PUBLIC_STREAM_RIGHT_BANNER_URL") ?? "/CstepBanner.jpeg";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   base_user: "Base User",
@@ -65,6 +61,7 @@ export type NavItem = {
 export const LOBBY_NAV_PATHS = [
   "/dashboard/lobby",
   "/dashboard/sessions",
+  "/dashboard/manage-recordings",
   // "/dashboard/travel",
   // "/dashboard/medical",
   // "/dashboard/translation",
@@ -93,6 +90,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Manage Lobby", href: "/dashboard/lobby" },
       { label: "Manage Sessions", href: "/dashboard/sessions" },
+      { label: "Manage Recordings", href: "/dashboard/manage-recordings" },
       { label: "Manage Assistance", href: "/dashboard/assistance" },
       // { label: "Manage Travel Requests", href: "/dashboard/travel" },
       // { label: "Manage Medical Requests", href: "/dashboard/medical" },

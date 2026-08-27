@@ -20,6 +20,7 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuthStore } from "@/store/useAuthStore";
 import { resolvePostAuthDestination } from "@/lib/auth-utils";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/constants";
+import { isEventRegistrationClosed } from "@/lib/event-registration-window";
 import { markLocationPermissionPromptForDestination } from "@/lib/location-permission";
 import { ROUTES, buildAuthUrl } from "@/lib/routes";
 
@@ -179,9 +180,14 @@ function LoginForm() {
                 Please sign in to watch the live stream.
               </div>
             )}
-            {redirectTo?.startsWith(ROUTES.eventRegister) && !verified && (
+            {redirectTo?.startsWith(ROUTES.eventRegister) && !verified && !isEventRegistrationClosed() && (
               <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
                 Sign in to complete your event registration.
+              </div>
+            )}
+            {isEventRegistrationClosed() && !verified && (
+              <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+                Event registration is closed. After sign in you will return to the home page to watch recordings.
               </div>
             )}
 
