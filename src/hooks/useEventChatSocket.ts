@@ -9,7 +9,7 @@ import { parseEventChatServerMessage } from "@/lib/event-chat-mappers";
 import {
   buildEventChatWebSocketUrl,
   CHAT_MAX_MESSAGE_LENGTH,
-} from "@/lib/event-chat-ws";
+} from "@/lib/event-chat-ws"; 
 import type { ChatReactionType, LiveChatMessage, LiveChatReaction } from "@/types";
 
 const RECONNECT_BASE_MS = 1500;
